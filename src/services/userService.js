@@ -1,5 +1,5 @@
 // Ejemplo de servicio (lógica de negocio)
-const pool = require('../config/database');
+const { pool } = require('../config/database');
 
 const getAllUsers = async () => {
   try {
