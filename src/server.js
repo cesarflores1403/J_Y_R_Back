@@ -1,54 +1,11 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const { testConnection } = require('./config/database');
-const userRoutes = require('./routes/userRoutes');
+import dotenv from 'dotenv'; // // Carga variables de entorno
 
-const app = express();
+dotenv.config(); // // Carga .env ANTES de importar app
 
-// Middleware de seguridad y logging
-app.use(helmet());
-app.use(morgan('dev'));
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*'
-}));
+const { default: app } = await import('./app.js'); // // Import dinámico para respetar dotenv
 
-// Parsear JSON y datos de formularios
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const PORT = process.env.PORT || 5000; // // Puerto configurable
 
-// Ruta de prueba
-app.get('/', (req, res) => {
-  res.json({ message: 'Servidor Backend en funcionamiento' });
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`); // // Log server
 });
-
-// Rutas de la API
-app.use('/api/users', userRoutes);
-
-// Manejo de errores 404
-app.use((req, res) => {
-  res.status(404).json({ error: 'Ruta no encontrada' });
-});
-
-// Manejo de errores global
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Error interno del servidor' });
-});
-
-const PORT = process.env.PORT || 5000;
-
-const startServer = async () => {
-  // Probar conexión a la base de datos antes de iniciar
-  await testConnection();
-
-  app.listen(PORT, () => {
-    console.log(`Servidor ejecutándose en puerto ${PORT}`);
-  });
-};
-
-startServer();
-
-module.exports = app;
