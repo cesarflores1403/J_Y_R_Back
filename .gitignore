@@ -30,3 +30,10 @@ yarn-error.log*
 # IDE
 .VSCode
 *.swp
+
+# Env (NO subir jamás)
+.env
+.env.*
+
+# Logs
+*.log
