@@ -1,0 +1,95 @@
+import { useEffect, useState } from 'react'; // // Hooks
+import { productoApi } from '../services/producto.api.js'; // // API producto
+
+export const useProducto = () => {
+  const [producto, setProducto] = useState([]); // // Lista
+  const [loading, setLoading] = useState(true); // // Loading lista
+  const [saving, setSaving] = useState(false); // // Loading acciones (POST/PUT/DELETE)
+  const [error, setError] = useState(''); // // Error general
+  const [success, setSuccess] = useState(''); // // Mensaje éxito
+
+  const limpiarMensajes = () => {
+    setError(''); // // Limpia error
+    setSuccess(''); // // Limpia success
+  };
+
+  const cargar = async () => {
+    try {
+      setLoading(true); // // Inicia carga
+      limpiarMensajes(); // // Limpia mensajes
+
+      const data = await productoApi.getAll(); // // GET (apiFetch retorna solo data)
+      setProducto(Array.isArray(data) ? data : []); // // Set lista segura
+    } catch (e) {
+      setProducto([]); // // Evita datos viejos si falla
+      setError(e.message || 'Error al cargar productos'); // // Error
+    } finally {
+      setLoading(false); // // Fin
+    }
+  };
+
+  const crear = async (payload) => {
+    try {
+      setSaving(true); // // Inicia acción
+      limpiarMensajes(); // // Limpia mensajes
+
+      await productoApi.create(payload); // // POST
+      setSuccess('Producto creado correctamente ✅'); // // Éxito
+      await cargar(); // // Refresca lista
+    } catch (e) {
+      setError(e.message || 'Error al crear producto'); // // Error
+    } finally {
+      setSaving(false); // // Fin
+    }
+  };
+
+  const actualizar = async (payload) => {
+    try {
+      setSaving(true); // // Inicia acción
+      limpiarMensajes(); // // Limpia mensajes
+
+      await productoApi.update(payload); // // PUT (pa_update 1 campo)
+      setSuccess('Producto actualizado correctamente ✅'); // // Éxito
+      await cargar(); // // Refresca lista
+    } catch (e) {
+      setError(e.message || 'Error al actualizar producto'); // // Error
+    } finally {
+      setSaving(false); // // Fin
+    }
+  };
+
+  const eliminar = async (payload) => {
+    try {
+      setSaving(true); // // Inicia acción
+      limpiarMensajes(); // // Limpia mensajes
+
+      await productoApi.remove(payload); // // DELETE (BE espera { cod_producto })
+      setSuccess('Producto eliminado correctamente ✅'); // // Éxito
+      await cargar(); // // Refresca lista
+    } catch (e) {
+      setError(e.message || 'Error al eliminar producto'); // // Error
+    } finally {
+      setSaving(false); // // Fin
+    }
+  };
+
+  useEffect(() => {
+    cargar(); // // Carga inicial
+  }, []);
+
+  return {
+    producto, // // Lista
+    loading, // // Loading lista
+    saving, // // Loading acciones
+    error, // // Mensaje error
+    success, // // Mensaje éxito
+    setError, // // Setter error
+    setSuccess, // // Setter success
+    cargar, // // Recargar lista
+    crear, // // Acción POST
+    actualizar, // // Acción PUT
+    eliminar, // // Acción DELETE
+  };
+};
+
+
