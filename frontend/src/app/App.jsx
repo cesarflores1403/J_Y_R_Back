@@ -1,10 +1,42 @@
-import ProductoPage from '../pages/ProductoPage.jsx'; // // Página productos
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from '../contexts/AuthContext.jsx';
+import { ToastContainer } from 'react-toastify';
+
+import Login from '../components/auth/Login.jsx';
+import Layout from '../components/layout/Layout.jsx';
+import Dashboard from '../components/dashboard/Dashboard.jsx';
+import Clientes from '../components/clientes/Clientes.jsx';
+import Proveedores from '../components/proveedores/Proveedores.jsx';
+import Reportes from '../components/reportes/Reportes.jsx';
+import ProductoPage from '../pages/ProductoPage.jsx';
+
+const PrivateRoute = ({ children, roles }) => {
+  const { autenticado, usuario, cargando } = useAuth();
+  if (cargando) return <div className="jyr-spinner" style={{ minHeight: '100vh' }} />;
+  if (!autenticado) return <Navigate to="/login" />;
+  if (roles && !roles.includes(usuario?.rol)) return <Navigate to="/" />;
+  return children;
+};
 
 const App = () => {
   return (
-    <div className="container py-4">
-      <ProductoPage />
-    </div>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+            <Route index element={<Dashboard />} />
+            <Route path="productos" element={<ProductoPage />} />
+            <Route path="clientes" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Clientes /></PrivateRoute>} />
+            <Route path="proveedores" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><Proveedores /></PrivateRoute>} />
+            <Route path="reportes" element={<PrivateRoute roles={['Administrador']}><Reportes /></PrivateRoute>} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </BrowserRouter>
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} theme="dark" />
+    </AuthProvider>
   );
 };
 

@@ -1,9 +1,14 @@
 import express from 'express';
 import cors from 'cors'; // // Permite requests del frontend
 import cookieParser from 'cookie-parser'; // // Permite leer cookies
+import helmet from 'helmet'; // // Seguridad HTTP headers
+import morgan from 'morgan'; // // Logger HTTP requests
 import routes from './routes/index.js';
 
 import pool from './config/db-connection.js'; // // Pool BD (conexión PostgreSQL)
+
+// Importar asociaciones Sequelize (registra las relaciones entre modelos)
+import './models/associations.js';
 
 import { notFound } from './middlewares/notFound.js'; // // 404 centralizado
 import { errorHandler } from './middlewares/errorHandler.js'; // // Error global
@@ -14,6 +19,8 @@ const app = express();
 // MIDDLEWARES GLOBALES
 // =======================
 
+app.use(helmet()); // // Seguridad HTTP
+app.use(morgan('dev')); // // Log de requests en desarrollo
 app.use(express.json()); // // Permite recibir JSON
 app.use(express.urlencoded({ extended: true })); // // Permite recibir form-data
 app.use(cookieParser()); // // Habilita cookies
