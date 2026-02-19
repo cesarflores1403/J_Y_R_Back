@@ -23,7 +23,14 @@ app.use(cookieParser()); // // Habilita cookies
 // =======================
 
 app.use(cors({
-  origin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173', // // Permitir frontend Vite
+  origin: function (origin, callback) {
+    // // Permitir requests sin origin (Postman, curl, etc.)
+    if (!origin) return callback(null, true);
+    // // Permitir cualquier localhost en desarrollo
+    const allowed = /^http:\/\/localhost:\d+$/;
+    if (allowed.test(origin)) return callback(null, true);
+    callback(new Error('No permitido por CORS'));
+  },
   credentials: true // // Permitir cookies
 }));
 
