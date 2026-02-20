@@ -4,8 +4,9 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { getInitials } from '../../utils/helpers.js';
 import {
   FiGrid, FiUsers, FiTruck, FiPackage,
-  FiBarChart2, FiLogOut
+  FiBarChart2, FiLogOut, FiFileText
 } from 'react-icons/fi';
+import logoClean from '../../assets/img/logo2.jpeg';
 
 const menuItems = [
   { section: 'Principal', items: [
@@ -13,6 +14,7 @@ const menuItems = [
   ]},
   { section: 'Comercial', items: [
     { path: '/clientes', label: 'Clientes', icon: <FiUsers />, roles: ['Administrador', 'Cajero'] },
+    { path: '/facturas', label: 'Facturación', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
   ]},
   { section: 'Inventario', items: [
     { path: '/productos', label: 'Productos', icon: <FiPackage />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
@@ -38,10 +40,10 @@ const Sidebar = () => {
   return (
     <aside className="jyr-sidebar">
       <div className="jyr-sidebar-brand">
-        <div className="jyr-sidebar-brand-icon">JYR</div>
+        <img src={logoClean} alt="J&R" className="jyr-sidebar-logo" />
         <div>
-          <h1>JYR</h1>
-          <small>Inventario & Facturación</small>
+          <h1>J&R</h1>
+          <small>Accesorios & Reparaciones</small>
         </div>
       </div>
 

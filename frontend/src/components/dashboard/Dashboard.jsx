@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { reporteService } from '../../services/serviceIndex.js';
 import { formatMoney } from '../../utils/helpers.js';
 import { FiUsers, FiTruck, FiPackage, FiFileText, FiAlertTriangle } from 'react-icons/fi';
+import logoClean from '../../assets/img/logo2.jpeg';
 
 const Dashboard = () => {
   const { usuario } = useAuth();
@@ -28,9 +29,12 @@ const Dashboard = () => {
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h3 className="mb-1">Dashboard</h3>
-          <p className="text-muted mb-0">Bienvenido, <strong>{usuario?.nombre_usuario}</strong> ({usuario?.rol})</p>
+        <div className="d-flex align-items-center gap-3">
+          <img src={logoClean} alt="J&R" style={{ height: 48, objectFit: 'contain' }} />
+          <div>
+            <h3 className="mb-1">Dashboard</h3>
+            <p className="text-muted mb-0">Bienvenido, <strong>{usuario?.nombre_usuario}</strong> ({usuario?.rol})</p>
+          </div>
         </div>
       </div>
 

@@ -127,7 +127,7 @@ a {
   display: flex;
   flex-direction: column;
   transition: transform var(--transition-base);
-  overflow-y: auto;
+  overflow: hidden;
   border-right: 1px solid var(--jyr-black-medium);
 }
 
@@ -175,6 +175,8 @@ a {
 .jyr-sidebar-nav {
   flex: 1;
   padding: 12px 10px;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .jyr-sidebar-section {
@@ -244,6 +246,7 @@ a {
   align-items: center;
   gap: 10px;
   background: var(--jyr-black-soft);
+  flex-shrink: 0;
 }
 
 .jyr-sidebar-user-avatar {
@@ -340,6 +343,34 @@ a {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.jyr-topbar-user-label {
+  font-size: 13px;
+  color: var(--jyr-gray-500);
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.jyr-topbar-logout {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: 1px solid var(--jyr-red);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--jyr-red);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.jyr-topbar-logout:hover {
+  background: var(--jyr-red);
+  color: var(--jyr-white);
+  box-shadow: var(--shadow-red);
 }
 
 /* ============================================================
@@ -780,107 +811,167 @@ a {
 }
 
 /* ============================================================
-   LOGIN PAGE
+   LOGIN PAGE — Fondo oscuro, centrado, marca de agua
    ============================================================ */
 .jyr-login-container {
   min-height: 100vh;
   display: flex;
-  background: var(--jyr-white);
-}
-
-.jyr-login-left {
-  flex: 1;
-  background: var(--jyr-black);
-  display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
+  background: var(--jyr-black);
   position: relative;
   overflow: hidden;
 }
 
-.jyr-login-left::before {
+/* Radiales decorativos de fondo */
+.jyr-login-container::before {
   content: '';
   position: absolute;
-  width: 600px;
-  height: 600px;
+  width: 700px;
+  height: 700px;
   border-radius: 50%;
   background: radial-gradient(circle, var(--jyr-red-dark) 0%, transparent 70%);
-  opacity: 0.3;
-  top: -100px;
+  opacity: 0.2;
+  top: -200px;
   right: -200px;
+  pointer-events: none;
 }
 
-.jyr-login-left::after {
+.jyr-login-container::after {
   content: '';
   position: absolute;
-  width: 400px;
-  height: 400px;
+  width: 500px;
+  height: 500px;
   border-radius: 50%;
   background: radial-gradient(circle, var(--jyr-red) 0%, transparent 70%);
-  opacity: 0.15;
-  bottom: -100px;
-  left: -100px;
+  opacity: 0.1;
+  bottom: -150px;
+  left: -150px;
+  pointer-events: none;
 }
 
-.login-brand {
+/* Marca de agua — logo escudo */
+.login-watermark {
+  position: absolute;
+  width: 550px;
+  height: 550px;
+  object-fit: contain;
+  opacity: 0.06;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  user-select: none;
+  filter: grayscale(30%);
+}
+
+/* Card del formulario */
+.login-center-card {
   position: relative;
-  z-index: 1;
-  text-align: center;
-  color: var(--jyr-white);
-}
-
-.login-logo {
-  width: 90px;
-  height: 90px;
-  background: var(--jyr-red);
-  border-radius: var(--radius-xl);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  font-weight: 800;
-  margin: 0 auto 24px;
-  box-shadow: 0 8px 32px rgba(185, 28, 28, 0.4);
-}
-
-.login-brand h1 {
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: 2px;
-  margin-bottom: 8px;
-}
-
-.login-brand p {
-  font-size: 14px;
-  color: var(--jyr-gray-400);
-  letter-spacing: 1px;
-}
-
-.jyr-login-right {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-}
-
-.login-form-wrapper {
+  z-index: 2;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
+  background: rgba(26, 26, 26, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--jyr-black-medium);
+  border-radius: var(--radius-xl);
+  padding: 40px 36px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(185, 28, 28, 0.08);
+  animation: fadeInUp 0.5s ease forwards;
 }
 
-.login-form-wrapper h2 {
-  font-size: 26px;
+.login-form-logo {
+  height: 72px;
+  object-fit: contain;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 2px 8px rgba(185, 28, 28, 0.3));
+}
+
+.login-title {
+  font-size: 24px;
   font-weight: 800;
-  color: var(--jyr-black);
-  margin-bottom: 6px;
+  color: var(--jyr-white);
+  margin-bottom: 4px;
+  letter-spacing: -0.3px;
 }
 
 .login-subtitle {
-  color: var(--jyr-gray-500);
-  margin-bottom: 32px;
+  color: var(--jyr-gray-400);
+  margin-bottom: 28px;
+  font-size: 13px;
+}
+
+.login-label {
+  color: var(--jyr-gray-300);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.login-input-icon {
+  background: var(--jyr-black-light);
+  border: 1px solid var(--jyr-black-light);
+  color: var(--jyr-red-light);
+}
+
+.login-input {
+  background: var(--jyr-black-medium) !important;
+  border: 1px solid var(--jyr-black-light) !important;
+  color: var(--jyr-white) !important;
+  transition: all var(--transition-fast);
+}
+
+.login-input::placeholder {
+  color: var(--jyr-gray-500) !important;
+}
+
+.login-input:focus {
+  border-color: var(--jyr-red) !important;
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.2) !important;
+  background: var(--jyr-black-soft) !important;
+}
+
+.login-btn {
+  background: var(--jyr-red);
+  color: var(--jyr-white);
+  border: none;
+  font-weight: 700;
   font-size: 14px;
+  padding: 11px 0;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.login-btn:hover:not(:disabled) {
+  background: var(--jyr-red-bright);
+  box-shadow: 0 6px 20px rgba(185, 28, 28, 0.4);
+  transform: translateY(-1px);
+  color: var(--jyr-white);
+}
+
+.login-btn:disabled {
+  opacity: 0.6;
+  color: var(--jyr-white);
+}
+
+.login-footer-text {
+  color: var(--jyr-gray-600);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Alert dentro del login oscuro */
+.login-center-card .alert-danger {
+  background: rgba(185, 28, 28, 0.15);
+  border: 1px solid var(--jyr-red-dark);
+  color: var(--jyr-red-light);
+  font-size: 13px;
+  border-radius: var(--radius-sm);
 }
 
 /* ============================================================
@@ -977,8 +1068,13 @@ a {
 }
 
 @media (max-width: 768px) {
-  .jyr-login-left {
-    display: none;
+  .login-center-card {
+    margin: 16px;
+    padding: 28px 22px;
+  }
+  .login-watermark {
+    width: 350px;
+    height: 350px;
   }
   .jyr-content {
     padding: 16px;
@@ -1008,3 +1104,524 @@ a {
 .animate-in:nth-child(4) { animation-delay: 0.15s; }
 .animate-in:nth-child(5) { animation-delay: 0.2s; }
 .animate-in:nth-child(6) { animation-delay: 0.25s; }
+
+/* ============================================================
+   SIDEBAR LOGO
+   ============================================================ */
+.jyr-sidebar-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  box-shadow: var(--shadow-red);
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   LOGIN LOGOS
+   ============================================================ */
+.login-logo-img {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  border-radius: var(--radius-xl);
+  margin-bottom: 24px;
+  filter: drop-shadow(0 8px 32px rgba(185, 28, 28, 0.4));
+}
+
+.login-form-logo {
+  height: 64px;
+  object-fit: contain;
+  margin-bottom: 8px;
+}
+
+/* ============================================================
+   FACTURA MODERNA — INVOICE (inv-*)
+   ============================================================ */
+.inv {
+  max-width: 860px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  overflow: hidden;
+  position: relative;
+  font-family: var(--font-primary);
+}
+
+/* Barras decorativas */
+.inv-topbar {
+  height: 6px;
+  background: linear-gradient(90deg, var(--jyr-red) 0%, var(--jyr-black) 100%);
+}
+.inv-bottombar {
+  height: 6px;
+  background: linear-gradient(90deg, var(--jyr-black) 0%, var(--jyr-red) 100%);
+}
+
+.inv-body {
+  padding: 36px 40px;
+}
+
+/* --- Marca de agua ANULADA --- */
+.inv-void-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-35deg);
+  font-size: 100px;
+  font-weight: 900;
+  color: rgba(185, 28, 28, 0.07);
+  letter-spacing: 20px;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+/* --- Encabezado --- */
+.inv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.inv-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.inv-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+.inv-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.inv-company {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--jyr-black);
+  margin: 0;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+.inv-tagline {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  color: var(--jyr-red);
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+.inv-title-block {
+  text-align: right;
+}
+
+.inv-title {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--jyr-red);
+  letter-spacing: 5px;
+  line-height: 1;
+}
+
+.inv-number {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--jyr-black);
+  font-family: var(--font-mono);
+  margin-top: 4px;
+  letter-spacing: 0.5px;
+}
+
+/* --- Fila datos empresa + meta --- */
+.inv-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 0;
+  border-top: 1px solid var(--jyr-gray-200);
+  border-bottom: 1px solid var(--jyr-gray-200);
+  margin-bottom: 24px;
+}
+
+.inv-empresa-datos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inv-dato {
+  font-size: 12px;
+  color: var(--jyr-gray-600);
+}
+
+.inv-dato span {
+  font-weight: 600;
+  color: var(--jyr-black);
+}
+
+.inv-meta-datos {
+  flex-shrink: 0;
+}
+
+.inv-meta-table {
+  border-collapse: collapse;
+}
+
+.inv-meta-table td {
+  padding: 3px 0;
+  font-size: 12px;
+  color: var(--jyr-gray-600);
+}
+
+.inv-meta-table td:first-child {
+  font-weight: 600;
+  color: var(--jyr-black);
+  padding-right: 14px;
+  white-space: nowrap;
+}
+
+.inv-status {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.inv-status-ok {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.inv-status-void {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* --- Cliente --- */
+.inv-client-box {
+  background: var(--jyr-gray-100);
+  border-radius: var(--radius-md);
+  padding: 18px 22px;
+  margin-bottom: 24px;
+  border-left: 4px solid var(--jyr-red);
+}
+
+.inv-client-label {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  color: var(--jyr-red);
+  margin-bottom: 6px;
+}
+
+.inv-client-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--jyr-black);
+  margin-bottom: 4px;
+}
+
+.inv-client-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 12px;
+  color: var(--jyr-gray-600);
+}
+
+.inv-client-details strong {
+  color: var(--jyr-gray-700);
+}
+
+/* --- Tabla de productos --- */
+.inv-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0;
+}
+
+.inv-table thead tr {
+  background: var(--jyr-black);
+}
+
+.inv-table thead th {
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 11px 14px;
+  border: none;
+}
+
+.inv-th-num { width: 44px; text-align: center; }
+.inv-th-desc { text-align: left; }
+.inv-th-qty { width: 60px; text-align: center; }
+.inv-th-price { width: 110px; text-align: right; }
+
+.inv-table tbody td {
+  padding: 11px 14px;
+  font-size: 13px;
+  color: var(--jyr-black-soft);
+  border-bottom: 1px solid var(--jyr-gray-200);
+  vertical-align: middle;
+}
+
+.inv-row-even td {
+  background: var(--jyr-gray-100);
+}
+
+.inv-td-product {
+  min-width: 160px;
+}
+
+.inv-product-name {
+  font-weight: 600;
+  color: var(--jyr-black);
+  font-size: 13px;
+}
+
+.inv-td-bold {
+  font-weight: 700;
+  color: var(--jyr-black);
+}
+
+/* --- Resumen de totales --- */
+.inv-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 20px;
+  gap: 24px;
+}
+
+.inv-summary-left {
+  flex: 1;
+  padding-top: 8px;
+}
+
+.inv-summary-note {
+  font-size: 12px;
+  color: var(--jyr-gray-600);
+  margin-bottom: 4px;
+}
+
+.inv-note-light {
+  font-size: 11px;
+  color: var(--jyr-gray-400);
+  font-style: italic;
+}
+
+.inv-summary-right {
+  width: 280px;
+  flex-shrink: 0;
+}
+
+.inv-total-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--jyr-gray-600);
+  border-bottom: 1px solid var(--jyr-gray-200);
+}
+
+.inv-total-line span:last-child {
+  font-weight: 600;
+  color: var(--jyr-black);
+}
+
+.inv-grand-total {
+  background: var(--jyr-black);
+  color: #fff !important;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  border-bottom: none;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.inv-grand-total span {
+  color: #fff !important;
+  font-weight: 800 !important;
+}
+
+/* --- Pie de factura --- */
+.inv-footer {
+  margin-top: 40px;
+}
+
+.inv-footer-top {
+  display: flex;
+  justify-content: space-around;
+  gap: 40px;
+  margin-bottom: 32px;
+}
+
+.inv-footer-col {
+  text-align: center;
+  flex: 1;
+  max-width: 220px;
+}
+
+.inv-sign-line {
+  width: 100%;
+  height: 1px;
+  background: var(--jyr-gray-300);
+  margin-bottom: 8px;
+  margin-top: 50px;
+}
+
+.inv-footer-col span {
+  font-size: 11px;
+  color: var(--jyr-gray-500);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.inv-footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--jyr-gray-200);
+}
+
+.inv-footer-logo {
+  height: 36px;
+  object-fit: contain;
+  opacity: 0.5;
+}
+
+.inv-footer-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.inv-footer-text strong {
+  font-size: 13px;
+  color: var(--jyr-black);
+}
+
+.inv-footer-text span {
+  font-size: 11px;
+  color: var(--jyr-gray-500);
+}
+
+.inv-legal {
+  font-size: 10px !important;
+  color: var(--jyr-gray-400) !important;
+  margin-top: 2px;
+}
+
+/* ============================================================
+   PRINT STYLES
+   ============================================================ */
+@media print {
+  .jyr-sidebar,
+  .jyr-topbar,
+  .no-print,
+  .Toastify,
+  nav,
+  .jyr-sidebar-user {
+    display: none !important;
+  }
+
+  .jyr-main {
+    margin-left: 0 !important;
+  }
+
+  .jyr-content {
+    padding: 0 !important;
+  }
+
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv {
+    max-width: 100%;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .inv-body {
+    padding: 20px 28px;
+  }
+
+  .inv-topbar,
+  .inv-bottombar {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-table thead tr {
+    background: var(--jyr-black) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-table thead th {
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-row-even td {
+    background: #f5f5f5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-grand-total {
+    background: var(--jyr-black) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-grand-total span {
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-client-box {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-status {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .inv-void-watermark {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  @page {
+    margin: 12mm 8mm;
+    size: letter;
+  }
+}

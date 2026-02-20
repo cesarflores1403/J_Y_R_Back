@@ -9,6 +9,7 @@ import Dashboard from '../components/dashboard/Dashboard.jsx';
 import Clientes from '../components/clientes/Clientes.jsx';
 import Proveedores from '../components/proveedores/Proveedores.jsx';
 import Reportes from '../components/reportes/Reportes.jsx';
+import Facturas from '../components/facturas/Facturas.jsx';
 import ProductoPage from '../pages/ProductoPage.jsx';
 
 const PrivateRoute = ({ children, roles }) => {
@@ -29,6 +30,7 @@ const App = () => {
             <Route index element={<Dashboard />} />
             <Route path="productos" element={<ProductoPage />} />
             <Route path="clientes" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Clientes /></PrivateRoute>} />
+            <Route path="facturas" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Facturas /></PrivateRoute>} />
             <Route path="proveedores" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><Proveedores /></PrivateRoute>} />
             <Route path="reportes" element={<PrivateRoute roles={['Administrador']}><Reportes /></PrivateRoute>} />
           </Route>

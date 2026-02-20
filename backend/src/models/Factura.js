@@ -14,7 +14,9 @@ const Factura = sequelize.define('factura', {
   subtotal: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   isv: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   total: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
-  estado: { type: DataTypes.BOOLEAN, defaultValue: true }
+  estado: { type: DataTypes.BOOLEAN, defaultValue: true },
+  creado_en: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+  actualizado_en: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 });
 
 export default Factura;

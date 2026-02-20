@@ -32,3 +32,13 @@ export const reporteService = {
   productosVendidos: () => api.get('/reportes/productos-vendidos'),
   inventario: () => api.get('/reportes/inventario'),
 };
+
+// ==================== FACTURAS ====================
+export const facturaService = {
+  listar: (params) => api.get('/facturas', { params }),
+  obtener: (id) => api.get(`/facturas/${id}`),
+  crear: (data) => api.post('/facturas', data),
+  anular: (id) => api.patch(`/facturas/${id}/anular`),
+  productosDisponibles: (params) => api.get('/facturas/productos-disponibles', { params }),
+  clientesDisponibles: (params) => api.get('/facturas/clientes-disponibles', { params }),
+};

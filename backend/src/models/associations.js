@@ -5,6 +5,7 @@ import UsuarioRol from './UsuarioRol.js';
 import Cliente from './Cliente.js';
 import Proveedor from './ProveedorModel.js';
 import Factura from './Factura.js';
+import DetalleFactura from './DetalleFactura.js';
 import ProductoSeq from './ProductoSeq.js';
 
 // =============================================
@@ -33,6 +34,14 @@ Factura.belongsTo(Cliente, { foreignKey: 'cod_cliente', as: 'cliente' });
 Usuario.hasMany(Factura, { foreignKey: 'cod_usuario', as: 'facturas' });
 Factura.belongsTo(Usuario, { foreignKey: 'cod_usuario', as: 'usuario' });
 
+// Factura -> DetalleFactura
+Factura.hasMany(DetalleFactura, { foreignKey: 'cod_factura', as: 'detalles' });
+DetalleFactura.belongsTo(Factura, { foreignKey: 'cod_factura', as: 'factura' });
+
+// DetalleFactura -> Producto
+ProductoSeq.hasMany(DetalleFactura, { foreignKey: 'cod_producto', as: 'detallesFactura' });
+DetalleFactura.belongsTo(ProductoSeq, { foreignKey: 'cod_producto', as: 'producto' });
+
 export {
   sequelize,
   Usuario,
@@ -41,5 +50,6 @@ export {
   Cliente,
   Proveedor,
   Factura,
+  DetalleFactura,
   ProductoSeq
 };
