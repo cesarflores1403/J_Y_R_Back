@@ -12,6 +12,7 @@ const Factura = sequelize.define('factura', {
   metodo_pago: { type: DataTypes.INTEGER },
   ref_pago: { type: DataTypes.STRING(200) },
   subtotal: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+  descuento: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   isv: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   total: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   estado: { type: DataTypes.BOOLEAN, defaultValue: true },

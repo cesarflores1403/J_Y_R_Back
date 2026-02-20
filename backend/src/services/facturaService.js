@@ -62,9 +62,13 @@ class FacturaService {
 
   // =============================================
   // CREAR FACTURA (transacción: factura + detalles + inventario)
+  // HU-FAC-03: Cálculo ISV y totales por línea con redondeo a 2 decimales
   // =============================================
   async crear(datos, codUsuario) {
     const { cod_cliente, metodo_pago, ref_pago, items } = datos;
+
+    // Función de redondeo preciso a 2 decimales
+    const round2 = (n) => Math.round((parseFloat(n) + Number.EPSILON) * 100) / 100;
 
     // Validaciones
     if (!cod_cliente) throw Object.assign(new Error('El cliente es requerido'), { statusCode: 400 });
@@ -80,10 +84,9 @@ class FacturaService {
     const t = await sequelize.transaction();
 
     try {
-      // Calcular totales por cada ítem
       let subtotalGeneral = 0;
+      let descuentoGeneral = 0;
       let isvGeneral = 0;
-
       const detallesCalculados = [];
 
       for (const item of items) {
@@ -115,27 +118,43 @@ class FacturaService {
           );
         }
 
-        const precioUnitario = parseFloat(producto.precio_venta);
-        const isvProducto = parseFloat(producto.isv) || 0;
-        const subtotalItem = precioUnitario * item.cantidad;
-        const isvItem = (isvProducto / 100) * subtotalItem;
-        const totalItem = subtotalItem + isvItem;
+        const precioUnitario = round2(producto.precio_venta);
+        const descuento = round2(item.descuento || 0); // porcentaje 0-100
 
-        subtotalGeneral += subtotalItem;
-        isvGeneral += isvItem;
+        // Obtener ISV del catálogo usando cod_isv del producto
+        let isvPorcentaje = 0;
+        if (producto.cod_isv) {
+          const [isvInfo] = await sequelize.query(
+            'SELECT porcentaje FROM catalogo_isv WHERE cod_isv = :codIsv LIMIT 1',
+            { replacements: { codIsv: producto.cod_isv }, type: sequelize.QueryTypes.SELECT, transaction: t }
+          );
+          isvPorcentaje = isvInfo ? parseFloat(isvInfo.porcentaje) : 0;
+        }
+
+        // Cálculo por línea con redondeo
+        const subtotalBruto = round2(precioUnitario * item.cantidad);
+        const montoDescuento = round2((descuento / 100) * subtotalBruto);
+        const subtotalItem = round2(subtotalBruto - montoDescuento);
+        const isvItem = round2((isvPorcentaje / 100) * subtotalItem);
+        const totalItem = round2(subtotalItem + isvItem);
+
+        subtotalGeneral = round2(subtotalGeneral + subtotalItem);
+        descuentoGeneral = round2(descuentoGeneral + montoDescuento);
+        isvGeneral = round2(isvGeneral + isvItem);
 
         detallesCalculados.push({
           tipo_item: 'PRODUCTO',
           cod_producto: item.cod_producto,
           cantidad: item.cantidad,
-          precio_unitario: precioUnitario.toFixed(2),
-          isv: isvItem.toFixed(2),
-          subtotal: subtotalItem.toFixed(2),
-          total: totalItem.toFixed(2)
+          precio_unitario: precioUnitario,
+          descuento: descuento,
+          isv: isvItem,
+          subtotal: subtotalItem,
+          total: totalItem
         });
       }
 
-      const totalGeneral = subtotalGeneral + isvGeneral;
+      const totalGeneral = round2(subtotalGeneral + isvGeneral);
 
       // Crear factura
       const factura = await Factura.create({
@@ -143,9 +162,10 @@ class FacturaService {
         cod_usuario: codUsuario,
         metodo_pago: metodo_pago || null,
         ref_pago: ref_pago || null,
-        subtotal: subtotalGeneral.toFixed(2),
-        isv: isvGeneral.toFixed(2),
-        total: totalGeneral.toFixed(2),
+        subtotal: subtotalGeneral,
+        descuento: descuentoGeneral,
+        isv: isvGeneral,
+        total: totalGeneral,
         estado: true
       }, { transaction: t });
 
@@ -209,31 +229,93 @@ class FacturaService {
   }
 
   // =============================================
+  // ELIMINAR FACTURA PERMANENTEMENTE
+  // (Primero restaura inventario si estaba activa, luego borra detalles y factura)
+  // =============================================
+  async eliminar(id) {
+    const factura = await Factura.findByPk(id, {
+      include: [{ model: DetalleFactura, as: 'detalles' }]
+    });
+    if (!factura) throw Object.assign(new Error('Factura no encontrada'), { statusCode: 404 });
+
+    const t = await sequelize.transaction();
+    try {
+      // Si la factura estaba activa, restaurar inventario antes de eliminar
+      if (factura.estado) {
+        for (const detalle of factura.detalles) {
+          if (detalle.cod_producto) {
+            await sequelize.query(
+              'UPDATE inventario SET stock = stock + :cant, fecha_ult_mov = NOW() WHERE cod_producto = :codProd',
+              { replacements: { cant: detalle.cantidad, codProd: detalle.cod_producto }, transaction: t }
+            );
+          }
+        }
+      }
+
+      // Eliminar detalles
+      await DetalleFactura.destroy({ where: { cod_factura: id }, transaction: t });
+
+      // Eliminar factura
+      await factura.destroy({ transaction: t });
+
+      await t.commit();
+      return { mensaje: 'Factura eliminada permanentemente' };
+    } catch (error) {
+      await t.rollback();
+      throw error;
+    }
+  }
+
+  // =============================================
   // OBTENER PRODUCTOS DISPONIBLES (para el selector)
+  // Busca por código o nombre del producto
   // =============================================
   async productosDisponibles({ buscar = '' }) {
     const where = { estado_producto: true };
     if (buscar) {
-      where.nombre_producto = { [Op.iLike]: `%${buscar}%` };
+      const busqueda = buscar.trim();
+      // Si es numérico, buscamos por cod_producto exacto o parcial
+      // Si es texto, buscamos por nombre
+      const esNumero = /^\d+$/.test(busqueda);
+      if (esNumero) {
+        where[Op.or] = [
+          { cod_producto: parseInt(busqueda) },
+          { nombre_producto: { [Op.iLike]: `%${busqueda}%` } }
+        ];
+      } else {
+        where[Op.or] = [
+          { nombre_producto: { [Op.iLike]: `%${busqueda}%` } },
+          sequelize.where(
+            sequelize.cast(sequelize.col('cod_producto'), 'TEXT'),
+            { [Op.iLike]: `%${busqueda}%` }
+          )
+        ];
+      }
     }
 
     const productos = await ProductoSeq.findAll({
       where,
-      attributes: ['cod_producto', 'nombre_producto', 'unidad_medida', 'precio_venta', 'isv'],
+      attributes: ['cod_producto', 'nombre_producto', 'unidad_medida', 'precio_venta', 'cod_isv'],
       order: [['nombre_producto', 'ASC']],
-      limit: 50
+      limit: 20
     });
 
-    // Agregar stock a cada producto
+    // Agregar stock e ISV a cada producto
     const resultado = [];
     for (const p of productos) {
       const [inv] = await sequelize.query(
         'SELECT stock FROM inventario WHERE cod_producto = :codProd LIMIT 1',
         { replacements: { codProd: p.cod_producto }, type: sequelize.QueryTypes.SELECT }
       );
+      const [isvInfo] = await sequelize.query(
+        'SELECT porcentaje, descripcion FROM catalogo_isv WHERE cod_isv = :codIsv LIMIT 1',
+        { replacements: { codIsv: p.cod_isv }, type: sequelize.QueryTypes.SELECT }
+      );
       resultado.push({
         ...p.toJSON(),
-        stock: inv ? parseInt(inv.stock) : 0
+        stock: inv ? parseInt(inv.stock) : 0,
+        isv: isvInfo ? parseFloat(isvInfo.porcentaje) : 0,
+        isv_descripcion: isvInfo ? isvInfo.descripcion : 'Sin ISV'
       });
     }
 

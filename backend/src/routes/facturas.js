@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { autenticar, autorizar } from '../middlewares/auth.js';
-import { listar, obtener, crear, anular, productosDisponibles, clientesDisponibles } from '../controllers/facturaController.js';
+import { listar, obtener, crear, anular, eliminar, productosDisponibles, clientesDisponibles } from '../controllers/facturaController.js';
 
 const router = Router();
 
@@ -20,5 +20,8 @@ router.post('/', autorizar('Administrador', 'Cajero'), crear);
 
 // Solo Administrador puede anular
 router.patch('/:id/anular', autorizar('Administrador'), anular);
+
+// Solo Administrador puede eliminar permanentemente
+router.delete('/:id', autorizar('Administrador'), eliminar);
 
 export default router;

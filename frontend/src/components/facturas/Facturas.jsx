@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { facturaService } from '../../services/serviceIndex.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { toast } from 'react-toastify';
-import { FiPlus, FiSearch, FiX, FiTrash2, FiEye, FiFileText, FiArrowLeft, FiPrinter } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiX, FiTrash2, FiEye, FiFileText, FiArrowLeft, FiPrinter, FiAlertTriangle, FiXCircle } from 'react-icons/fi';
 import logoClean from '../../assets/img/logo2.jpeg';
 import logoFull from '../../assets/img/logo1.jpeg';
+import BuscadorProducto from './BuscadorProducto.jsx';
 
 const formatMoney = (v) => {
   const n = parseFloat(v) || 0;
@@ -39,14 +40,34 @@ const ListaFacturas = ({ onNueva, onVer }) => {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const anular = async (id) => {
-    if (!window.confirm('¿Anular esta factura? Se restaurará el inventario.')) return;
+  const [modalAnular, setModalAnular] = useState(null); // { id, numero } de la factura a gestionar
+
+  const abrirModalAnular = (f) => {
+    setModalAnular({ id: f.cod_factura, numero: `FAC-${String(f.cod_factura).padStart(6, '0')}`, estado: f.estado });
+  };
+
+  const anular = async () => {
+    if (!modalAnular) return;
     try {
-      await facturaService.anular(id);
-      toast.success('Factura anulada');
+      await facturaService.anular(modalAnular.id);
+      toast.success('Factura anulada correctamente');
+      setModalAnular(null);
       cargar();
     } catch (err) {
       toast.error(err.response?.data?.mensaje || 'Error al anular');
+    }
+  };
+
+  const eliminarDefinitivamente = async () => {
+    if (!modalAnular) return;
+    if (!window.confirm(`¿ELIMINAR PERMANENTEMENTE ${modalAnular.numero}? Esta acción NO se puede deshacer.`)) return;
+    try {
+      await facturaService.eliminar(modalAnular.id);
+      toast.success('Factura eliminada permanentemente');
+      setModalAnular(null);
+      cargar();
+    } catch (err) {
+      toast.error(err.response?.data?.mensaje || 'Error al eliminar');
     }
   };
 
@@ -104,8 +125,14 @@ const ListaFacturas = ({ onNueva, onVer }) => {
                         <FiEye />
                       </button>
                       {f.estado && usuario?.rol === 'Administrador' && (
-                        <button className="btn btn-sm btn-outline-danger" title="Anular" onClick={() => anular(f.cod_factura)}>
-                          <FiX />
+                        <button className="btn btn-sm btn-outline-danger me-1" title="Anular / Eliminar" onClick={() => abrirModalAnular(f)}>
+                          <FiXCircle />
+                        </button>
+                      )}
+                      {!f.estado && usuario?.rol === 'Administrador' && (
+                        <button className="btn btn-sm btn-outline-danger" title="Eliminar permanentemente"
+                          onClick={() => { setModalAnular({ id: f.cod_factura, numero: `FAC-${String(f.cod_factura).padStart(6, '0')}`, estado: f.estado }); }}>
+                          <FiTrash2 />
                         </button>
                       )}
                     </td>
@@ -133,6 +160,50 @@ const ListaFacturas = ({ onNueva, onVer }) => {
               <button className="page-link" onClick={() => setPagina(p => p + 1)}>Siguiente</button>
             </li>
           </ul></nav>
+        </div>
+      )}
+
+      {/* ====== MODAL ANULAR / ELIMINAR FACTURA ====== */}
+      {modalAnular && (
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={() => setModalAnular(null)}>
+          <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header bg-danger text-white">
+                <h5 className="modal-title"><FiAlertTriangle className="me-2" />Gestionar Factura</h5>
+                <button type="button" className="btn-close btn-close-white" onClick={() => setModalAnular(null)} />
+              </div>
+              <div className="modal-body text-center py-4">
+                <h5 className="mb-3">{modalAnular.numero}</h5>
+                {modalAnular.estado ? (
+                  <p className="text-muted mb-0">
+                    ¿Qué deseas hacer con esta factura?<br />
+                    <strong>Anular:</strong> Se marca como anulada y se restaura el inventario.<br />
+                    <strong>Eliminar:</strong> Se borra permanentemente de la base de datos.
+                  </p>
+                ) : (
+                  <p className="text-muted mb-0">
+                    Esta factura ya está <span className="badge bg-danger">Anulada</span>.<br />
+                    ¿Deseas eliminarla permanentemente de la base de datos?
+                  </p>
+                )}
+              </div>
+              <div className="modal-footer justify-content-between">
+                <button className="btn btn-secondary" onClick={() => setModalAnular(null)}>
+                  Cancelar
+                </button>
+                <div className="d-flex gap-2">
+                  {modalAnular.estado && (
+                    <button className="btn btn-warning" onClick={anular}>
+                      <FiXCircle className="me-1" />Anular
+                    </button>
+                  )}
+                  <button className="btn btn-danger" onClick={eliminarDefinitivamente}>
+                    <FiTrash2 className="me-1" />Eliminar Definitivamente
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -260,25 +331,30 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
                 <th className="inv-th-desc">Descripción del Producto</th>
                 <th className="inv-th-qty">Cant.</th>
                 <th className="inv-th-price">Precio Unit.</th>
+                <th className="inv-th-price">Desc %</th>
                 <th className="inv-th-price">Subtotal</th>
                 <th className="inv-th-price">ISV</th>
                 <th className="inv-th-price">Total</th>
               </tr>
             </thead>
             <tbody>
-              {factura.detalles?.map((d, i) => (
-                <tr key={d.cod_detalle_factura} className={i % 2 === 0 ? 'inv-row-even' : ''}>
-                  <td className="text-center">{String(i + 1).padStart(2, '0')}</td>
-                  <td className="inv-td-product">
-                    <div className="inv-product-name">{d.producto?.nombre_producto || `Producto #${d.cod_producto}`}</div>
-                  </td>
-                  <td className="text-center">{d.cantidad}</td>
-                  <td className="text-end">{formatMoney(d.precio_unitario)}</td>
-                  <td className="text-end">{formatMoney(d.subtotal)}</td>
-                  <td className="text-end">{formatMoney(d.isv)}</td>
-                  <td className="text-end inv-td-bold">{formatMoney(d.total)}</td>
-                </tr>
-              ))}
+              {factura.detalles?.map((d, i) => {
+                const descPct = parseFloat(d.descuento) || 0;
+                return (
+                  <tr key={d.cod_detalle_factura} className={i % 2 === 0 ? 'inv-row-even' : ''}>
+                    <td className="text-center">{String(i + 1).padStart(2, '0')}</td>
+                    <td className="inv-td-product">
+                      <div className="inv-product-name">{d.producto?.nombre_producto || `Producto #${d.cod_producto}`}</div>
+                    </td>
+                    <td className="text-center">{d.cantidad}</td>
+                    <td className="text-end">{formatMoney(d.precio_unitario)}</td>
+                    <td className="text-center">{descPct > 0 ? `${descPct}%` : '-'}</td>
+                    <td className="text-end">{formatMoney(d.subtotal)}</td>
+                    <td className="text-end">{formatMoney(d.isv)}</td>
+                    <td className="text-end inv-td-bold">{formatMoney(d.total)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 
@@ -297,6 +373,12 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
                 <span>Subtotal</span>
                 <span>{formatMoney(factura.subtotal)}</span>
               </div>
+              {parseFloat(factura.descuento) > 0 && (
+                <div className="inv-total-line" style={{ color: '#dc3545' }}>
+                  <span>Descuento</span>
+                  <span>- {formatMoney(factura.descuento)}</span>
+                </div>
+              )}
               <div className="inv-total-line">
                 <span>ISV (15%)</span>
                 <span>{formatMoney(factura.isv)}</span>
@@ -344,16 +426,13 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
 // ==========================================
 const NuevaFactura = ({ onVolver, onCreada }) => {
   const [clientes, setClientes] = useState([]);
-  const [productos, setProductos] = useState([]);
   const [buscarCliente, setBuscarCliente] = useState('');
-  const [buscarProducto, setBuscarProducto] = useState('');
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [items, setItems] = useState([]);
   const [refPago, setRefPago] = useState('');
   const [metodoPago, setMetodoPago] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [showClienteDropdown, setShowClienteDropdown] = useState(false);
-  const [showProductoDropdown, setShowProductoDropdown] = useState(false);
 
   // Buscar clientes
   useEffect(() => {
@@ -367,42 +446,15 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
     return () => clearTimeout(timer);
   }, [buscarCliente]);
 
-  // Buscar productos
-  useEffect(() => {
-    if (buscarProducto.length < 2) { setProductos([]); return; }
-    const timer = setTimeout(async () => {
-      try {
-        const { data } = await facturaService.productosDisponibles({ buscar: buscarProducto });
-        if (data.ok) setProductos(data.datos);
-      } catch { /* silenciar */ }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [buscarProducto]);
-
   const seleccionarCliente = (c) => {
     setClienteSeleccionado(c);
     setBuscarCliente('');
     setShowClienteDropdown(false);
   };
 
-  const agregarProducto = (p) => {
-    // Verificar si ya está en la lista
-    const existe = items.find(i => i.cod_producto === p.cod_producto);
-    if (existe) {
-      toast.warning('Este producto ya está en la factura');
-      return;
-    }
-    setItems([...items, {
-      cod_producto: p.cod_producto,
-      nombre_producto: p.nombre_producto,
-      unidad_medida: p.unidad_medida,
-      precio_venta: parseFloat(p.precio_venta),
-      isv_pct: parseFloat(p.isv) || 0,
-      stock: p.stock,
-      cantidad: 1
-    }]);
-    setBuscarProducto('');
-    setShowProductoDropdown(false);
+  const agregarProducto = (producto) => {
+    // HU-FAC-03: añadir campo descuento por línea (porcentaje 0-100)
+    setItems(prev => [...prev, { ...producto, descuento: 0 }]);
   };
 
   const cambiarCantidad = (index, cantidad) => {
@@ -412,22 +464,42 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
     setItems(nuevo);
   };
 
+  const cambiarDescuento = (index, valor) => {
+    const num = Math.min(100, Math.max(0, parseFloat(valor) || 0));
+    const nuevo = [...items];
+    nuevo[index].descuento = num;
+    setItems(nuevo);
+  };
+
   const eliminarItem = (index) => {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  // Cálculos
+  // HU-FAC-03: Redondeo preciso a 2 decimales (misma lógica que backend)
+  const round2 = (n) => Math.round((parseFloat(n) + Number.EPSILON) * 100) / 100;
+
+  // HU-FAC-03: Cálculo ISV y totales por línea con redondeo
   const calcularItem = (item) => {
-    const subtotal = item.precio_venta * item.cantidad;
-    const isv = (item.isv_pct / 100) * subtotal;
-    const total = subtotal + isv;
-    return { subtotal, isv, total };
+    const precio = round2(item.precio_venta);
+    const descuento = round2(item.descuento || 0);
+    const subtotalBruto = round2(precio * item.cantidad);
+    const montoDescuento = round2((descuento / 100) * subtotalBruto);
+    const subtotal = round2(subtotalBruto - montoDescuento);
+    const isv = round2((item.isv_pct / 100) * subtotal);
+    const total = round2(subtotal + isv);
+    return { subtotalBruto, montoDescuento, subtotal, isv, total };
   };
 
   const totales = items.reduce((acc, item) => {
-    const { subtotal, isv, total } = calcularItem(item);
-    return { subtotal: acc.subtotal + subtotal, isv: acc.isv + isv, total: acc.total + total };
-  }, { subtotal: 0, isv: 0, total: 0 });
+    const calc = calcularItem(item);
+    return {
+      subtotalBruto: round2(acc.subtotalBruto + calc.subtotalBruto),
+      descuento: round2(acc.descuento + calc.montoDescuento),
+      subtotal: round2(acc.subtotal + calc.subtotal),
+      isv: round2(acc.isv + calc.isv),
+      total: round2(acc.total + calc.total)
+    };
+  }, { subtotalBruto: 0, descuento: 0, subtotal: 0, isv: 0, total: 0 });
 
   const validarItems = () => {
     for (const item of items) {
@@ -449,7 +521,7 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
         cod_cliente: clienteSeleccionado.cod_cliente,
         metodo_pago: metodoPago ? parseInt(metodoPago) : null,
         ref_pago: refPago || null,
-        items: items.map(i => ({ cod_producto: i.cod_producto, cantidad: i.cantidad }))
+        items: items.map(i => ({ cod_producto: i.cod_producto, cantidad: i.cantidad, descuento: i.descuento || 0 }))
       };
       const { data } = await facturaService.crear(payload);
       if (data.ok) {
@@ -472,8 +544,8 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
         {/* Columna izquierda: cliente + productos */}
         <div className="col-lg-8">
           {/* Selector de cliente */}
-          <div className="jyr-card mb-3">
-            <div className="jyr-card-body">
+          <div className="jyr-card mb-3" style={{ overflow: 'visible' }}>
+            <div className="jyr-card-body" style={{ overflow: 'visible' }}>
               <h6 className="mb-3">Cliente *</h6>
               {clienteSeleccionado ? (
                 <div className="d-flex align-items-center justify-content-between p-2 border rounded bg-light">
@@ -512,68 +584,57 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
             </div>
           </div>
 
-          {/* Agregar productos */}
-          <div className="jyr-card mb-3">
-            <div className="jyr-card-body">
-              <h6 className="mb-3">Agregar Productos</h6>
-              <div className="position-relative">
-                <div className="input-group">
-                  <span className="input-group-text"><FiSearch /></span>
-                  <input type="text" className="form-control" placeholder="Buscar producto por nombre..."
-                    value={buscarProducto}
-                    onChange={(e) => { setBuscarProducto(e.target.value); setShowProductoDropdown(true); }}
-                    onFocus={() => setShowProductoDropdown(true)} />
-                </div>
-                {showProductoDropdown && productos.length > 0 && (
-                  <div className="position-absolute w-100 bg-white border rounded shadow-sm mt-1" style={{ zIndex: 1050, maxHeight: 250, overflowY: 'auto' }}>
-                    {productos.map(p => (
-                      <div key={p.cod_producto} className="px-3 py-2 border-bottom d-flex justify-content-between align-items-center"
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => agregarProducto(p)}>
-                        <div>
-                          <strong>{p.nombre_producto}</strong>
-                          <span className="text-muted ms-2">{formatMoney(p.precio_venta)}</span>
-                        </div>
-                        <span className={`badge ${p.stock > 0 ? 'bg-success' : 'bg-danger'}`}>
-                          Stock: {p.stock}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+          {/* Agregar productos — HU-FAC-02: Buscador rápido por código/nombre */}
+          <div className="jyr-card mb-3" style={{ overflow: 'visible' }}>
+            <div className="jyr-card-body" style={{ overflow: 'visible' }}>
+              <BuscadorProducto onAgregar={agregarProducto} itemsActuales={items} />
             </div>
           </div>
 
-          {/* Tabla de ítems */}
+          {/* Tabla de ítems — HU-FAC-03: ISV monto, descuento, totales por línea */}
           <div className="jyr-card">
             <div className="jyr-card-body p-0">
               <div className="table-responsive">
-                <table className="table table-hover mb-0">
-                  <thead><tr>
-                    <th>#</th><th>Producto</th><th>P. Unit.</th><th>Cant.</th><th>ISV %</th><th>Subtotal</th><th>Total</th><th></th>
+                <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.88rem' }}>
+                  <thead className="table-light"><tr>
+                    <th style={{ width: 36 }}>#</th>
+                    <th>Producto</th>
+                    <th style={{ width: 100 }}>P. Unit.</th>
+                    <th style={{ width: 80 }}>Cant.</th>
+                    <th style={{ width: 80 }}>Desc %</th>
+                    <th style={{ width: 100 }}>Subtotal</th>
+                    <th style={{ width: 60 }}>ISV %</th>
+                    <th style={{ width: 100 }}>ISV (L)</th>
+                    <th style={{ width: 110 }}>Total</th>
+                    <th style={{ width: 40 }}></th>
                   </tr></thead>
                   <tbody>
                     {items.length === 0 ? (
-                      <tr><td colSpan="8" className="text-center text-muted py-4">Agrega productos a la factura</td></tr>
+                      <tr><td colSpan="10" className="text-center text-muted py-4">Agrega productos a la factura</td></tr>
                     ) : items.map((item, index) => {
                       const calc = calcularItem(item);
                       const stockError = item.cantidad > item.stock;
                       return (
                         <tr key={item.cod_producto} className={stockError ? 'table-danger' : ''}>
-                          <td>{index + 1}</td>
+                          <td className="text-muted">{index + 1}</td>
                           <td>
                             <strong>{item.nombre_producto}</strong>
-                            <div className="text-muted small">Stock: {item.stock} | {item.unidad_medida || 'und'}</div>
+                            <div className="text-muted small">Cód: {item.cod_producto} | Stock: {item.stock} {item.unidad_medida || 'und'}</div>
                           </td>
                           <td>{formatMoney(item.precio_venta)}</td>
-                          <td style={{ width: 100 }}>
+                          <td>
                             <input type="number" className={`form-control form-control-sm ${stockError ? 'is-invalid' : ''}`}
                               min="1" max={item.stock} value={item.cantidad}
                               onChange={(e) => cambiarCantidad(index, e.target.value)} />
                           </td>
-                          <td>{item.isv_pct}%</td>
+                          <td>
+                            <input type="number" className="form-control form-control-sm"
+                              min="0" max="100" step="0.5" value={item.descuento || 0}
+                              onChange={(e) => cambiarDescuento(index, e.target.value)} />
+                          </td>
                           <td>{formatMoney(calc.subtotal)}</td>
+                          <td className="text-center">{item.isv_pct}%</td>
+                          <td>{formatMoney(calc.isv)}</td>
                           <td><strong>{formatMoney(calc.total)}</strong></td>
                           <td>
                             <button className="btn btn-sm btn-outline-danger" onClick={() => eliminarItem(index)}>
@@ -614,7 +675,15 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
                 <span>Ítems:</span><strong>{items.length}</strong>
               </div>
               <div className="d-flex justify-content-between mb-2">
-                <span>Subtotal:</span><strong>{formatMoney(totales.subtotal)}</strong>
+                <span>Subtotal Bruto:</span><strong>{formatMoney(totales.subtotalBruto)}</strong>
+              </div>
+              {totales.descuento > 0 && (
+                <div className="d-flex justify-content-between mb-2 text-danger">
+                  <span>Descuento:</span><strong>- {formatMoney(totales.descuento)}</strong>
+                </div>
+              )}
+              <div className="d-flex justify-content-between mb-2">
+                <span>Subtotal Neto:</span><strong>{formatMoney(totales.subtotal)}</strong>
               </div>
               <div className="d-flex justify-content-between mb-2">
                 <span>ISV:</span><strong>{formatMoney(totales.isv)}</strong>

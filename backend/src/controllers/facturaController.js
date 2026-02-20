@@ -36,6 +36,15 @@ export const anular = async (req, res) => {
   }
 };
 
+export const eliminar = async (req, res) => {
+  try {
+    const resultado = await facturaService.eliminar(req.params.id);
+    res.json({ ok: true, ...resultado });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });
+  }
+};
+
 export const productosDisponibles = async (req, res) => {
   try {
     const productos = await facturaService.productosDisponibles(req.query);
