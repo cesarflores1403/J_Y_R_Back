@@ -3,6 +3,7 @@ import Alert from '../components/common/Alert.jsx'; // // Alert
 import ProductoForm from '../components/producto/ProductoForm.jsx'; // // Form
 import ProductoList from '../components/producto/ProductoList.jsx'; // // Tabla
 import { useProducto } from '../hooks/useProducto.js'; // // Hook
+import { FiPackage } from 'react-icons/fi';
 
 const ProductoPage = () => {
   const {
@@ -18,51 +19,66 @@ const ProductoPage = () => {
     eliminar,
   } = useProducto();
 
-  const [selected, setSelected] = useState(null); // // Producto seleccionado para editar
+  const [selected, setSelected] = useState(null);
 
-  const handleEdit = (p) => {
-    setSelected(p); // // Carga en el form
-  };
-
-  const handleCancelEdit = () => {
-    setSelected(null); // // Limpia selección
-  };
+  const handleEdit = (p) => setSelected(p);
+  const handleCancelEdit = () => setSelected(null);
 
   const handleSubmit = async (payload) => {
-    // // Si hay seleccionado => update, si no => create
     if (selected) {
-      await actualizar(payload); // // PUT (sincronizado con BE)
-      setSelected(null); // // Limpia
+      await actualizar(payload);
+      setSelected(null);
     } else {
-      await crear(payload); // // POST
+      await crear(payload);
     }
   };
 
   return (
-    <div className="container py-3">
-      <h2 className="mb-3">Productos</h2>
+    <div>
+      {/* Header */}
+      <div className="d-flex align-items-center gap-3 mb-4">
+        <div style={{
+          width: 48, height: 48, borderRadius: 'var(--radius-md)',
+          background: 'var(--jyr-red)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          boxShadow: 'var(--shadow-red)'
+        }}>
+          <FiPackage size={24} color="#fff" />
+        </div>
+        <div>
+          <h3 style={{ margin: 0, fontWeight: 700 }}>Productos</h3>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--jyr-gray-500)' }}>
+            Gestión del catálogo de productos e ISV
+          </p>
+        </div>
+      </div>
 
       <Alert type="success" message={success} onClose={() => setSuccess('')} />
       <Alert type="danger" message={error} onClose={() => setError('')} />
 
-      <div className="row g-3">
+      <div className="row g-4">
         <div className="col-12 col-lg-5">
           <ProductoForm
-            saving={saving} // // Loading submit
-            onSubmit={handleSubmit} // // Create/Update centralizado
-            selected={selected} // // Para precargar form
-            onCancelEdit={handleCancelEdit} // // Cancelar edición
+            saving={saving}
+            onSubmit={handleSubmit}
+            selected={selected}
+            onCancelEdit={handleCancelEdit}
           />
         </div>
 
         <div className="col-12 col-lg-7">
           {loading ? (
-            <div className="alert alert-info">Cargando lista...</div>
+            <div className="jyr-card">
+              <div className="jyr-card-body text-center py-5">
+                <div className="jyr-spinner" />
+                <p style={{ marginTop: 12, color: 'var(--jyr-gray-500)' }}>Cargando productos...</p>
+              </div>
+            </div>
           ) : (
             <ProductoList
-              productos={producto} // // Data
-              onEdit={handleEdit} // // Editar
-              onDelete={eliminar} // // Eliminar (sincronizado: { cod_producto })
+              productos={producto}
+              onEdit={handleEdit}
+              onDelete={eliminar}
             />
           )}
         </div>

@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'; // // Hooks
+import { useIsv } from '../../hooks/useIsv.js'; // // Hook catálogo ISV
 
 const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
+  const { catalogoIsv, loadingIsv } = useIsv(); // // Catálogo ISV desde BD
+
   const [form, setForm] = useState({
     cod_categoria: 2,
     nombre_producto: '',
     unidad_medida: 'UND',
     precio_venta: '',
-    isv: 18,
+    cod_isv: '',
     estado_producto: true,
   }); // // Estado form
 
@@ -22,7 +25,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       nombre_producto: selected.nombre_producto ?? '',
       unidad_medida: selected.unidad_medida ?? 'UND',
       precio_venta: selected.precio_venta ?? '',
-      isv: selected.isv ?? 18,
+      cod_isv: selected.cod_isv ?? '',
       estado_producto: Boolean(selected.estado_producto),
     });
   }, [isEdit, selected]);
@@ -40,7 +43,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
     if (!form.nombre_producto.trim()) return 'nombre_producto es requerido';
     if (!form.unidad_medida.trim()) return 'unidad_medida es requerido';
     if (Number(form.precio_venta) <= 0) return 'precio_venta debe ser mayor a 0';
-    if (Number(form.isv) < 0) return 'isv no puede ser negativo';
+    if (!form.cod_isv) return 'Debe seleccionar un tipo de ISV';
     return '';
   };
 
@@ -49,7 +52,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
     nombre_producto: form.nombre_producto.trim(),
     unidad_medida: form.unidad_medida.trim(),
     precio_venta: Number(form.precio_venta),
-    isv: Number(form.isv),
+    cod_isv: Number(form.cod_isv),
     estado_producto: Boolean(form.estado_producto),
   });
 
@@ -65,7 +68,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       nombre_producto: form.nombre_producto.trim(),
       unidad_medida: form.unidad_medida.trim(),
       precio_venta: Number(form.precio_venta),
-      isv: Number(form.isv),
+      cod_isv: Number(form.cod_isv),
       estado_producto: Boolean(form.estado_producto),
     };
 
@@ -75,7 +78,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       'nombre_producto',
       'unidad_medida',
       'precio_venta',
-      'isv',
+      'cod_isv',
       'estado_producto',
     ];
 
@@ -140,7 +143,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
           nombre_producto: '',
           unidad_medida: 'UND',
           precio_venta: '',
-          isv: 18,
+          cod_isv: '',
           estado_producto: true,
         });
       }
@@ -150,85 +153,132 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
   };
 
   return (
-    <div className="card">
-      <div className="card-header">{isEdit ? 'Editar producto' : 'Crear producto'}</div>
+    <div className="jyr-card">
+      <div className="jyr-card-header">
+        <h3>{isEdit ? '✏️ Editar producto' : '➕ Crear producto'}</h3>
+      </div>
 
-      <div className="card-body">
-        {formError && <div className="alert alert-warning">{formError}</div>}
+      <div className="jyr-card-body">
+        {formError && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+            background: 'var(--jyr-warning-bg)', color: 'var(--jyr-warning)',
+            fontSize: 13, fontWeight: 500, marginBottom: 16,
+            border: '1px solid #fde68a'
+          }}>
+            {formError}
+          </div>
+        )}
 
-        <form className="row g-2" onSubmit={handleSubmit}>
-          <div className="col-12">
-            <label className="form-label">cod_categoria (1 Lubricantes / 2 Repuestos)</label>
-            <input
-              className="form-control"
+        <form onSubmit={handleSubmit}>
+          <div className="jyr-form-group">
+            <label className="jyr-form-label">Categoría</label>
+            <select
+              className="jyr-form-control jyr-form-select"
               name="cod_categoria"
               value={form.cod_categoria}
               onChange={onChange}
               disabled={saving}
-            />
+            >
+              <option value={1}>1 — Lubricantes</option>
+              <option value={2}>2 — Repuestos</option>
+            </select>
           </div>
 
-          <div className="col-12">
-            <label className="form-label">nombre_producto</label>
+          <div className="jyr-form-group">
+            <label className="jyr-form-label">Nombre del producto</label>
             <input
-              className="form-control"
+              className="jyr-form-control"
               name="nombre_producto"
+              placeholder="Ej: Filtro de aceite"
               value={form.nombre_producto}
               onChange={onChange}
               disabled={saving}
             />
           </div>
 
-          <div className="col-6">
-            <label className="form-label">unidad_medida</label>
-            <input
-              className="form-control"
-              name="unidad_medida"
-              value={form.unidad_medida}
-              onChange={onChange}
-              disabled={saving}
-            />
-          </div>
-
-          <div className="col-6">
-            <label className="form-label">precio_venta</label>
-            <input
-              className="form-control"
-              name="precio_venta"
-              value={form.precio_venta}
-              onChange={onChange}
-              disabled={saving}
-            />
-          </div>
-
-          <div className="col-6">
-            <label className="form-label">isv</label>
-            <input className="form-control" name="isv" value={form.isv} onChange={onChange} disabled={saving} />
-          </div>
-
-          <div className="col-6 d-flex align-items-end">
-            <div className="form-check">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="jyr-form-group">
+              <label className="jyr-form-label">Unidad medida</label>
               <input
-                className="form-check-input"
-                type="checkbox"
-                name="estado_producto"
-                checked={form.estado_producto}
+                className="jyr-form-control"
+                name="unidad_medida"
+                value={form.unidad_medida}
                 onChange={onChange}
                 disabled={saving}
               />
-              <label className="form-check-label">estado_producto</label>
+            </div>
+
+            <div className="jyr-form-group">
+              <label className="jyr-form-label">Precio venta (L.)</label>
+              <input
+                className="jyr-form-control"
+                name="precio_venta"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={form.precio_venta}
+                onChange={onChange}
+                disabled={saving}
+              />
             </div>
           </div>
 
-          <div className="col-12 d-flex gap-2">
-            <button className="btn btn-primary w-100" disabled={saving}>
-              {saving ? 'Guardando...' : isEdit ? 'Actualizar (1 campo)' : 'Guardar'}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="jyr-form-group">
+              <label className="jyr-form-label">ISV (Impuesto)</label>
+              <select
+                className="jyr-form-control jyr-form-select"
+                name="cod_isv"
+                value={form.cod_isv}
+                onChange={onChange}
+                disabled={saving || loadingIsv}
+              >
+                <option value="">-- Seleccionar --</option>
+                {catalogoIsv.map((isv) => (
+                  <option key={isv.cod_isv} value={isv.cod_isv}>
+                    {isv.descripcion} ({isv.porcentaje}%)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="jyr-form-group" style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 18 }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                cursor: 'pointer', fontSize: 13, fontWeight: 500
+              }}>
+                <input
+                  type="checkbox"
+                  name="estado_producto"
+                  checked={form.estado_producto}
+                  onChange={onChange}
+                  disabled={saving}
+                  style={{ width: 18, height: 18, accentColor: 'var(--jyr-red)' }}
+                />
+                {form.estado_producto ? (
+                  <span className="jyr-badge jyr-badge-success">Activo</span>
+                ) : (
+                  <span className="jyr-badge jyr-badge-danger">Inactivo</span>
+                )}
+              </label>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <button
+              type="submit"
+              className={`jyr-btn ${isEdit ? 'jyr-btn-primary' : 'jyr-btn-danger'}`}
+              style={{ flex: 1 }}
+              disabled={saving}
+            >
+              {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Guardar producto'}
             </button>
 
             {isEdit && (
               <button
                 type="button"
-                className="btn btn-outline-secondary"
+                className="jyr-btn jyr-btn-outline"
                 disabled={saving}
                 onClick={() => onCancelEdit && onCancelEdit()}
               >
@@ -239,9 +289,12 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
         </form>
 
         {isEdit && (
-          <div className="form-text mt-2">
-            * En edición: por regla del backend (pa_update) se actualiza solo 1 campo por vez.
-          </div>
+          <p style={{
+            marginTop: 12, fontSize: 11, color: 'var(--jyr-gray-400)',
+            fontStyle: 'italic'
+          }}>
+            * En edición se actualiza 1 campo por vez (pa_update).
+          </p>
         )}
       </div>
     </div>

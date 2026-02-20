@@ -13,7 +13,7 @@ const ProductoSeq = sequelize.define('producto', {
   nombre_producto: { type: DataTypes.STRING(100), allowNull: false },
   unidad_medida: { type: DataTypes.STRING(10) },
   precio_venta: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
-  isv: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+  cod_isv: { type: DataTypes.INTEGER, allowNull: true },
   estado_producto: { type: DataTypes.BOOLEAN, defaultValue: true }
 });
 

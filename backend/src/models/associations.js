@@ -7,6 +7,7 @@ import Proveedor from './ProveedorModel.js';
 import Factura from './Factura.js';
 import DetalleFactura from './DetalleFactura.js';
 import ProductoSeq from './ProductoSeq.js';
+import Isv from './Isv.js';
 
 // =============================================
 // RELACIONES
@@ -42,6 +43,10 @@ DetalleFactura.belongsTo(Factura, { foreignKey: 'cod_factura', as: 'factura' });
 ProductoSeq.hasMany(DetalleFactura, { foreignKey: 'cod_producto', as: 'detallesFactura' });
 DetalleFactura.belongsTo(ProductoSeq, { foreignKey: 'cod_producto', as: 'producto' });
 
+// Producto -> ISV (catálogo)
+Isv.hasMany(ProductoSeq, { foreignKey: 'cod_isv', as: 'productos' });
+ProductoSeq.belongsTo(Isv, { foreignKey: 'cod_isv', as: 'isv' });
+
 export {
   sequelize,
   Usuario,
@@ -51,5 +56,6 @@ export {
   Proveedor,
   Factura,
   DetalleFactura,
-  ProductoSeq
+  ProductoSeq,
+  Isv
 };

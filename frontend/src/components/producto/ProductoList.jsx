@@ -1,34 +1,33 @@
+import { FiEdit2, FiTrash2 } from 'react-icons/fi';
+
 const ProductoList = ({ productos = [], onEdit, onDelete }) => {
   const handleDelete = (p) => {
-    // // Confirmación PRO (evita borrados accidentales)
     const ok = window.confirm(
       `¿Eliminar el producto ${p.cod_producto} - ${p.nombre_producto}?`
     );
     if (!ok) return;
-
-    // // Sincronizado con BE: DELETE /api/producto con body { cod_producto }
     if (onDelete) onDelete({ cod_producto: p.cod_producto });
   };
 
   return (
-    <div className="card shadow-sm">
-      <div className="card-header d-flex justify-content-between align-items-center">
-        <span>Listado de Productos</span>
-        <span className="badge bg-secondary">{productos.length} registros</span>
+    <div className="jyr-card">
+      <div className="jyr-card-header">
+        <h3>📦 Listado de Productos</h3>
+        <span className="jyr-badge jyr-badge-dark">{productos.length} registros</span>
       </div>
 
-      <div className="table-responsive">
-        <table className="table table-striped table-hover mb-0">
-          <thead className="table-light">
+      <div className="jyr-table-wrapper">
+        <table className="jyr-table">
+          <thead>
             <tr>
-              <th>cod_producto</th>
-              <th>cod_categoria</th>
-              <th>nombre</th>
-              <th>unidad</th>
-              <th>precio</th>
-              <th>isv</th>
-              <th>estado</th>
-              <th className="text-center">acciones</th>
+              <th>#</th>
+              <th>Categoría</th>
+              <th>Nombre</th>
+              <th>Unidad</th>
+              <th>Precio</th>
+              <th>ISV</th>
+              <th>Estado</th>
+              <th style={{ textAlign: 'center' }}>Acciones</th>
             </tr>
           </thead>
 
@@ -36,40 +35,51 @@ const ProductoList = ({ productos = [], onEdit, onDelete }) => {
             {productos.length > 0 ? (
               productos.map((p) => (
                 <tr key={p.cod_producto}>
-                  <td>{p.cod_producto}</td>
-                  <td>{p.cod_categoria}</td>
-                  <td>{p.nombre_producto}</td>
+                  <td><strong>{p.cod_producto}</strong></td>
+                  <td>
+                    <span className="jyr-badge jyr-badge-info">
+                      {Number(p.cod_categoria) === 1 ? 'Lubricantes' : 'Repuestos'}
+                    </span>
+                  </td>
+                  <td style={{ fontWeight: 500 }}>{p.nombre_producto}</td>
                   <td>{p.unidad_medida}</td>
-                  <td>L. {p.precio_venta}</td>
-                  <td>{p.isv}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                    L. {Number(p.precio_venta).toFixed(2)}
+                  </td>
+                  <td>
+                    <span className="jyr-badge jyr-badge-warning">
+                      {p.isv_descripcion} ({p.isv_porcentaje}%)
+                    </span>
+                  </td>
                   <td>
                     {p.estado_producto ? (
-                      <span className="badge bg-success">Activo</span>
+                      <span className="jyr-badge jyr-badge-success">Activo</span>
                     ) : (
-                      <span className="badge bg-danger">Inactivo</span>
+                      <span className="jyr-badge jyr-badge-danger">Inactivo</span>
                     )}
                   </td>
-
-                  <td className="text-center">
+                  <td style={{ textAlign: 'center' }}>
                     <button
-                      className="btn btn-sm btn-outline-primary me-2"
+                      className="jyr-btn jyr-btn-sm jyr-btn-outline"
+                      style={{ marginRight: 6 }}
                       onClick={() => onEdit && onEdit(p)}
+                      title="Editar"
                     >
-                      Editar
+                      <FiEdit2 size={14} /> Editar
                     </button>
-
                     <button
-                      className="btn btn-sm btn-outline-danger"
+                      className="jyr-btn jyr-btn-sm jyr-btn-outline-red"
                       onClick={() => handleDelete(p)}
+                      title="Eliminar"
                     >
-                      Eliminar
+                      <FiTrash2 size={14} /> Eliminar
                     </button>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="text-center text-muted py-4">
+                <td colSpan="8" style={{ textAlign: 'center', padding: 40, color: 'var(--jyr-gray-400)' }}>
                   No hay productos registrados
                 </td>
               </tr>
@@ -81,4 +91,4 @@ const ProductoList = ({ productos = [], onEdit, onDelete }) => {
   );
 };
 
-export default ProductoList; // ✅ MUY IMPORTANTE
+export default ProductoList;

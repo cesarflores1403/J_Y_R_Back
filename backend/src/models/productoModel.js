@@ -7,18 +7,21 @@ import pool from '../config/db-connection.js';
 // =====================================================
 
 // =======================
-// GET PRODUCTOS
+// GET PRODUCTOS (con detalle ISV del catálogo)
 // =======================
 export const getProducto = async () => {
-  const tabla = 'producto'; // // Nombre real de la tabla
-
-  const columnas =
-    'cod_producto, cod_categoria, nombre_producto, unidad_medida, precio_venta, isv, estado_producto'; // // Columnas reales
-
-  const query = 'SELECT function_select($1, $2) as resultado'; // // Llama función select genérica
-  const result = await pool.query(query, [tabla, columnas]); // // Ejecuta query
-
-  return result.rows[0].resultado || []; // // Retorna arreglo o vacío
+  const query = `
+    SELECT p.cod_producto, p.cod_categoria, p.nombre_producto,
+           p.unidad_medida, p.precio_venta, p.cod_isv,
+           COALESCE(i.porcentaje, 0) AS isv_porcentaje,
+           COALESCE(i.descripcion, 'Sin ISV') AS isv_descripcion,
+           p.estado_producto
+    FROM producto p
+    LEFT JOIN catalogo_isv i ON p.cod_isv = i.cod_isv
+    ORDER BY p.cod_producto
+  `;
+  const result = await pool.query(query);
+  return result.rows || [];
 };
 
 // =======================
