@@ -27,6 +27,16 @@ export const productoApi = {
   },
 
   // =====================================================
+  // PATCH - Cambiar estado (Activo/Inactivo/Descontinuado)
+  // payload esperado: { cod_producto, estado }
+  // =====================================================
+  cambiarEstado: (payload) =>
+    apiFetch('/api/producto/estado', {
+      method: 'PATCH',
+      body: JSON.stringify(payload), // // { cod_producto, estado }
+    }),
+
+  // =====================================================
   // DELETE compatible con BE actual (body)
   // payload esperado: { cod_producto }
   // =====================================================

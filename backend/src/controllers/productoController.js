@@ -24,20 +24,20 @@ export const getProducto = async (req, res, next) => {
 // =======================
 export const createProducto = async (req, res, next) => {
   try {
-    // // Validar que el ISV exista si se envía cod_isv
+    // ISV validado en validator, existencia verificada aquí
     if (req.body.cod_isv !== undefined && req.body.cod_isv !== null) {
       await isvService.validarIsvExiste(req.body.cod_isv);
     }
 
-    await productoService.createProducto(req.body); // // Crear producto
+    await productoService.createProducto(req.body);
 
     return sendOk(res, {
-      status: 201, // // Created
-      message: 'Producto creado exitosamente.', // // Mensaje
-      data: null // // Consistencia
+      status: 201,
+      message: 'Producto creado exitosamente.',
+      data: null
     });
   } catch (err) {
-    next(err); // // Envía al errorHandler global
+    next(err);
   }
 };
 
@@ -46,35 +46,22 @@ export const createProducto = async (req, res, next) => {
 // =======================
 export const updateProducto = async (req, res, next) => {
   try {
-    const { cod_producto, datos } = req.body; // // cod_producto = PK, datos = campos a actualizar
+    const { cod_producto, datos } = req.body;
 
-    // // Validaciones mínimas (formato) - lo fuerte luego lo pasamos a validator
-    if (cod_producto === undefined || cod_producto === null) {
-      const error = new Error('cod_producto es obligatorio'); // // Error
-      error.status = 400; // // Bad Request
-      return next(error); // // Envía al errorHandler global
-    }
-
-    if (!datos || typeof datos !== 'object' || Array.isArray(datos) || Object.keys(datos).length === 0) {
-      const error = new Error('datos debe ser un objeto con campos a actualizar'); // // Error
-      error.status = 400; // // Bad Request
-      return next(error); // // Envía al errorHandler global
-    }
-
-    // // Si se está actualizando cod_isv, validar que exista
+    // Si se está actualizando cod_isv, validar que exista
     if (datos.cod_isv !== undefined && datos.cod_isv !== null) {
       await isvService.validarIsvExiste(datos.cod_isv);
     }
 
-    await productoService.updateProducto({ cod_producto, datos }); // // Actualizar producto
+    await productoService.updateProducto({ cod_producto, datos });
 
     return sendOk(res, {
-      status: 200, // // OK
-      message: 'Producto actualizado correctamente.', // // Mensaje
-      data: null // // Consistencia
+      status: 200,
+      message: 'Producto actualizado correctamente.',
+      data: null
     });
   } catch (err) {
-    next(err); // // Envía al errorHandler global
+    next(err);
   }
 };
 
@@ -83,23 +70,41 @@ export const updateProducto = async (req, res, next) => {
 // =======================
 export const deleteProducto = async (req, res, next) => {
   try {
-    const { cod_producto } = req.body; // // PK a eliminar
+    const { cod_producto } = req.body;
 
-    // // Validación mínima
-    if (cod_producto === undefined || cod_producto === null) {
-      const error = new Error('cod_producto es obligatorio para eliminar'); // // Error
-      error.status = 400; // // Bad Request
-      return next(error); // // Envía al errorHandler global
-    }
-
-    await productoService.deleteProducto(cod_producto); // // Eliminar producto
+    await productoService.deleteProducto(cod_producto);
 
     return sendOk(res, {
-      status: 200, // // OK
-      message: 'Producto eliminado.', // // Mensaje
-      data: null // // Consistencia
+      status: 200,
+      message: 'Producto eliminado.',
+      data: null
     });
   } catch (err) {
-    next(err); // // Envía al errorHandler global
+    next(err);
+  }
+};
+
+// =======================
+// CAMBIAR ESTADO PRODUCTO (PATCH)
+// =======================
+export const cambiarEstado = async (req, res, next) => {
+  try {
+    const { cod_producto, estado } = req.body;
+
+    await productoService.cambiarEstado(cod_producto, estado);
+
+    const mensajes = {
+      Activo: 'Producto activado correctamente.',
+      Inactivo: 'Producto inactivado. Ya no estará disponible para venta.',
+      Descontinuado: 'Producto marcado como descontinuado.'
+    };
+
+    return sendOk(res, {
+      status: 200,
+      message: mensajes[estado] || 'Estado actualizado.',
+      data: { cod_producto, estado }
+    });
+  } catch (err) {
+    next(err);
   }
 };

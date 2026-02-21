@@ -17,6 +17,7 @@ const ProductoPage = () => {
     crear,
     actualizar,
     eliminar,
+    cambiarEstado,
   } = useProducto();
 
   const [selected, setSelected] = useState(null);
@@ -79,6 +80,7 @@ const ProductoPage = () => {
               productos={producto}
               onEdit={handleEdit}
               onDelete={eliminar}
+              onCambiarEstado={cambiarEstado}
             />
           )}
         </div>

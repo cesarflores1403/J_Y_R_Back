@@ -1,5 +1,11 @@
 import express from 'express';
-import { getProducto, createProducto, updateProducto, deleteProducto } from '../controllers/productoController.js';
+import { getProducto, createProducto, updateProducto, deleteProducto, cambiarEstado } from '../controllers/productoController.js';
+import {
+  validarCrearProducto,
+  validarActualizarProducto,
+  validarCambiarEstado,
+  validarEliminarProducto
+} from '../middlewares/productoValidator.js';
 
 const router = express.Router();
 
@@ -7,12 +13,15 @@ const router = express.Router();
 router.get('/', getProducto);
 
 // POST /api/v1/productos
-router.post('/', createProducto);
+router.post('/', validarCrearProducto, createProducto);
 
 // PUT /api/v1/productos
-router.put('/', updateProducto);
+router.put('/', validarActualizarProducto, updateProducto);
+
+// PATCH /api/v1/productos/estado — Cambiar estado (Activo/Inactivo/Descontinuado)
+router.patch('/estado', validarCambiarEstado, cambiarEstado);
 
 // DELETE /api/v1/productos
-router.delete('/', deleteProducto);
+router.delete('/', validarEliminarProducto, deleteProducto);
 
 export default router;

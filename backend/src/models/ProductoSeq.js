@@ -14,7 +14,14 @@ const ProductoSeq = sequelize.define('producto', {
   unidad_medida: { type: DataTypes.STRING(10) },
   precio_venta: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   cod_isv: { type: DataTypes.INTEGER, allowNull: true },
-  estado_producto: { type: DataTypes.BOOLEAN, defaultValue: true }
+  estado_producto: {
+    type: DataTypes.STRING(15),
+    defaultValue: 'Activo',
+    allowNull: false,
+    validate: {
+      isIn: [['Activo', 'Inactivo', 'Descontinuado']]
+    }
+  }
 });
 
 export default ProductoSeq;

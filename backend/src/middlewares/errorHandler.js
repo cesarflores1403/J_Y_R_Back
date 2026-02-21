@@ -9,7 +9,8 @@ export const errorHandler = (err, req, res, next) => {
   if (err.name === 'SequelizeValidationError') {
     return res.status(400).json({
       ok: false,
-      mensaje: 'Error de validación',
+      message: 'Error de validación',
+      data: null,
       errores: err.errors.map(e => ({ campo: e.path, mensaje: e.message }))
     });
   }
@@ -17,7 +18,8 @@ export const errorHandler = (err, req, res, next) => {
   if (err.name === 'SequelizeUniqueConstraintError') {
     return res.status(409).json({
       ok: false,
-      mensaje: 'Registro duplicado',
+      message: 'Registro duplicado',
+      data: null,
       errores: err.errors.map(e => ({ campo: e.path, mensaje: e.message }))
     });
   }
@@ -25,7 +27,8 @@ export const errorHandler = (err, req, res, next) => {
   if (err.name === 'SequelizeForeignKeyConstraintError') {
     return res.status(400).json({
       ok: false,
-      mensaje: 'Error de referencia: el registro relacionado no existe'
+      message: 'Error de referencia: el registro relacionado no existe',
+      data: null
     });
   }
 
@@ -35,6 +38,6 @@ export const errorHandler = (err, req, res, next) => {
   res.status(status).json({
     ok: false,
     message,
-    mensaje: message,
+    data: null,
   });
 };

@@ -73,6 +73,12 @@ const BuscadorProducto = ({ onAgregar, itemsActuales = [] }) => {
       return;
     }
 
+    // Bloquear si el producto no está activo
+    if (producto.estado_producto && producto.estado_producto !== 'Activo') {
+      toast.error(`"${producto.nombre_producto}" no está disponible para venta (Estado: ${producto.estado_producto})`);
+      return;
+    }
+
     // Bloquear si stock = 0 y no es admin
     if (producto.stock <= 0 && !esAdmin) {
       toast.error(`Sin stock disponible para "${producto.nombre_producto}"`);

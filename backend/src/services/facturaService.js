@@ -100,8 +100,11 @@ class FacturaService {
         if (!producto) {
           throw Object.assign(new Error(`Producto con código ${item.cod_producto} no encontrado`), { statusCode: 404 });
         }
-        if (!producto.estado_producto) {
-          throw Object.assign(new Error(`El producto "${producto.nombre_producto}" está inactivo`), { statusCode: 400 });
+        if (producto.estado_producto !== 'Activo') {
+          throw Object.assign(
+            new Error(`El producto "${producto.nombre_producto}" no está disponible para venta (Estado: ${producto.estado_producto})`),
+            { statusCode: 400 }
+          );
         }
 
         // Verificar stock en inventario
@@ -271,7 +274,7 @@ class FacturaService {
   // Busca por código o nombre del producto
   // =============================================
   async productosDisponibles({ buscar = '' }) {
-    const where = { estado_producto: true };
+    const where = { estado_producto: 'Activo' };
     if (buscar) {
       const busqueda = buscar.trim();
       // Si es numérico, buscamos por cod_producto exacto o parcial

@@ -1,12 +1,39 @@
-import { FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 
-const ProductoList = ({ productos = [], onEdit, onDelete }) => {
+// Mapa de badges por estado
+const estadoBadge = {
+  Activo: { className: 'jyr-badge jyr-badge-success', label: 'Activo' },
+  Inactivo: { className: 'jyr-badge jyr-badge-danger', label: 'Inactivo' },
+  Descontinuado: { className: 'jyr-badge jyr-badge-warning', label: 'Descontinuado' },
+};
+
+const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado }) => {
   const handleDelete = (p) => {
     const ok = window.confirm(
       `¿Eliminar el producto ${p.cod_producto} - ${p.nombre_producto}?`
     );
     if (!ok) return;
     if (onDelete) onDelete({ cod_producto: p.cod_producto });
+  };
+
+  const handleEstadoChange = (p, nuevoEstado) => {
+    if (nuevoEstado === p.estado_producto) return;
+
+    const mensajes = {
+      Inactivo: `¿Inactivar "${p.nombre_producto}"? Ya no estará disponible para venta.`,
+      Descontinuado: `¿Marcar "${p.nombre_producto}" como descontinuado? No se podrá vender.`,
+      Activo: `¿Reactivar "${p.nombre_producto}"? Volverá a estar disponible para venta.`,
+    };
+
+    const ok = window.confirm(mensajes[nuevoEstado] || `¿Cambiar estado a "${nuevoEstado}"?`);
+    if (!ok) return;
+    if (onCambiarEstado) onCambiarEstado(p.cod_producto, nuevoEstado);
+  };
+
+  // Normalizar estado (compatibilidad con boolean legacy)
+  const getEstado = (p) => {
+    if (typeof p.estado_producto === 'boolean') return p.estado_producto ? 'Activo' : 'Inactivo';
+    return p.estado_producto || 'Activo';
   };
 
   return (
@@ -33,8 +60,12 @@ const ProductoList = ({ productos = [], onEdit, onDelete }) => {
 
           <tbody>
             {productos.length > 0 ? (
-              productos.map((p) => (
-                <tr key={p.cod_producto}>
+              productos.map((p) => {
+                const estado = getEstado(p);
+                const badge = estadoBadge[estado] || estadoBadge.Activo;
+
+                return (
+                <tr key={p.cod_producto} style={estado !== 'Activo' ? { opacity: 0.7 } : {}}>
                   <td><strong>{p.cod_producto}</strong></td>
                   <td>
                     <span className="jyr-badge jyr-badge-info">
@@ -52,11 +83,25 @@ const ProductoList = ({ productos = [], onEdit, onDelete }) => {
                     </span>
                   </td>
                   <td>
-                    {p.estado_producto ? (
-                      <span className="jyr-badge jyr-badge-success">Activo</span>
-                    ) : (
-                      <span className="jyr-badge jyr-badge-danger">Inactivo</span>
-                    )}
+                    <select
+                      className="jyr-form-control jyr-form-select"
+                      value={estado}
+                      onChange={(e) => handleEstadoChange(p, e.target.value)}
+                      style={{
+                        fontSize: 12, padding: '4px 8px', width: 'auto',
+                        fontWeight: 600, minWidth: 130,
+                        color: estado === 'Activo' ? 'var(--jyr-success, #16a34a)'
+                          : estado === 'Descontinuado' ? 'var(--jyr-warning, #d97706)'
+                          : 'var(--jyr-danger, #dc2626)',
+                        borderColor: estado === 'Activo' ? 'var(--jyr-success, #16a34a)'
+                          : estado === 'Descontinuado' ? 'var(--jyr-warning, #d97706)'
+                          : 'var(--jyr-danger, #dc2626)'
+                      }}
+                    >
+                      <option value="Activo">✅ Activo</option>
+                      <option value="Inactivo">🚫 Inactivo</option>
+                      <option value="Descontinuado">⚠️ Descontinuado</option>
+                    </select>
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <button
@@ -76,7 +121,8 @@ const ProductoList = ({ productos = [], onEdit, onDelete }) => {
                     </button>
                   </td>
                 </tr>
-              ))
+                );
+              })
             ) : (
               <tr>
                 <td colSpan="8" style={{ textAlign: 'center', padding: 40, color: 'var(--jyr-gray-400)' }}>

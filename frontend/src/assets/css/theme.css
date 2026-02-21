@@ -2022,3 +2022,20 @@ a {
     size: letter;
   }
 }
+
+/* =====================================================
+   HU-03: Validación de campos — estilos de error
+   ===================================================== */
+.jyr-input-error {
+  border-color: var(--jyr-danger, #dc2626) !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15) !important;
+}
+
+.jyr-field-error {
+  display: block;
+  color: var(--jyr-danger, #dc2626);
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+  line-height: 1.3;
+}

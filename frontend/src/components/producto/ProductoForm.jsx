@@ -10,10 +10,11 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
     unidad_medida: 'UND',
     precio_venta: '',
     cod_isv: '',
-    estado_producto: true,
+    estado_producto: 'Activo',
   }); // // Estado form
 
-  const [formError, setFormError] = useState(''); // // Error validación
+  const [fieldErrors, setFieldErrors] = useState({}); // // Errores por campo
+  const [formError, setFormError] = useState(''); // // Error general
   const isEdit = Boolean(selected?.cod_producto); // // Modo edición
 
   // // Si seleccionan un producto, precarga el form
@@ -26,34 +27,83 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       unidad_medida: selected.unidad_medida ?? 'UND',
       precio_venta: selected.precio_venta ?? '',
       cod_isv: selected.cod_isv ?? '',
-      estado_producto: Boolean(selected.estado_producto),
+      estado_producto: typeof selected.estado_producto === 'boolean'
+        ? (selected.estado_producto ? 'Activo' : 'Inactivo')
+        : (selected.estado_producto || 'Activo'),
     });
   }, [isEdit, selected]);
 
   const onChange = (e) => {
-    const { name, value, type, checked } = e.target; // // Input
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value, // // checkbox vs texto
-    }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    // Limpiar error del campo al escribir
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: '' }));
+    }
   };
 
+  // =====================================================
+  // HU-03: Validación por campo con mensajes específicos
+  // =====================================================
   const validar = () => {
-    if (![1, 2].includes(Number(form.cod_categoria))) return 'cod_categoria debe ser 1 o 2';
-    if (!form.nombre_producto.trim()) return 'nombre_producto es requerido';
-    if (!form.unidad_medida.trim()) return 'unidad_medida es requerido';
-    if (Number(form.precio_venta) <= 0) return 'precio_venta debe ser mayor a 0';
-    if (!form.cod_isv) return 'Debe seleccionar un tipo de ISV';
-    return '';
+    const errors = {};
+
+    // Categoría
+    if (![1, 2].includes(Number(form.cod_categoria))) {
+      errors.cod_categoria = 'Debe ser 1 (Lubricantes) o 2 (Repuestos).';
+    }
+
+    // Nombre
+    const nombre = form.nombre_producto.trim();
+    if (!nombre) {
+      errors.nombre_producto = 'El nombre del producto es obligatorio.';
+    } else if (nombre.length < 2) {
+      errors.nombre_producto = 'El nombre debe tener al menos 2 caracteres.';
+    } else if (nombre.length > 100) {
+      errors.nombre_producto = 'El nombre no puede exceder 100 caracteres.';
+    }
+
+    // Unidad de medida
+    const unidad = form.unidad_medida.trim();
+    if (!unidad) {
+      errors.unidad_medida = 'La unidad de medida es obligatoria.';
+    } else if (unidad.length > 10) {
+      errors.unidad_medida = 'La unidad de medida no puede exceder 10 caracteres.';
+    }
+
+    // Precio
+    const precio = Number(form.precio_venta);
+    if (!form.precio_venta && form.precio_venta !== 0) {
+      errors.precio_venta = 'El precio de venta es obligatorio.';
+    } else if (isNaN(precio)) {
+      errors.precio_venta = 'El precio debe ser un número válido.';
+    } else if (precio <= 0) {
+      errors.precio_venta = 'El precio de venta debe ser mayor a 0.';
+    } else if (precio > 999999.99) {
+      errors.precio_venta = 'El precio no puede exceder L. 999,999.99';
+    }
+
+    // ISV
+    if (!form.cod_isv) {
+      errors.cod_isv = 'Debe seleccionar un tipo de ISV.';
+    }
+
+    // Estado
+    if (!['Activo', 'Inactivo', 'Descontinuado'].includes(form.estado_producto)) {
+      errors.estado_producto = 'Estado inválido.';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const buildCreatePayload = () => ({
     cod_categoria: Number(form.cod_categoria),
     nombre_producto: form.nombre_producto.trim(),
-    unidad_medida: form.unidad_medida.trim(),
+    unidad_medida: form.unidad_medida.trim().toUpperCase(),
     precio_venta: Number(form.precio_venta),
     cod_isv: Number(form.cod_isv),
-    estado_producto: Boolean(form.estado_producto),
+    estado_producto: form.estado_producto,
   });
 
   // =====================================================
@@ -66,10 +116,10 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
     const next = {
       cod_categoria: Number(form.cod_categoria),
       nombre_producto: form.nombre_producto.trim(),
-      unidad_medida: form.unidad_medida.trim(),
+      unidad_medida: form.unidad_medida.trim().toUpperCase(),
       precio_venta: Number(form.precio_venta),
       cod_isv: Number(form.cod_isv),
-      estado_producto: Boolean(form.estado_producto),
+      estado_producto: form.estado_producto,
     };
 
     // // Lista de campos en orden de prioridad (solo 1 se manda)
@@ -88,11 +138,11 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       const a = original[f];
       const b = next[f];
 
-      // // Normaliza comparaciones numéricas/boolean
+      // // Normaliza comparaciones numéricas/string
       const normA =
-        typeof b === 'number' ? Number(a) : typeof b === 'boolean' ? Boolean(a) : String(a ?? '');
+        typeof b === 'number' ? Number(a) : String(a ?? '');
       const normB =
-        typeof b === 'number' ? Number(b) : typeof b === 'boolean' ? Boolean(b) : String(b ?? '');
+        typeof b === 'number' ? Number(b) : String(b ?? '');
 
       if (normA !== normB) {
         changedField = f;
@@ -113,15 +163,16 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
   };
 
   const handleSubmit = (e) => {
-    e.preventDefault(); // // Evita refresh
+    e.preventDefault();
 
-    const msg = validar(); // // Valida
-    if (msg) {
-      setFormError(msg); // // Muestra error
+    const isValid = validar();
+    if (!isValid) {
+      setFormError('Corrige los campos marcados en rojo.');
       return;
     }
 
-    setFormError(''); // // Limpia error
+    setFormError('');
+    setFieldErrors({});
 
     try {
       if (isEdit) {
@@ -144,7 +195,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
           unidad_medida: 'UND',
           precio_venta: '',
           cod_isv: '',
-          estado_producto: true,
+          estado_producto: 'Activo',
         });
       }
     } catch (err) {
@@ -174,7 +225,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
           <div className="jyr-form-group">
             <label className="jyr-form-label">Categoría</label>
             <select
-              className="jyr-form-control jyr-form-select"
+              className={`jyr-form-control jyr-form-select ${fieldErrors.cod_categoria ? 'jyr-input-error' : ''}`}
               name="cod_categoria"
               value={form.cod_categoria}
               onChange={onChange}
@@ -183,44 +234,56 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
               <option value={1}>1 — Lubricantes</option>
               <option value={2}>2 — Repuestos</option>
             </select>
+            {fieldErrors.cod_categoria && <span className="jyr-field-error">{fieldErrors.cod_categoria}</span>}
           </div>
 
           <div className="jyr-form-group">
             <label className="jyr-form-label">Nombre del producto</label>
             <input
-              className="jyr-form-control"
+              className={`jyr-form-control ${fieldErrors.nombre_producto ? 'jyr-input-error' : ''}`}
               name="nombre_producto"
               placeholder="Ej: Filtro de aceite"
               value={form.nombre_producto}
               onChange={onChange}
               disabled={saving}
+              maxLength={100}
             />
+            {fieldErrors.nombre_producto && <span className="jyr-field-error">{fieldErrors.nombre_producto}</span>}
+            <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)' }}>
+              {form.nombre_producto.trim().length}/100
+            </span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div className="jyr-form-group">
               <label className="jyr-form-label">Unidad medida</label>
               <input
-                className="jyr-form-control"
+                className={`jyr-form-control ${fieldErrors.unidad_medida ? 'jyr-input-error' : ''}`}
                 name="unidad_medida"
                 value={form.unidad_medida}
                 onChange={onChange}
                 disabled={saving}
+                maxLength={10}
+                style={{ textTransform: 'uppercase' }}
               />
+              {fieldErrors.unidad_medida && <span className="jyr-field-error">{fieldErrors.unidad_medida}</span>}
             </div>
 
             <div className="jyr-form-group">
               <label className="jyr-form-label">Precio venta (L.)</label>
               <input
-                className="jyr-form-control"
+                className={`jyr-form-control ${fieldErrors.precio_venta ? 'jyr-input-error' : ''}`}
                 name="precio_venta"
                 type="number"
                 step="0.01"
+                min="0.01"
+                max="999999.99"
                 placeholder="0.00"
                 value={form.precio_venta}
                 onChange={onChange}
                 disabled={saving}
               />
+              {fieldErrors.precio_venta && <span className="jyr-field-error">{fieldErrors.precio_venta}</span>}
             </div>
           </div>
 
@@ -228,7 +291,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
             <div className="jyr-form-group">
               <label className="jyr-form-label">ISV (Impuesto)</label>
               <select
-                className="jyr-form-control jyr-form-select"
+                className={`jyr-form-control jyr-form-select ${fieldErrors.cod_isv ? 'jyr-input-error' : ''}`}
                 name="cod_isv"
                 value={form.cod_isv}
                 onChange={onChange}
@@ -241,27 +304,28 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
                   </option>
                 ))}
               </select>
+              {fieldErrors.cod_isv && <span className="jyr-field-error">{fieldErrors.cod_isv}</span>}
             </div>
 
-            <div className="jyr-form-group" style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 18 }}>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                cursor: 'pointer', fontSize: 13, fontWeight: 500
-              }}>
-                <input
-                  type="checkbox"
-                  name="estado_producto"
-                  checked={form.estado_producto}
-                  onChange={onChange}
-                  disabled={saving}
-                  style={{ width: 18, height: 18, accentColor: 'var(--jyr-red)' }}
-                />
-                {form.estado_producto ? (
-                  <span className="jyr-badge jyr-badge-success">Activo</span>
-                ) : (
-                  <span className="jyr-badge jyr-badge-danger">Inactivo</span>
-                )}
-              </label>
+            <div className="jyr-form-group">
+              <label className="jyr-form-label">Estado del producto</label>
+              <select
+                className="jyr-form-control jyr-form-select"
+                name="estado_producto"
+                value={form.estado_producto}
+                onChange={onChange}
+                disabled={saving}
+                style={{
+                  fontWeight: 600,
+                  color: form.estado_producto === 'Activo' ? 'var(--jyr-success, #16a34a)'
+                    : form.estado_producto === 'Descontinuado' ? 'var(--jyr-warning, #d97706)'
+                    : 'var(--jyr-danger, #dc2626)'
+                }}
+              >
+                <option value="Activo">✅ Activo</option>
+                <option value="Inactivo">🚫 Inactivo</option>
+                <option value="Descontinuado">⚠️ Descontinuado</option>
+              </select>
             </div>
           </div>
 

@@ -73,6 +73,24 @@ export const useProducto = () => {
     }
   };
 
+  // =======================
+  // CAMBIAR ESTADO (Activo/Inactivo/Descontinuado)
+  // =======================
+  const cambiarEstado = async (cod_producto, estado) => {
+    try {
+      setSaving(true);
+      limpiarMensajes();
+
+      const res = await productoApi.cambiarEstado({ cod_producto, estado });
+      setSuccess(res?.message || `Estado cambiado a "${estado}" ✅`);
+      await cargar();
+    } catch (e) {
+      setError(e.message || 'Error al cambiar estado del producto');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     cargar(); // // Carga inicial
   }, []);
@@ -89,6 +107,7 @@ export const useProducto = () => {
     crear, // // Acción POST
     actualizar, // // Acción PUT
     eliminar, // // Acción DELETE
+    cambiarEstado, // // Cambiar estado (Activo/Inactivo/Descontinuado)
   };
 };
 
