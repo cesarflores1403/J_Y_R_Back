@@ -50,6 +50,7 @@ export const productosDisponibles = async (req, res) => {
     const productos = await facturaService.productosDisponibles(req.query);
     res.json({ ok: true, datos: productos });
   } catch (error) {
+    console.error('❌ ERROR productosDisponibles:', error.message, error.stack);
     res.status(500).json({ ok: false, mensaje: error.message });
   }
 };

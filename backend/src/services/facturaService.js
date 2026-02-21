@@ -4,6 +4,7 @@ import DetalleFactura from '../models/DetalleFactura.js';
 import Cliente from '../models/Cliente.js';
 import ProductoSeq from '../models/ProductoSeq.js';
 import Usuario from '../models/Usuario.js';
+import Pago from '../models/Pago.js';
 import { Op } from 'sequelize';
 
 class FacturaService {
@@ -53,6 +54,12 @@ class FacturaService {
           model: DetalleFactura,
           as: 'detalles',
           include: [{ model: ProductoSeq, as: 'producto', attributes: ['cod_producto', 'nombre_producto', 'unidad_medida'] }]
+        },
+        {
+          model: Pago,
+          as: 'pagos',
+          include: [{ model: Usuario, as: 'usuario', attributes: ['cod_usuario', 'nombre_usuario'] }],
+          order: [['fecha_pago', 'DESC']]
         }
       ]
     });
@@ -63,17 +70,31 @@ class FacturaService {
   // =============================================
   // CREAR FACTURA (transacción: factura + detalles + inventario)
   // HU-FAC-03: Cálculo ISV y totales por línea con redondeo a 2 decimales
+  // HU-FAC-04: Descuentos por línea (% o monto) y/o descuento global por factura
   // =============================================
   async crear(datos, codUsuario) {
-    const { cod_cliente, metodo_pago, ref_pago, items } = datos;
+    const { cod_cliente, metodo_pago, ref_pago, items, descuento_global, tipo_descuento_global } = datos;
 
     // Función de redondeo preciso a 2 decimales
     const round2 = (n) => Math.round((parseFloat(n) + Number.EPSILON) * 100) / 100;
 
-    // Validaciones
+    // Validaciones básicas
     if (!cod_cliente) throw Object.assign(new Error('El cliente es requerido'), { statusCode: 400 });
     if (!items || !Array.isArray(items) || items.length === 0) {
       throw Object.assign(new Error('Debe incluir al menos 1 ítem'), { statusCode: 400 });
+    }
+
+    // Validar descuento global si se envía
+    const descGlobal = parseFloat(descuento_global) || 0;
+    const tipoDescGlobal = tipo_descuento_global || null;
+    if (descGlobal > 0 && !['PORCENTAJE', 'MONTO'].includes(tipoDescGlobal)) {
+      throw Object.assign(new Error('tipo_descuento_global debe ser PORCENTAJE o MONTO'), { statusCode: 400 });
+    }
+    if (descGlobal < 0) {
+      throw Object.assign(new Error('El descuento global no puede ser negativo'), { statusCode: 400 });
+    }
+    if (tipoDescGlobal === 'PORCENTAJE' && descGlobal > 100) {
+      throw Object.assign(new Error('El descuento global en porcentaje no puede ser mayor a 100%'), { statusCode: 400 });
     }
 
     // Verificar que el cliente existe
@@ -84,8 +105,9 @@ class FacturaService {
     const t = await sequelize.transaction();
 
     try {
-      let subtotalGeneral = 0;
-      let descuentoGeneral = 0;
+      let subtotalBrutoGeneral = 0;   // Suma de (precio * cantidad) antes de descuentos
+      let descuentoLineasTotal = 0;    // Suma monetaria de descuentos de línea
+      let subtotalGeneral = 0;         // Suma de subtotales después de desc. línea
       let isvGeneral = 0;
       const detallesCalculados = [];
 
@@ -93,6 +115,19 @@ class FacturaService {
         // Validar item
         if (!item.cod_producto || !item.cantidad || item.cantidad <= 0) {
           throw Object.assign(new Error('Cada ítem debe tener cod_producto y cantidad > 0'), { statusCode: 400 });
+        }
+
+        // Validar tipo de descuento de línea
+        const tipoDescLinea = item.tipo_descuento || 'PORCENTAJE';
+        if (!['PORCENTAJE', 'MONTO'].includes(tipoDescLinea)) {
+          throw Object.assign(new Error('tipo_descuento del ítem debe ser PORCENTAJE o MONTO'), { statusCode: 400 });
+        }
+        const descLinea = round2(parseFloat(item.descuento) || 0);
+        if (descLinea < 0) {
+          throw Object.assign(new Error('El descuento del ítem no puede ser negativo'), { statusCode: 400 });
+        }
+        if (tipoDescLinea === 'PORCENTAJE' && descLinea > 100) {
+          throw Object.assign(new Error('El descuento en porcentaje no puede ser mayor a 100%'), { statusCode: 400 });
         }
 
         // Obtener producto
@@ -122,7 +157,6 @@ class FacturaService {
         }
 
         const precioUnitario = round2(producto.precio_venta);
-        const descuento = round2(item.descuento || 0); // porcentaje 0-100
 
         // Obtener ISV del catálogo usando cod_isv del producto
         let isvPorcentaje = 0;
@@ -134,15 +168,23 @@ class FacturaService {
           isvPorcentaje = isvInfo ? parseFloat(isvInfo.porcentaje) : 0;
         }
 
-        // Cálculo por línea con redondeo
+        // --- Cálculo de descuento por línea (HU-FAC-04) ---
         const subtotalBruto = round2(precioUnitario * item.cantidad);
-        const montoDescuento = round2((descuento / 100) * subtotalBruto);
+        let montoDescuento = 0;
+        if (tipoDescLinea === 'PORCENTAJE') {
+          montoDescuento = round2((descLinea / 100) * subtotalBruto);
+        } else {
+          // MONTO: no puede exceder el subtotal bruto
+          montoDescuento = round2(Math.min(descLinea, subtotalBruto));
+        }
+
         const subtotalItem = round2(subtotalBruto - montoDescuento);
         const isvItem = round2((isvPorcentaje / 100) * subtotalItem);
         const totalItem = round2(subtotalItem + isvItem);
 
+        subtotalBrutoGeneral = round2(subtotalBrutoGeneral + subtotalBruto);
+        descuentoLineasTotal = round2(descuentoLineasTotal + montoDescuento);
         subtotalGeneral = round2(subtotalGeneral + subtotalItem);
-        descuentoGeneral = round2(descuentoGeneral + montoDescuento);
         isvGeneral = round2(isvGeneral + isvItem);
 
         detallesCalculados.push({
@@ -150,14 +192,39 @@ class FacturaService {
           cod_producto: item.cod_producto,
           cantidad: item.cantidad,
           precio_unitario: precioUnitario,
-          descuento: descuento,
+          tipo_descuento: tipoDescLinea,
+          descuento: descLinea,
+          monto_descuento: montoDescuento,
           isv: isvItem,
           subtotal: subtotalItem,
           total: totalItem
         });
       }
 
+      // --- Descuento global de factura (HU-FAC-04) ---
+      let montoDescGlobal = 0;
+      if (descGlobal > 0 && tipoDescGlobal) {
+        if (tipoDescGlobal === 'PORCENTAJE') {
+          montoDescGlobal = round2((descGlobal / 100) * subtotalGeneral);
+        } else {
+          // MONTO: no puede exceder el subtotal general
+          montoDescGlobal = round2(Math.min(descGlobal, subtotalGeneral));
+        }
+
+        // Recalcular ISV proporcionalmente al descuento global
+        // factor = porción que queda del subtotal después del descuento global
+        if (subtotalGeneral > 0) {
+          const factor = round2((subtotalGeneral - montoDescGlobal) / subtotalGeneral);
+          isvGeneral = round2(isvGeneral * factor);
+        }
+        subtotalGeneral = round2(subtotalGeneral - montoDescGlobal);
+      }
+
+      const descuentoTotal = round2(descuentoLineasTotal + montoDescGlobal);
       const totalGeneral = round2(subtotalGeneral + isvGeneral);
+
+      // Determinar si se aplicó algún descuento (para auditoría)
+      const hayDescuento = descuentoLineasTotal > 0 || montoDescGlobal > 0;
 
       // Crear factura
       const factura = await Factura.create({
@@ -166,9 +233,16 @@ class FacturaService {
         metodo_pago: metodo_pago || null,
         ref_pago: ref_pago || null,
         subtotal: subtotalGeneral,
-        descuento: descuentoGeneral,
+        descuento: descuentoTotal,
+        descuento_global: descGlobal,
+        tipo_descuento_global: tipoDescGlobal,
+        monto_descuento_global: montoDescGlobal,
+        descuento_aplicado_por: hayDescuento ? codUsuario : null,
         isv: isvGeneral,
         total: totalGeneral,
+        estado_pago: 'PENDIENTE',
+        total_pagado: 0,
+        saldo: totalGeneral,
         estado: true
       }, { transaction: t });
 
@@ -275,10 +349,9 @@ class FacturaService {
   // =============================================
   async productosDisponibles({ buscar = '' }) {
     const where = { estado_producto: 'Activo' };
+
     if (buscar) {
       const busqueda = buscar.trim();
-      // Si es numérico, buscamos por cod_producto exacto o parcial
-      // Si es texto, buscamos por nombre
       const esNumero = /^\d+$/.test(busqueda);
       if (esNumero) {
         where[Op.or] = [
@@ -286,13 +359,7 @@ class FacturaService {
           { nombre_producto: { [Op.iLike]: `%${busqueda}%` } }
         ];
       } else {
-        where[Op.or] = [
-          { nombre_producto: { [Op.iLike]: `%${busqueda}%` } },
-          sequelize.where(
-            sequelize.cast(sequelize.col('cod_producto'), 'TEXT'),
-            { [Op.iLike]: `%${busqueda}%` }
-          )
-        ];
+        where.nombre_producto = { [Op.iLike]: `%${busqueda}%` };
       }
     }
 

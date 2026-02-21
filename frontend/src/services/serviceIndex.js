@@ -43,3 +43,10 @@ export const facturaService = {
   productosDisponibles: (params) => api.get('/facturas/productos-disponibles', { params }),
   clientesDisponibles: (params) => api.get('/facturas/clientes-disponibles', { params }),
 };
+
+// ==================== PAGOS (HU-FAC-05) ====================
+export const pagoService = {
+  listarPorFactura: (codFactura) => api.get(`/pagos/factura/${codFactura}`),
+  registrar: (data) => api.post('/pagos', data),
+  anular: (codPago) => api.patch(`/pagos/${codPago}/anular`),
+};

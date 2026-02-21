@@ -8,6 +8,7 @@ import Factura from './Factura.js';
 import DetalleFactura from './DetalleFactura.js';
 import ProductoSeq from './ProductoSeq.js';
 import Isv from './Isv.js';
+import Pago from './Pago.js';
 
 // =============================================
 // RELACIONES
@@ -47,6 +48,14 @@ DetalleFactura.belongsTo(ProductoSeq, { foreignKey: 'cod_producto', as: 'product
 Isv.hasMany(ProductoSeq, { foreignKey: 'cod_isv', as: 'productos' });
 ProductoSeq.belongsTo(Isv, { foreignKey: 'cod_isv', as: 'isv' });
 
+// Factura -> Pago (HU-FAC-05)
+Factura.hasMany(Pago, { foreignKey: 'cod_factura', as: 'pagos' });
+Pago.belongsTo(Factura, { foreignKey: 'cod_factura', as: 'factura' });
+
+// Pago -> Usuario (auditoría)
+Usuario.hasMany(Pago, { foreignKey: 'cod_usuario', as: 'pagosRegistrados' });
+Pago.belongsTo(Usuario, { foreignKey: 'cod_usuario', as: 'usuario' });
+
 export {
   sequelize,
   Usuario,
@@ -57,5 +66,6 @@ export {
   Factura,
   DetalleFactura,
   ProductoSeq,
-  Isv
+  Isv,
+  Pago
 };
