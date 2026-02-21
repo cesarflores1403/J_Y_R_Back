@@ -3,12 +3,15 @@ import bcrypt from 'bcryptjs';
 import Usuario from '../models/Usuario.js';
 import Rol from '../models/Rol.js';
 
+const JWT_SECRET = process.env.JWT_SECRET || 'CAMBIA_ESTE_SECRET_EN_ENV';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || process.env.JWT_EXPIRE || '8h';
+
 class AuthService {
   generarToken(usuario, nombreRol) {
     return jwt.sign(
       { id: usuario.cod_usuario, nombre: usuario.nombre_usuario, rol: nombreRol },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
     );
   }
 
