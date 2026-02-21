@@ -6,6 +6,8 @@ import proveedoresRoutes from './proveedores.js';
 import reportesRoutes from './reportes.js';
 import facturasRoutes from './facturas.js';
 import isvRoutes from './isv.js';
+import ubicacionesRoutes from './ubicaciones.js';
+import inventarioExistenciasRoutes from './inventarioExistencias.js';
 
 const router = express.Router();
 
@@ -16,5 +18,7 @@ router.use('/proveedores', proveedoresRoutes);
 router.use('/reportes', reportesRoutes);
 router.use('/facturas', facturasRoutes);
 router.use('/isv', isvRoutes);
+router.use('/ubicaciones', ubicacionesRoutes);
+router.use('/inventario', inventarioExistenciasRoutes);
 
 export default router;
