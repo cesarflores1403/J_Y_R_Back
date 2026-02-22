@@ -10,19 +10,20 @@ export const productoApi = {
     }),
 
   // =====================================================
-  // PUT (pa_update) - 1 campo por vez
-  // payload esperado: { cod_producto, datos: { campo: valor } }
+  // PUT - HU-05: Editar producto (m\u00faltiples campos)
+  // payload esperado: { cod_producto, datos: { campo1: valor1, campo2: valor2, ... } }
+  // El backend itera internamente con pa_update por cada campo
   // =====================================================
   update: (payload) => {
-    const datos = payload?.datos || {}; // // Datos a actualizar
+    const datos = payload?.datos || {};
 
-    if (Object.keys(datos).length !== 1) {
-      throw new Error('Solo se permite actualizar 1 campo por vez (pa_update)');
+    if (Object.keys(datos).length === 0) {
+      throw new Error('No hay campos para actualizar.');
     }
 
     return apiFetch('/api/producto', {
       method: 'PUT',
-      body: JSON.stringify(payload), // // { cod_producto, datos:{ campo: valor } }
+      body: JSON.stringify(payload),
     });
   },
 

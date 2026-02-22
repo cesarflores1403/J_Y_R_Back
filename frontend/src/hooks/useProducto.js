@@ -33,8 +33,15 @@ export const useProducto = () => {
       setSaving(true); // // Inicia acción
       limpiarMensajes(); // // Limpia mensajes
 
-      await productoApi.create(payload); // // POST
-      setSuccess('Producto creado correctamente ✅'); // // Éxito
+      const productoCreado = await productoApi.create(payload); // // POST — retorna producto con cod_producto
+
+      // HU-04: Mostrar el código único formateado (PROD-XXXX)
+      const codigoUnico = productoCreado?.codigo_producto || productoCreado?.cod_producto;
+      setSuccess(
+        codigoUnico
+          ? `Producto creado exitosamente. Código asignado: ${codigoUnico} ✅`
+          : 'Producto creado correctamente ✅'
+      );
       await cargar(); // // Refresca lista
     } catch (e) {
       setError(e.message || 'Error al crear producto'); // // Error
@@ -48,8 +55,21 @@ export const useProducto = () => {
       setSaving(true); // // Inicia acción
       limpiarMensajes(); // // Limpia mensajes
 
-      await productoApi.update(payload); // // PUT (pa_update 1 campo)
-      setSuccess('Producto actualizado correctamente ✅'); // // Éxito
+      const result = await productoApi.update(payload); // // PUT (múltiples campos)
+
+      // HU-05: Mensaje con detalle de campos actualizados
+      const codigo = payload.cod_producto;
+      const codigoFmt = `PROD-${String(codigo).padStart(4, '0')}`;
+      const camposLegibles = {
+        cod_categoria: 'Categoría',
+        nombre_producto: 'Nombre',
+        unidad_medida: 'Unidad',
+        precio_venta: 'Precio',
+        cod_isv: 'ISV',
+        estado_producto: 'Estado'
+      };
+      const camposTexto = Object.keys(payload.datos).map(c => camposLegibles[c] || c).join(', ');
+      setSuccess(`${codigoFmt} actualizado correctamente. Campos: ${camposTexto} ✅`);
       await cargar(); // // Refresca lista
     } catch (e) {
       setError(e.message || 'Error al actualizar producto'); // // Error

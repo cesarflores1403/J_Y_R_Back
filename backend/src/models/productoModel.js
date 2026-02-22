@@ -7,6 +7,14 @@ import pool from '../config/db-connection.js';
 // =====================================================
 
 // =======================
+// HU-04: Generar código formateado PROD-XXXX
+// =======================
+export const formatCodProducto = (cod) => {
+  if (!cod) return null;
+  return `PROD-${String(cod).padStart(4, '0')}`;
+};
+
+// =======================
 // GET PRODUCTOS (con detalle ISV del catálogo)
 // =======================
 export const getProducto = async () => {
@@ -21,20 +29,42 @@ export const getProducto = async () => {
     ORDER BY p.cod_producto
   `;
   const result = await pool.query(query);
-  return result.rows || [];
+
+  // HU-04: Agregar codigo_producto formateado a cada fila
+  return (result.rows || []).map(row => ({
+    ...row,
+    codigo_producto: formatCodProducto(row.cod_producto)
+  }));
 };
 
 // =======================
-// INSERT PRODUCTO
+// INSERT PRODUCTO (HU-04: retorna el producto creado con cod_producto)
 // =======================
 export const createProducto = async (datos) => {
-  const tabla = 'producto'; // // Tabla real
+  const tabla = 'producto';
+  const datosJson = JSON.stringify(datos);
+  const queryInsert = 'CALL public.pa_insert($1, $2::json)';
 
-  const datosJson = JSON.stringify(datos); // // Convertir objeto JS a JSON válido
+  // // 1. Insertar producto
+  await pool.query(queryInsert, [tabla, datosJson]);
 
-  const query = 'CALL public.pa_insert($1, $2::json)'; // // Forzamos tipo JSON
+  // // 2. Buscar el producto recién creado por nombre (método confiable con Supabase pooler)
+  const buscar = `
+    SELECT cod_producto, nombre_producto, cod_categoria,
+           unidad_medida, precio_venta, cod_isv, estado_producto
+    FROM producto
+    WHERE LOWER(TRIM(nombre_producto)) = LOWER(TRIM($1))
+    ORDER BY cod_producto DESC
+    LIMIT 1
+  `;
+  const result = await pool.query(buscar, [datos.nombre_producto]);
 
-  await pool.query(query, [tabla, datosJson]); // // Ejecuta procedure
+  // HU-04: Agregar codigo_producto formateado
+  const producto = result.rows[0] || null;
+  if (producto) {
+    producto.codigo_producto = formatCodProducto(producto.cod_producto);
+  }
+  return producto;
 };
 
 // =======================

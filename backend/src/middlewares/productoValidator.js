@@ -46,7 +46,7 @@ export const validarCrearProducto = [
 ];
 
 // =======================
-// ACTUALIZAR PRODUCTO (pa_update 1 campo)
+// ACTUALIZAR PRODUCTO (HU-05: permite múltiples campos)
 // =======================
 export const validarActualizarProducto = [
   body('cod_producto')
@@ -59,39 +59,40 @@ export const validarActualizarProducto = [
     .custom((datos) => {
       const keys = Object.keys(datos);
       if (keys.length === 0) throw new Error('datos no puede estar vacío.');
-      if (keys.length > 1) throw new Error('Solo se permite actualizar 1 campo por vez (pa_update).');
 
-      const campo = keys[0];
-      const valor = datos[campo];
       const camposPermitidos = ['cod_categoria', 'nombre_producto', 'unidad_medida', 'precio_venta', 'cod_isv', 'estado_producto'];
 
-      if (!camposPermitidos.includes(campo)) {
-        throw new Error(`Campo "${campo}" no es un campo válido de producto.`);
-      }
+      // Validar cada campo enviado
+      for (const campo of keys) {
+        const valor = datos[campo];
 
-      // Validar reglas por campo individual
-      switch (campo) {
-        case 'cod_categoria':
-          if (![1, 2].includes(Number(valor))) throw new Error('cod_categoria debe ser 1 o 2.');
-          break;
-        case 'nombre_producto':
-          if (!valor || typeof valor !== 'string' || valor.trim().length < 2) throw new Error('nombre_producto debe tener al menos 2 caracteres.');
-          if (valor.trim().length > 100) throw new Error('nombre_producto no puede exceder 100 caracteres.');
-          break;
-        case 'unidad_medida':
-          if (!valor || typeof valor !== 'string' || valor.trim().length < 1) throw new Error('unidad_medida es obligatoria.');
-          if (valor.trim().length > 10) throw new Error('unidad_medida no puede exceder 10 caracteres.');
-          break;
-        case 'precio_venta':
-          if (Number(valor) <= 0) throw new Error('precio_venta debe ser mayor a 0.');
-          if (Number(valor) > 999999.99) throw new Error('precio_venta no puede exceder 999,999.99.');
-          break;
-        case 'cod_isv':
-          if (!Number.isInteger(Number(valor)) || Number(valor) < 1) throw new Error('cod_isv debe ser un entero positivo.');
-          break;
-        case 'estado_producto':
-          if (!['Activo', 'Inactivo', 'Descontinuado'].includes(valor)) throw new Error('estado_producto inválido.');
-          break;
+        if (!camposPermitidos.includes(campo)) {
+          throw new Error(`Campo "${campo}" no es un campo válido de producto.`);
+        }
+
+        switch (campo) {
+          case 'cod_categoria':
+            if (![1, 2].includes(Number(valor))) throw new Error('cod_categoria debe ser 1 o 2.');
+            break;
+          case 'nombre_producto':
+            if (!valor || typeof valor !== 'string' || valor.trim().length < 2) throw new Error('nombre_producto debe tener al menos 2 caracteres.');
+            if (valor.trim().length > 100) throw new Error('nombre_producto no puede exceder 100 caracteres.');
+            break;
+          case 'unidad_medida':
+            if (!valor || typeof valor !== 'string' || valor.trim().length < 1) throw new Error('unidad_medida es obligatoria.');
+            if (valor.trim().length > 10) throw new Error('unidad_medida no puede exceder 10 caracteres.');
+            break;
+          case 'precio_venta':
+            if (Number(valor) <= 0) throw new Error('precio_venta debe ser mayor a 0.');
+            if (Number(valor) > 999999.99) throw new Error('precio_venta no puede exceder 999,999.99.');
+            break;
+          case 'cod_isv':
+            if (!Number.isInteger(Number(valor)) || Number(valor) < 1) throw new Error('cod_isv debe ser un entero positivo.');
+            break;
+          case 'estado_producto':
+            if (!['Activo', 'Inactivo', 'Descontinuado'].includes(valor)) throw new Error('estado_producto inválido.');
+            break;
+        }
       }
 
       return true;

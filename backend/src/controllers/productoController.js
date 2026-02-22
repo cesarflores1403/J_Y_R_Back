@@ -20,7 +20,7 @@ export const getProducto = async (req, res, next) => {
 };
 
 // =======================
-// CREATE PRODUCTO
+// CREATE PRODUCTO (HU-04: retorna producto con cod_producto asignado)
 // =======================
 export const createProducto = async (req, res, next) => {
   try {
@@ -29,12 +29,15 @@ export const createProducto = async (req, res, next) => {
       await isvService.validarIsvExiste(req.body.cod_isv);
     }
 
-    await productoService.createProducto(req.body);
+    // HU-04: createProducto retorna el producto insertado con cod_producto
+    const productoCreado = await productoService.createProducto(req.body);
 
     return sendOk(res, {
       status: 201,
-      message: 'Producto creado exitosamente.',
-      data: null
+      message: productoCreado
+        ? `Producto creado exitosamente. Código asignado: ${productoCreado.cod_producto}`
+        : 'Producto creado exitosamente.',
+      data: productoCreado
     });
   } catch (err) {
     next(err);
@@ -42,7 +45,7 @@ export const createProducto = async (req, res, next) => {
 };
 
 // =======================
-// UPDATE PRODUCTO
+// UPDATE PRODUCTO (HU-05: múltiples campos + mensaje detallado)
 // =======================
 export const updateProducto = async (req, res, next) => {
   try {
@@ -55,10 +58,22 @@ export const updateProducto = async (req, res, next) => {
 
     await productoService.updateProducto({ cod_producto, datos });
 
+    // HU-05: Mensaje detallado con campos actualizados
+    const camposActualizados = Object.keys(datos);
+    const nombresLegibles = {
+      cod_categoria: 'Categoría',
+      nombre_producto: 'Nombre',
+      unidad_medida: 'Unidad de medida',
+      precio_venta: 'Precio de venta',
+      cod_isv: 'ISV',
+      estado_producto: 'Estado'
+    };
+    const camposTexto = camposActualizados.map(c => nombresLegibles[c] || c).join(', ');
+
     return sendOk(res, {
       status: 200,
-      message: 'Producto actualizado correctamente.',
-      data: null
+      message: `Producto actualizado correctamente. Campos modificados: ${camposTexto}.`,
+      data: { cod_producto, campos_actualizados: camposActualizados }
     });
   } catch (err) {
     next(err);

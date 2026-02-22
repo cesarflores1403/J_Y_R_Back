@@ -107,10 +107,10 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
   });
 
   // =====================================================
-  // pa_update: 1 campo por vez
-  // Para edición: elegimos SOLO 1 campo que cambió
+  // HU-05: Detectar TODOS los campos que cambiaron
+  // pa_update los procesa 1 por 1 internamente en el modelo
   // =====================================================
-  const buildUpdatePayloadOneField = () => {
+  const buildUpdatePayload = () => {
     const original = selected || {};
 
     const next = {
@@ -122,7 +122,6 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       estado_producto: form.estado_producto,
     };
 
-    // // Lista de campos en orden de prioridad (solo 1 se manda)
     const fields = [
       'cod_categoria',
       'nombre_producto',
@@ -132,37 +131,31 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       'estado_producto',
     ];
 
-    // // Detecta el primer cambio
-    let changedField = null;
+    // // Detecta TODOS los campos que cambiaron
+    const changedData = {};
     for (const f of fields) {
       const a = original[f];
       const b = next[f];
 
-      // // Normaliza comparaciones numéricas/string
-      const normA =
-        typeof b === 'number' ? Number(a) : String(a ?? '');
-      const normB =
-        typeof b === 'number' ? Number(b) : String(b ?? '');
+      const normA = typeof b === 'number' ? Number(a) : String(a ?? '');
+      const normB = typeof b === 'number' ? Number(b) : String(b ?? '');
 
       if (normA !== normB) {
-        changedField = f;
-        break;
+        changedData[f] = next[f];
       }
     }
 
-    if (!changedField) {
-      throw new Error('No hay cambios para actualizar');
+    if (Object.keys(changedData).length === 0) {
+      throw new Error('No hay cambios para actualizar.');
     }
 
     return {
       cod_producto: selected.cod_producto,
-      datos: {
-        [changedField]: next[changedField],
-      },
+      datos: changedData,
     };
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const isValid = validar();
@@ -176,19 +169,13 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
 
     try {
       if (isEdit) {
-        const payload = buildUpdatePayloadOneField(); // // PUT 1 campo
-
-        // =====================================================
-        // DEBUG TEMPORAL: Ver exactamente qué manda al backend
-        // =====================================================
-        console.log('UPDATE PAYLOAD =>', payload);
-
-        onSubmit(payload); // // Ejecuta UPDATE
+        const payload = buildUpdatePayload(); // // HU-05: PUT múltiples campos
+        await onSubmit(payload); // // Ejecuta UPDATE (await para esperar respuesta)
       } else {
         const payload = buildCreatePayload(); // // POST
-        onSubmit(payload); // // Ejecuta CREATE
+        await onSubmit(payload); // // Ejecuta CREATE (await para esperar respuesta)
 
-        // // Limpia form luego de crear
+        // // Limpia form luego de crear exitosamente
         setForm({
           cod_categoria: 2,
           nombre_producto: '',
@@ -210,6 +197,21 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       </div>
 
       <div className="jyr-card-body">
+        {/* HU-05: Detalle del producto en modo edición */}
+        {isEdit && selected && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 'var(--radius-sm)',
+            background: 'var(--jyr-info-bg)', color: 'var(--jyr-info)',
+            fontSize: 13, fontWeight: 500, marginBottom: 16,
+            border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', gap: 10
+          }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 14 }}>
+              {selected.codigo_producto || `PROD-${String(selected.cod_producto).padStart(4, '0')}`}
+            </span>
+            <span>— Editando: <strong>{selected.nombre_producto}</strong></span>
+          </div>
+        )}
+
         {formError && (
           <div style={{
             padding: '10px 14px', borderRadius: 'var(--radius-sm)',
@@ -357,7 +359,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
             marginTop: 12, fontSize: 11, color: 'var(--jyr-gray-400)',
             fontStyle: 'italic'
           }}>
-            * En edición se actualiza 1 campo por vez (pa_update).
+            * Modifica los campos que necesites y presiona "Actualizar".
           </p>
         )}
       </div>

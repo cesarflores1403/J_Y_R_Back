@@ -38,6 +38,21 @@ const normalizar = (datos) => {
 };
 
 // =======================
+// HU-04: VERIFICAR UNICIDAD DE cod_producto
+// =======================
+const verificarCodProductoExistente = async (cod_producto) => {
+  const query = `SELECT cod_producto, nombre_producto FROM producto WHERE cod_producto = $1`;
+  const result = await pool.query(query, [cod_producto]);
+  if (result.rows.length > 0) {
+    const error = new Error(
+      `Ya existe un producto con el código ${cod_producto} ("${result.rows[0].nombre_producto}"). El código de producto debe ser único.`
+    );
+    error.status = 409;
+    throw error;
+  }
+};
+
+// =======================
 // VERIFICAR NOMBRE DUPLICADO
 // =======================
 const verificarDuplicado = async (nombre_producto, codExcluir = null) => {
@@ -66,15 +81,22 @@ export const getProducto = async () => {
 };
 
 // =======================
-// CREATE PRODUCTO
+// CREATE PRODUCTO (HU-04: validar unicidad + retornar producto creado)
 // =======================
 export const createProducto = async (datos) => {
   const datosNorm = normalizar(datos);
 
+  // HU-04: Si se envió cod_producto manual, verificar unicidad
+  if (datosNorm.cod_producto !== undefined && datosNorm.cod_producto !== null) {
+    await verificarCodProductoExistente(datosNorm.cod_producto);
+  }
+
   // Verificar duplicado por nombre
   await verificarDuplicado(datosNorm.nombre_producto);
 
-  return await productoModel.createProducto(datosNorm);
+  // Insertar y retornar el producto creado (con cod_producto asignado)
+  const productoCreado = await productoModel.createProducto(datosNorm);
+  return productoCreado;
 };
 
 // =======================
