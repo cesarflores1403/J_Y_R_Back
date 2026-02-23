@@ -25,6 +25,16 @@ export const proveedorService = {
   toggleEstado: (id) => api.patch(`/proveedores/${id}/toggle-estado`),
 };
 
+// ==================== UBICACIONES ====================
+export const ubicacionService = {
+  listar: (params) => api.get('/ubicaciones', { params }),
+  obtener: (id) => api.get(`/ubicaciones/${id}`),
+  crear: (data) => api.post('/ubicaciones', data),
+  actualizar: (id, data) => api.put(`/ubicaciones/${id}`, data),
+  desactivar: (id) => api.patch(`/ubicaciones/${id}/desactivar`),
+  eliminar: (id) => api.delete(`/ubicaciones/${id}`),
+};
+
 // ==================== REPORTES ====================
 export const reporteService = {
   dashboard: () => api.get('/reportes/dashboard'),
