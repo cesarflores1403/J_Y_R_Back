@@ -7,6 +7,8 @@ import { FiLogOut } from 'react-icons/fi';
 const pageNames = {
   '/': 'Dashboard',
   '/productos': 'Productos',
+  '/ubicaciones': 'Ubicaciones',
+  '/inventario': 'Existencias',
   '/clientes': 'Clientes',
   '/proveedores': 'Proveedores',
   '/reportes': 'Reportes',
