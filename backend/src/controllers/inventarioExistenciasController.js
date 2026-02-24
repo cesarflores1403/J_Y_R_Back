@@ -1,5 +1,6 @@
 import { sendOk } from '../utils/response.js';
 import inventarioExistenciasService from '../services/inventarioExistenciasService.js';
+import logger from '../config/logger.js';
 
 // // GET /api/inventario/existencias
 // // Lista existencias con filtros por producto/ubicacion y paginacion
@@ -24,6 +25,20 @@ export const listarExistencias = async (req, res, next) => {
 // // Actualiza unicamente stock_minimo y stock_maximo
 export const actualizarMinMax = async (req, res, next) => {
   try {
+    // // Bloqueo explicito de campos de stock para evitar cambios fuera del alcance HU2
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'stock')) {
+      const error = new Error('No se permite actualizar stock desde este endpoint');
+      error.status = 400;
+      throw error;
+    }
+
+    // // Bloqueo explicito de stock_reservado (se administra por otros procesos)
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'stock_reservado')) {
+      const error = new Error('No se permite actualizar stock_reservado desde este endpoint');
+      error.status = 400;
+      throw error;
+    }
+
     // // Campos permitidos para este endpoint (no se permite stock)
     const camposPermitidos = ['stock_minimo', 'stock_maximo'];
     // // Detectamos cualquier campo adicional enviado por cliente
@@ -51,19 +66,40 @@ export const actualizarMinMax = async (req, res, next) => {
     }
 
     // // Ejecutamos update restringido en service
-    const data = await inventarioExistenciasService.actualizarMinMax(
+    const resultado = await inventarioExistenciasService.actualizarMinMax(
       Number(req.params.id),
       {
         stock_minimo: stockMinimo,
         stock_maximo: stockMaximo
+      },
+      {
+        // // Pasamos contexto minimo del usuario autenticado para auditoria de logs
+        usuario: req.usuario
       }
     );
+
+    // // Auditoria minima (no persistente): log estructurado before/after usando logger existente
+    logger.info('inventario.existencias.minmax_actualizado', {
+      // // Metadata de la accion para trazabilidad operacional
+      modulo: 'inventario',
+      accion: 'actualizar_min_max',
+      cod_inventario: Number(req.params.id),
+      // // Usuario autenticado si existe en el middleware actual
+      usuario: req.usuario ? {
+        cod_usuario: req.usuario.cod_usuario ?? null,
+        nombre_usuario: req.usuario.nombre_usuario ?? null,
+        rol: req.usuario.rol ?? null
+      } : null,
+      // // Snapshot before/after limitado al alcance HU2
+      before: resultado.before,
+      after: resultado.after
+    });
 
     // // Respuesta estandar de exito
     return sendOk(res, {
       status: 200,
       message: 'Minimos y maximos actualizados correctamente',
-      data
+      data: resultado.data
     });
   } catch (error) {
     // // Error inesperado pasa al middleware global
