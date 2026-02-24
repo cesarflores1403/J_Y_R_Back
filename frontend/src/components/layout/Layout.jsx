@@ -8,19 +8,27 @@ const pageNames = {
   '/': 'Dashboard',
   '/productos': 'Productos',
   '/ubicaciones': 'Ubicaciones',
-  '/inventario': 'Existencias',
+  // // Submodulos de Inventario con titulo independiente en topbar
+  '/inventario/existencias': 'Existencias',
+  '/inventario/kardex': 'Kardex',
+  '/inventario/entradas': 'Entradas',
+  // // Fallback por segmento base de inventario
+  '/inventario': 'Inventario',
   '/clientes': 'Clientes',
   '/proveedores': 'Proveedores',
   '/reportes': 'Reportes',
-  '/facturas': 'Facturación',
+  '/facturas': 'Facturacion',
 };
 
 const Layout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { usuario, cerrarSesion } = useAuth();
+
+  // // Fallback por primer segmento para rutas no mapeadas de forma exacta
   const basePath = '/' + (location.pathname.split('/')[1] || '');
-  const pageName = pageNames[basePath] || 'JYR Sistema';
+  // // Priorizamos coincidencia exacta y luego fallback
+  const pageName = pageNames[location.pathname] || pageNames[basePath] || 'JYR Sistema';
 
   const handleLogout = () => {
     cerrarSesion();
@@ -38,13 +46,13 @@ const Layout = () => {
           <div className="jyr-topbar-actions">
             {usuario && (
               <span className="jyr-topbar-user-label">
-                {usuario.nombre_usuario} — {usuario.rol}
+                {usuario.nombre_usuario} - {usuario.rol}
               </span>
             )}
             <button
               className="jyr-topbar-logout"
               onClick={handleLogout}
-              title="Cerrar sesión"
+              title="Cerrar sesion"
             >
               <FiLogOut />
               <span>Salir</span>

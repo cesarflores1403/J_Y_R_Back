@@ -13,6 +13,8 @@ import Facturas from '../components/facturas/Facturas.jsx';
 import ProductoPage from '../pages/ProductoPage.jsx';
 import Ubicaciones from '../components/ubicaciones/Ubicaciones.jsx';
 import Existencias from '../components/inventario/Existencias.jsx';
+import InventarioKardexPage from '../components/inventario/InventarioKardexPage.jsx';
+import InventarioEntradasPage from '../components/inventario/InventarioEntradasPage.jsx';
 
 const PrivateRoute = ({ children, roles }) => {
   const { autenticado, usuario, cargando } = useAuth();
@@ -33,6 +35,8 @@ const App = () => {
             <Route path="productos" element={<ProductoPage />} />
             <Route path="ubicaciones" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><Ubicaciones /></PrivateRoute>} />
             <Route path="inventario/existencias" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><Existencias /></PrivateRoute>} />
+            <Route path="inventario/kardex" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioKardexPage /></PrivateRoute>} />
+            <Route path="inventario/entradas" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioEntradasPage /></PrivateRoute>} />
             <Route path="clientes" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Clientes /></PrivateRoute>} />
             <Route path="facturas" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Facturas /></PrivateRoute>} />
             <Route path="proveedores" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><Proveedores /></PrivateRoute>} />
