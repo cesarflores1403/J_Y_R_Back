@@ -3,6 +3,8 @@ import { body, param, query } from 'express-validator';
 import { autenticar } from '../middlewares/auth.js';
 import { validarCampos } from '../middlewares/validar.js';
 import { listarExistencias, actualizarMinMax } from '../controllers/inventarioExistenciasController.js';
+import { listarMovimientos } from '../controllers/inventarioMovimientosController.js';
+import { registrarEntrada } from '../controllers/inventarioEntradasController.js';
 
 const router = Router();
 
@@ -68,6 +70,62 @@ router.get('/existencias', [
   validarCampos
 ], listarExistencias);
 
+// // GET /api/inventario/movimientos
+// // Kardex de movimientos con filtros y paginacion (HU3)
+router.get('/movimientos', [
+  // // Compatibilidad de paginacion con aliases usados en inventario
+  query('page')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('page debe ser un entero mayor o igual a 1')
+    .toInt(),
+  query('limit')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limit debe ser un entero entre 1 y 100')
+    .toInt(),
+  query('pagina')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('pagina debe ser un entero mayor o igual a 1')
+    .toInt(),
+  query('limite')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limite debe ser un entero entre 1 y 100')
+    .toInt(),
+  // // Filtros por fechas para kardex
+  query('fecha_desde')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_desde debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  query('fecha_hasta')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_hasta debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  // // Filtros exactos por producto y ubicacion
+  query('cod_producto')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_producto debe ser un entero mayor a 0')
+    .toInt(),
+  query('cod_ubicacion')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_ubicacion debe ser un entero mayor a 0')
+    .toInt(),
+  // // Tipo de movimiento permitido para kardex
+  query('tipo')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isIn(['ENTRADA', 'SALIDA', 'AJUSTE'])
+    .withMessage('tipo debe ser ENTRADA, SALIDA o AJUSTE'),
+  // // Respuesta 400 si falla cualquier validacion
+  validarCampos
+], listarMovimientos);
+
 // // PUT /api/inventario/existencias/:id
 router.put('/existencias/:id', [
   // // Id de inventario obligatorio y valido
@@ -102,5 +160,49 @@ router.put('/existencias/:id', [
   // // Ejecuta respuesta 400 si alguna validacion falla
   validarCampos
 ], actualizarMinMax);
+
+// // POST /api/inventario/entradas
+// // Registra una entrada y actualiza inventario de forma transaccional (HU4)
+router.post('/entradas', [
+  // // Relacion producto-ubicacion obligatoria
+  body('cod_producto')
+    .exists()
+    .withMessage('cod_producto es requerido')
+    .bail()
+    .isInt({ min: 1 })
+    .withMessage('cod_producto debe ser un entero mayor a 0')
+    .toInt(),
+  body('cod_ubicacion')
+    .exists()
+    .withMessage('cod_ubicacion es requerido')
+    .bail()
+    .isInt({ min: 1 })
+    .withMessage('cod_ubicacion debe ser un entero mayor a 0')
+    .toInt(),
+  // // Cantidad de entrada estrictamente positiva
+  body('cantidad')
+    .exists()
+    .withMessage('cantidad es requerida')
+    .bail()
+    .isInt({ min: 1 })
+    .withMessage('cantidad debe ser un entero mayor a 0')
+    .toInt(),
+  // // Referencia del documento de entrada para trazabilidad en kardex
+  body('referencia_documento')
+    .exists()
+    .withMessage('referencia_documento es requerida')
+    .bail()
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('referencia_documento debe tener entre 1 y 200 caracteres'),
+  // // Observaciones opcionales si el schema de movimientos las soporta
+  body('observaciones')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('observaciones no puede exceder 500 caracteres'),
+  // // Respuesta 400 si falla cualquier validacion
+  validarCampos
+], registrarEntrada);
 
 export default router;
