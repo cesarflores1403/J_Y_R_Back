@@ -23,10 +23,17 @@ const obtenerMensajeError = (error, accion) => {
   // // Mensaje del backend en formato actual del proyecto
   const serverMessage = error?.response?.data?.message
     || error?.response?.data?.mensaje;
+  // // Version normalizada para detectar mensajes tecnicos que no deben mostrarse en UI
+  const serverMessageLower = String(serverMessage || '').toLowerCase();
+
+  // // Ocultamos error tecnico de columna faltante mientras se aplica el cambio de BD manual
+  if (serverMessageLower.includes('stock_reservado') && serverMessageLower.includes('does not exist')) {
+    return '';
+  }
 
   // // Error 400 de validaciones de entrada
   if (status === 400) {
-    return serverMessage || `Solicitud inválida al ${accion}`;
+    return serverMessage || `Solicitud invalida al ${accion}`;
   }
 
   // // Error 404 para registro inexistente al actualizar
@@ -36,11 +43,56 @@ const obtenerMensajeError = (error, accion) => {
 
   // // Error 409 para conflictos de negocio
   if (status === 409) {
-    return serverMessage || 'Conflicto al procesar la operación';
+    return serverMessage || 'Conflicto al procesar la operacion';
   }
 
   // // Fallback genérico para errores inesperados
   return serverMessage || `Error inesperado al ${accion}`;
+};
+
+// // Normaliza el payload del backend soportando contrato nuevo (data+meta) y legacy
+const normalizarRespuestaExistencias = (payload, fallbackLimite = 15) => {
+  // // Si el backend ya devuelve data/meta (contrato nuevo)
+  if (Array.isArray(payload?.data) && payload?.meta) {
+    return {
+      filas: payload.data,
+      meta: {
+        total: Number(payload.meta.total || 0),
+        pagina: Number(payload.meta.page || 1),
+        limite: Number(payload.meta.limit || fallbackLimite),
+        totalPaginas: Number(payload.meta.totalPages || 1)
+      }
+    };
+  }
+
+  // // Fallback al contrato legacy actualmente usado en la UI (datos + pagina + limite)
+  return {
+    filas: Array.isArray(payload?.datos) ? payload.datos : [],
+    meta: {
+      total: Number(payload?.total || 0),
+      pagina: Number(payload?.pagina || payload?.page || 1),
+      limite: Number(payload?.limite || payload?.limit || fallbackLimite),
+      totalPaginas: Number(payload?.totalPaginas || payload?.totalPages || 1)
+    }
+  };
+};
+
+// // Elimina params vacios para no disparar validaciones backend por strings vacios
+const limpiarParamsConsulta = (params = {}) => {
+  // // Construimos nuevo objeto solo con valores realmente informados por la UI
+  const limpio = {};
+
+  // // Recorremos pares clave/valor y descartamos vacios comunes
+  Object.entries(params).forEach(([clave, valor]) => {
+    // // Omitimos undefined y null porque representan ausencia de filtro
+    if (valor === undefined || valor === null) return;
+    // // Omitimos strings vacios o con solo espacios para filtros textuales/numericos
+    if (typeof valor === 'string' && valor.trim() === '') return;
+    // // Conservamos el resto de valores (incluye false para includeInactive)
+    limpio[clave] = valor;
+  });
+
+  return limpio;
 };
 
 const Existencias = () => {
@@ -79,25 +131,29 @@ const Existencias = () => {
       setLoading(true);
       setError('');
 
+      // // Enviamos aliases nuevos y legacy para transicion segura sin romper backend existente
+      const paramsConsulta = limpiarParamsConsulta({
+        ...consulta,
+        page: Number(consulta.pagina || 1),
+        limit: Number(consulta.limite || 15),
+      });
+
       // // Request al backend usando servicio del modulo
-      const { data } = await inventarioExistenciasApi.listar(consulta);
+      const { data } = await inventarioExistenciasApi.listar(paramsConsulta);
 
       // // Validamos contrato esperado con helper de respuesta
       if (data?.ok) {
+        // // Unificamos contrato nuevo/legacy para mantener la vista incremental
+        const normalizado = normalizarRespuestaExistencias(data.data, Number(paramsConsulta.limit || 15));
         // // Cargamos filas recibidas desde backend
-        setExistencias(Array.isArray(data.data?.datos) ? data.data.datos : []);
+        setExistencias(normalizado.filas);
         // // Cargamos metadata de paginacion para UI
-        setMeta({
-          total: Number(data.data?.total || 0),
-          pagina: Number(data.data?.pagina || 1),
-          limite: Number(data.data?.limite || consulta.limite),
-          totalPaginas: Number(data.data?.totalPaginas || 1)
-        });
+        setMeta(normalizado.meta);
       } else {
         // // Si no cumple contrato de exito, mostramos error controlado
         setExistencias([]);
         setMeta({ total: 0, pagina: 1, limite: consulta.limite, totalPaginas: 1 });
-        setError('Respuesta inválida del servidor al listar existencias');
+        setError('Respuesta invalida del servidor al listar existencias');
       }
     } catch (err) {
       // // Error HTTP/validacion en la consulta
@@ -131,6 +187,7 @@ const Existencias = () => {
     // // Actualizamos query efectiva para que useEffect recargue datos
     setConsulta({
       ...filtros,
+      // // Mantenemos claves legacy de la vista y dejamos que cargarExistencias envie aliases nuevos
       pagina: Number(filtros.pagina || 1),
       limite: Number(filtros.limite || 15)
     });
@@ -193,16 +250,16 @@ const Existencias = () => {
 
       // // Si backend responde ok, cerramos modal y recargamos listado
       if (data?.ok) {
-        setSuccess('Mínimos y máximos actualizados correctamente');
+        setSuccess('Minimos y maximos actualizados correctamente');
         setModalAbierto(false);
         await cargarExistencias();
       } else {
         // // Error de contrato en respuesta de update
-        setErrorForm('Respuesta inválida del servidor al actualizar min/max');
+        setErrorForm('Respuesta invalida del servidor al actualizar min/max');
       }
     } catch (err) {
       // // Error específico del formulario de edicion
-      setErrorForm(obtenerMensajeError(err, 'actualizar mínimos y máximos'));
+      setErrorForm(obtenerMensajeError(err, 'actualizar minimos y maximos'));
     } finally {
       // // Fin de proceso de guardado
       setSaving(false);
@@ -269,7 +326,7 @@ const Existencias = () => {
             className="btn btn-outline-secondary btn-sm"
             disabled
           >
-            Página {meta.pagina} de {meta.totalPaginas}
+            Pagina {meta.pagina} de {meta.totalPaginas}
           </button>
           <button
             // // Boton pagina siguiente

@@ -37,7 +37,7 @@ const ExistenciasFormMinMax = ({
       <div className="modal-dialog">
         <div className="modal-content">
           <div className="modal-header">
-            <h5 className="modal-title">Actualizar mínimos y máximos</h5>
+            <h5 className="modal-title">Actualizar minimos y maximos</h5>
             <button
               // // Cierre de modal bloqueado mientras guarda
               type="button"
@@ -61,7 +61,7 @@ const ExistenciasFormMinMax = ({
               {existencia && (
                 <div className="mb-3">
                   <div><strong>Producto:</strong> {existencia.nombre_producto}</div>
-                  <div><strong>Ubicación:</strong> {existencia.ubicacion}</div>
+                  <div><strong>Ubicacion:</strong> {existencia.ubicacion}</div>
                   <div><strong>Stock actual:</strong> {existencia.stock}</div>
                 </div>
               )}
@@ -75,7 +75,7 @@ const ExistenciasFormMinMax = ({
 
               <div className="row g-3">
                 <div className="col-12 col-md-6">
-                  <label className="form-label">Stock mínimo</label>
+                  <label className="form-label">Stock minimo</label>
                   <input
                     // // Campo minimo no permite negativos
                     type="number"
@@ -90,7 +90,7 @@ const ExistenciasFormMinMax = ({
                   />
                 </div>
                 <div className="col-12 col-md-6">
-                  <label className="form-label">Stock máximo</label>
+                  <label className="form-label">Stock maximo</label>
                   <input
                     // // Campo maximo no permite negativos
                     type="number"

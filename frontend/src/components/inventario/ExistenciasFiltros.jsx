@@ -47,11 +47,11 @@ const ExistenciasFiltros = ({
                 name="producto"
                 value={filtros.producto}
                 onChange={handleInput}
-                placeholder="Nombre o código"
+                placeholder="Nombre o codigo"
               />
             </div>
             <div className="col-12 col-md-3">
-              <label className="form-label mb-1">Cod. Ubicación</label>
+              <label className="form-label mb-1">Cod. Ubicacion</label>
               <input
                 // // Filtro exacto por id de ubicacion
                 type="number"
@@ -64,7 +64,7 @@ const ExistenciasFiltros = ({
               />
             </div>
             <div className="col-12 col-md-3">
-              <label className="form-label mb-1">Ubicación</label>
+              <label className="form-label mb-1">Ubicacion</label>
               <input
                 // // Filtro por qr o detalle de ubicacion
                 type="text"
@@ -79,7 +79,7 @@ const ExistenciasFiltros = ({
 
           <div className="row g-2 mt-2">
             <div className="col-12 col-md-2">
-              <label className="form-label mb-1">Página</label>
+              <label className="form-label mb-1">Pagina</label>
               <input
                 // // Pagina solicitada
                 type="number"
@@ -91,9 +91,9 @@ const ExistenciasFiltros = ({
               />
             </div>
             <div className="col-12 col-md-2">
-              <label className="form-label mb-1">Límite</label>
+              <label className="form-label mb-1">Limite</label>
               <input
-                // // Tamaño de pagina para paginacion backend
+                // // Tamano de pagina para paginacion backend
                 type="number"
                 min="1"
                 max="100"
