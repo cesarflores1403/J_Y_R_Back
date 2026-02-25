@@ -6,9 +6,10 @@ import Factura from '../models/Factura.js';
 
 class ReporteService {
   async dashboard() {
+    // Conteos — estado_producto es varchar ('Activo'/'Inactivo'), no booleano
     const totalClientes = await Cliente.count();
     const totalProveedores = await Proveedor.count({ where: { estado_proveedor: true } });
-    const totalProductos = await ProductoSeq.count({ where: { estado_producto: true } });
+    const totalProductos = await ProductoSeq.count({ where: { estado_producto: 'Activo' } });
     const totalFacturas = await Factura.count({ where: { estado: true } });
 
     const [ventasResult] = await sequelize.query(`
@@ -18,6 +19,7 @@ class ReporteService {
       FROM factura WHERE estado = true
     `);
 
+    // stock_reservado no existe en la tabla inventario — usar solo stock vs stock_minimo
     const [stockBajo] = await sequelize.query(`
       SELECT COUNT(*) as total FROM inventario
       WHERE stock < stock_minimo AND stock_minimo > 0
@@ -93,7 +95,7 @@ class ReporteService {
       FROM producto p
       LEFT JOIN inventario i ON i.cod_producto = p.cod_producto
       LEFT JOIN categoria_producto cp ON cp.cod_categoria = p.cod_categoria
-      WHERE p.estado_producto = true
+      WHERE p.estado_producto = 'Activo'
       GROUP BY p.cod_producto, p.nombre_producto, p.precio_venta, cp.nombre_categoria
       ORDER BY p.nombre_producto
     `);
