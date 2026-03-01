@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'; // // Hooks
 import { useIsv } from '../../hooks/useIsv.js'; // // Hook catálogo ISV
+import { useCategorias } from '../../hooks/useCategorias.js'; // // Hook catálogo Categorías (HU-07)
 
 const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
   const { catalogoIsv, loadingIsv } = useIsv(); // // Catálogo ISV desde BD
+  const { categorias, loadingCategorias } = useCategorias(); // // Categorías dinámicas (HU-07)
 
   const [form, setForm] = useState({
-    cod_categoria: 2,
+    cod_categoria: '',
     nombre_producto: '',
     unidad_medida: 'UND',
     precio_venta: '',
@@ -22,7 +24,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
     if (!isEdit) return;
 
     setForm({
-      cod_categoria: selected.cod_categoria ?? 2,
+      cod_categoria: selected.cod_categoria ?? '',
       nombre_producto: selected.nombre_producto ?? '',
       unidad_medida: selected.unidad_medida ?? 'UND',
       precio_venta: selected.precio_venta ?? '',
@@ -48,9 +50,11 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
   const validar = () => {
     const errors = {};
 
-    // Categoría
-    if (![1, 2].includes(Number(form.cod_categoria))) {
-      errors.cod_categoria = 'Debe ser 1 (Lubricantes) o 2 (Repuestos).';
+    // Categoría (HU-07: validación dinámica)
+    if (!form.cod_categoria) {
+      errors.cod_categoria = 'Debe seleccionar una categoría.';
+    } else if (categorias.length > 0 && !categorias.find(c => c.cod_categoria === Number(form.cod_categoria))) {
+      errors.cod_categoria = 'Categoría no válida.';
     }
 
     // Nombre
@@ -177,7 +181,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
 
         // // Limpia form luego de crear exitosamente
         setForm({
-          cod_categoria: 2,
+          cod_categoria: '',
           nombre_producto: '',
           unidad_medida: 'UND',
           precio_venta: '',
@@ -231,10 +235,14 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
               name="cod_categoria"
               value={form.cod_categoria}
               onChange={onChange}
-              disabled={saving}
+              disabled={saving || loadingCategorias}
             >
-              <option value={1}>1 — Lubricantes</option>
-              <option value={2}>2 — Repuestos</option>
+              <option value="">-- Seleccionar --</option>
+              {categorias.map((cat) => (
+                <option key={cat.cod_categoria} value={cat.cod_categoria}>
+                  {cat.nombre_categoria}
+                </option>
+              ))}
             </select>
             {fieldErrors.cod_categoria && <span className="jyr-field-error">{fieldErrors.cod_categoria}</span>}
           </div>

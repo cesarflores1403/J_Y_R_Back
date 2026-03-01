@@ -9,9 +9,11 @@ import isvRoutes from './isv.js';
 import ubicacionesRoutes from './ubicaciones.js';
 import inventarioExistenciasRoutes from './inventarioExistencias.js';
 import pagosRoutes from './pagos.js';
+import categoriasRoutes from './categorias.js';
 
 const router = express.Router();
 
+router.use('/categorias', categoriasRoutes);
 router.use('/producto', productoRoutes);
 router.use('/auth', authRoutes);
 router.use('/clientes', clientesRoutes);

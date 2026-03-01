@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { FiEdit2, FiTrash2, FiSearch, FiChevronUp, FiChevronDown, FiFilter } from 'react-icons/fi';
 import Pagination from '../common/Pagination.jsx';
+import { useCategorias } from '../../hooks/useCategorias.js'; // // HU-07: Categorías dinámicas
 
 // =====================================================
 // HU-06: Listado con búsqueda, filtros, paginación y ordenamiento
@@ -16,6 +17,16 @@ const estadoBadge = {
 };
 
 const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado }) => {
+  // HU-07: Categorías dinámicas desde BD
+  const { categorias } = useCategorias();
+
+  // Mapa de categorías para lookup rápido
+  const categoriasMap = useMemo(() => {
+    const map = {};
+    categorias.forEach(c => { map[c.cod_categoria] = c.nombre_categoria; });
+    return map;
+  }, [categorias]);
+
   // =====================================================
   // ESTADOS: búsqueda, filtros, ordenamiento, paginación
   // =====================================================
@@ -213,8 +224,9 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado }) => 
             style={{ fontSize: 12, padding: '6px 10px', width: 'auto', minWidth: 140 }}
           >
             <option value="">Todas las categorías</option>
-            <option value="1">Lubricantes</option>
-            <option value="2">Repuestos</option>
+            {categorias.map((cat) => (
+              <option key={cat.cod_categoria} value={cat.cod_categoria}>{cat.nombre_categoria}</option>
+            ))}
           </select>
         </div>
 
@@ -281,7 +293,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado }) => 
                     </td>
                     <td>
                       <span className="jyr-badge jyr-badge-info">
-                        {Number(p.cod_categoria) === 1 ? 'Lubricantes' : 'Repuestos'}
+                        {categoriasMap[p.cod_categoria] || `Cat-${p.cod_categoria}`}
                       </span>
                     </td>
                     <td style={{ fontWeight: 500 }}>{p.nombre_producto}</td>

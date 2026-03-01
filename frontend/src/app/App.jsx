@@ -12,6 +12,7 @@ import Reportes from '../components/reportes/Reportes.jsx';
 import Facturas from '../components/facturas/Facturas.jsx';
 import ProductoPage from '../pages/ProductoPage.jsx';
 import Ubicaciones from '../components/ubicaciones/Ubicaciones.jsx';
+import Categorias from '../components/categorias/Categorias.jsx';
 import Existencias from '../components/inventario/Existencias.jsx';
 import InventarioKardexPage from '../components/inventario/InventarioKardexPage.jsx';
 import InventarioEntradasPage from '../components/inventario/InventarioEntradasPage.jsx';
@@ -33,6 +34,7 @@ const App = () => {
           <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="productos" element={<ProductoPage />} />
+            <Route path="categorias" element={<PrivateRoute roles={['Administrador']}><Categorias /></PrivateRoute>} />
             <Route path="ubicaciones" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><Ubicaciones /></PrivateRoute>} />
             <Route path="inventario/existencias" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><Existencias /></PrivateRoute>} />
             <Route path="inventario/kardex" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioKardexPage /></PrivateRoute>} />

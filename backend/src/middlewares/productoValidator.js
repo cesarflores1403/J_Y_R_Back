@@ -1,5 +1,6 @@
 import { body } from 'express-validator';
 import { validarCampos } from './validar.js';
+import CategoriaProducto from '../models/CategoriaProducto.js';
 
 // =====================================================
 // HU-03: Validaciones de producto con express-validator
@@ -12,7 +13,13 @@ import { validarCampos } from './validar.js';
 export const validarCrearProducto = [
   body('cod_categoria')
     .notEmpty().withMessage('La categoría es obligatoria.')
-    .isInt({ min: 1, max: 2 }).withMessage('La categoría debe ser 1 (Lubricantes) o 2 (Repuestos).'),
+    .isInt({ min: 1 }).withMessage('La categoría debe ser un número entero válido.')
+    .custom(async (val) => {
+      const cat = await CategoriaProducto.findByPk(val);
+      if (!cat) throw new Error('La categoría seleccionada no existe.');
+      if (!cat.estado_categoria) throw new Error('La categoría seleccionada está inactiva.');
+      return true;
+    }),
 
   body('nombre_producto')
     .notEmpty().withMessage('El nombre del producto es obligatorio.')
@@ -56,7 +63,7 @@ export const validarActualizarProducto = [
   body('datos')
     .notEmpty().withMessage('datos es obligatorio.')
     .isObject().withMessage('datos debe ser un objeto.')
-    .custom((datos) => {
+    .custom(async (datos) => {
       const keys = Object.keys(datos);
       if (keys.length === 0) throw new Error('datos no puede estar vacío.');
 
@@ -72,7 +79,11 @@ export const validarActualizarProducto = [
 
         switch (campo) {
           case 'cod_categoria':
-            if (![1, 2].includes(Number(valor))) throw new Error('cod_categoria debe ser 1 o 2.');
+            {
+              const cat = await CategoriaProducto.findByPk(Number(valor));
+              if (!cat) throw new Error('cod_categoria no existe.');
+              if (!cat.estado_categoria) throw new Error('La categoría seleccionada está inactiva.');
+            }
             break;
           case 'nombre_producto':
             if (!valor || typeof valor !== 'string' || valor.trim().length < 2) throw new Error('nombre_producto debe tener al menos 2 caracteres.');

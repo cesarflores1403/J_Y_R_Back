@@ -9,6 +9,7 @@ import DetalleFactura from './DetalleFactura.js';
 import ProductoSeq from './ProductoSeq.js';
 import Isv from './Isv.js';
 import Pago from './Pago.js';
+import CategoriaProducto from './CategoriaProducto.js';
 
 // =============================================
 // RELACIONES
@@ -56,6 +57,10 @@ Pago.belongsTo(Factura, { foreignKey: 'cod_factura', as: 'factura' });
 Usuario.hasMany(Pago, { foreignKey: 'cod_usuario', as: 'pagosRegistrados' });
 Pago.belongsTo(Usuario, { foreignKey: 'cod_usuario', as: 'usuario' });
 
+// CategoriaProducto -> Producto (HU-07)
+CategoriaProducto.hasMany(ProductoSeq, { foreignKey: 'cod_categoria', as: 'productos' });
+ProductoSeq.belongsTo(CategoriaProducto, { foreignKey: 'cod_categoria', as: 'categoria' });
+
 export {
   sequelize,
   Usuario,
@@ -67,5 +72,6 @@ export {
   DetalleFactura,
   ProductoSeq,
   Isv,
-  Pago
+  Pago,
+  CategoriaProducto
 };

@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { getInitials } from '../../utils/helpers.js';
 import {
   FiGrid, FiUsers, FiTruck, FiPackage,
-  FiBarChart2, FiLogOut, FiFileText, FiMapPin, FiDatabase, FiList, FiPlusCircle
+  FiBarChart2, FiLogOut, FiFileText, FiMapPin, FiDatabase, FiList, FiPlusCircle, FiTag
 } from 'react-icons/fi';
 import logoClean from '../../assets/img/logo2.jpeg';
 
@@ -18,6 +18,7 @@ const menuItems = [
   ]},
   { section: 'Inventario', items: [
     { path: '/productos', label: 'Productos', icon: <FiPackage />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
+    { path: '/categorias', label: 'Categorías', icon: <FiTag />, roles: ['Administrador'] },
     { path: '/ubicaciones', label: 'Ubicaciones', icon: <FiMapPin />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/existencias', label: 'Existencias', icon: <FiDatabase />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/kardex', label: 'Kardex', icon: <FiList />, roles: ['Administrador', 'Bodeguero'] },

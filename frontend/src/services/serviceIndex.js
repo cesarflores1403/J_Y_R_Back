@@ -60,3 +60,14 @@ export const pagoService = {
   registrar: (data) => api.post('/pagos', data),
   anular: (codPago) => api.patch(`/pagos/${codPago}/anular`),
 };
+
+// ==================== CATEGORÍAS (HU-07) ====================
+export const categoriaService = {
+  listar: (params) => api.get('/categorias', { params }),
+  listarActivas: () => api.get('/categorias/activas'),
+  obtener: (id) => api.get(`/categorias/${id}`),
+  crear: (data) => api.post('/categorias', data),
+  actualizar: (id, data) => api.put(`/categorias/${id}`, data),
+  toggleEstado: (id) => api.patch(`/categorias/${id}/toggle-estado`),
+  eliminar: (id) => api.delete(`/categorias/${id}`),
+};
