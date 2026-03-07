@@ -107,9 +107,9 @@ export const auditoriaFacturacionService = {
 export const notaCreditoService = {
   listar: (params) => api.get('/notas-credito', { params }),
   obtener: (id) => api.get(`/notas-credito/${id}`),
-  detallesFactura: (codFactura) => api.get(`/notas-credito/factura/${codFactura}/detalles`),
-  crear: (data) => api.post('/notas-credito', data),
-  anular: (id) => api.patch(`/notas-credito/${id}/anular`),
+ detallesFactura: (codFactura) => api.get(/notas-credito/factura/${codFactura}/detalles),
+crear: (data) => api.post('/notas-credito', data),
+anular: (id) => api.patch(/notas-credito/${id}/anular),
 };
 
 export const usuarioService = {
