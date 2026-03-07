@@ -12,6 +12,7 @@ const pageNames = {
   '/inventario/existencias': 'Existencias',
   '/inventario/kardex': 'Kardex',
   '/inventario/entradas': 'Entradas',
+  '/inventario/salidas': 'Salidas',
   // // Fallback por segmento base de inventario
   '/inventario': 'Inventario',
   '/clientes': 'Clientes',
