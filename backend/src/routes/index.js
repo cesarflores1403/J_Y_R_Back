@@ -14,6 +14,7 @@ import carruselRoutes from './carrusel.js';
 import cotizacionesRoutes from './cotizaciones.js';
 import bitacoraFacturacionRoutes from './bitacoraFacturacion.js';
 import notasCreditoRoutes from './notasCredito.js';
+import usuariosRoutes from './usuarios.js';
 
 const router = express.Router();
 
@@ -32,5 +33,8 @@ router.use('/carrusel', carruselRoutes);
 router.use('/cotizaciones', cotizacionesRoutes);
 router.use('/auditoria-facturacion', bitacoraFacturacionRoutes);
 router.use('/notas-credito', notasCreditoRoutes);
+router.use('/usuarios', usuariosRoutes);
 
 export default router;
+
+
