@@ -43,6 +43,11 @@ class ProveedorService {
     await proveedor.update({ estado_proveedor: !proveedor.estado_proveedor });
     return proveedor;
   }
+
+  async eliminar(id) {
+    const proveedor = await this.obtenerPorId(id);
+    await proveedor.destroy();
+  }
 }
 
 export default new ProveedorService();
