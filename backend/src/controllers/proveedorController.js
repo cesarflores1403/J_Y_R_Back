@@ -44,3 +44,12 @@ export const toggleEstado = async (req, res) => {
     res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });
   }
 };
+
+export const eliminar = async (req, res) => {
+  try {
+    await proveedorService.eliminar(req.params.id);
+    res.json({ ok: true, mensaje: 'Proveedor eliminado correctamente' });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });
+  }
+};
