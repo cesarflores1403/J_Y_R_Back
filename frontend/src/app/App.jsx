@@ -23,6 +23,8 @@ import InventarioBajasPage from '../components/inventario/InventarioBajasPage.js
 import InventarioTransferenciasPage from '../components/inventario/InventarioTransferenciasPage.jsx';
 import AuditoriaFacturacion from '../components/auditoria/AuditoriaFacturacion.jsx';
 import NotasCredito from '../components/notascredito/NotasCredito.jsx';
+import Usuarios from '../components/usuarios/Usuarios.jsx';
+import RecuperarPassword from '../components/auth/RecuperarPassword.jsx';
 const PrivateRoute = ({ children, roles }) => {
   const { autenticado, usuario, cargando } = useAuth();
   if (cargando) return <div className="jyr-spinner" style={{ minHeight: '100vh' }} />;
@@ -61,6 +63,7 @@ const App = () => {
             <Route path="carrusel" element={<PrivateRoute roles={['Administrador']}><CarruselPage /></PrivateRoute>} />
             <Route path="auditoria-facturacion" element={<PrivateRoute roles={['Administrador']}><AuditoriaFacturacion /></PrivateRoute>} />
             <Route path="notas-credito" element={<PrivateRoute roles={['Administrador', 'Cajero']}><NotasCredito /></PrivateRoute>} />
+            <Route path="usuarios" element={<PrivateRoute roles={['Administrador']}><Usuarios /></PrivateRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
@@ -71,3 +74,7 @@ const App = () => {
 };
 
 export default App;
+
+
+
+
