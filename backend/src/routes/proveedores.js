@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { validarCampos } from '../middlewares/validar.js';
 import { autenticar } from '../middlewares/auth.js';
-import { listar, obtener, crear, actualizar, toggleEstado } from '../controllers/proveedorController.js';
+import { listar, obtener, crear, actualizar, toggleEstado, eliminar } from '../controllers/proveedorController.js';
 
 const router = Router();
 
@@ -22,5 +22,6 @@ router.put('/:id', [
 ], actualizar);
 
 router.patch('/:id/toggle-estado', toggleEstado);
+router.delete('/:id', eliminar);
 
 export default router;
