@@ -86,6 +86,7 @@ const KardexFiltros = ({
             <option value="">Todos</option>
             <option value="ENTRADA">ENTRADA</option>
             <option value="SALIDA">SALIDA</option>
+            <option value="BAJA">BAJA</option>
             <option value="AJUSTE">AJUSTE</option>
           </select>
         </div>

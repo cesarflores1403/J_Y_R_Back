@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { getInitials } from '../../utils/helpers.js';
 import {
   FiGrid, FiUsers, FiTruck, FiPackage,
-  FiBarChart2, FiLogOut, FiFileText, FiMapPin, FiDatabase, FiList, FiPlusCircle, FiMinusCircle, FiTag
+  FiBarChart2, FiLogOut, FiFileText, FiMapPin, FiDatabase, FiList, FiPlusCircle, FiMinusCircle, FiAlertTriangle, FiTag, FiRepeat, FiClipboard, FiLock
 } from 'react-icons/fi';
 import logoClean from '../../assets/img/logo2.jpeg';
 
@@ -24,6 +24,13 @@ const menuItems = [
     { path: '/inventario/kardex', label: 'Kardex', icon: <FiList />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/entradas', label: 'Entradas', icon: <FiPlusCircle />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/salidas', label: 'Salidas', icon: <FiMinusCircle />, roles: ['Administrador', 'Bodeguero'] },
+    { path: '/inventario/bajas', label: 'Bajas', icon: <FiAlertTriangle />, roles: ['Administrador', 'Bodeguero'] },
+    // // Submodulo HU transferencias entre ubicaciones dentro de Inventario
+    { path: '/inventario/transferencias', label: 'Transferencias', icon: <FiRepeat />, roles: ['Administrador', 'Bodeguero'] },
+    // // Submodulo HU conteo fisico completo dentro de Inventario
+    { path: '/inventario/conteos', label: 'Conteos', icon: <FiClipboard />, roles: ['Administrador', 'Bodeguero'] },
+    // // Submodulo HU reservas de inventario
+    { path: '/inventario/reservas', label: 'Reservas', icon: <FiLock />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
   ]},
   { section: 'Compras', items: [
     { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, roles: ['Administrador', 'Bodeguero'] },

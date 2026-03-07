@@ -17,6 +17,10 @@ import Existencias from '../components/inventario/Existencias.jsx';
 import InventarioKardexPage from '../components/inventario/InventarioKardexPage.jsx';
 import InventarioEntradasPage from '../components/inventario/InventarioEntradasPage.jsx';
 import InventarioSalidasPage from '../components/inventario/InventarioSalidasPage.jsx';
+import InventarioBajasPage from '../components/inventario/InventarioBajasPage.jsx';
+import InventarioTransferenciasPage from '../components/inventario/InventarioTransferenciasPage.jsx';
+import InventarioConteosPage from '../components/inventario/InventarioConteosPage.jsx';
+import InventarioReservasPage from '../components/inventario/InventarioReservasPage.jsx';
 
 const PrivateRoute = ({ children, roles }) => {
   const { autenticado, usuario, cargando } = useAuth();
@@ -41,6 +45,13 @@ const App = () => {
             <Route path="inventario/kardex" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioKardexPage /></PrivateRoute>} />
             <Route path="inventario/entradas" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioEntradasPage /></PrivateRoute>} />
             <Route path="inventario/salidas" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioSalidasPage /></PrivateRoute>} />
+            <Route path="inventario/bajas" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioBajasPage /></PrivateRoute>} />
+            {/* // Submodulo de Inventario para transferencias origen/destino */}
+            <Route path="inventario/transferencias" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioTransferenciasPage /></PrivateRoute>} />
+            {/* // Submodulo de Inventario para conteo fisico completo */}
+            <Route path="inventario/conteos" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioConteosPage /></PrivateRoute>} />
+            {/* // Submodulo de Inventario para reservas de inventario */}
+            <Route path="inventario/reservas" element={<PrivateRoute roles={['Administrador', 'Bodeguero', 'Cajero']}><InventarioReservasPage /></PrivateRoute>} />
             <Route path="clientes" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Clientes /></PrivateRoute>} />
             <Route path="facturas" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Facturas /></PrivateRoute>} />
             <Route path="proveedores" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><Proveedores /></PrivateRoute>} />

@@ -13,6 +13,13 @@ const pageNames = {
   '/inventario/kardex': 'Kardex',
   '/inventario/entradas': 'Entradas',
   '/inventario/salidas': 'Salidas',
+  '/inventario/bajas': 'Bajas',
+  // // Submodulo de transferencias en Inventario
+  '/inventario/transferencias': 'Transferencias',
+  // // Submodulo de conteos fisicos en Inventario
+  '/inventario/conteos': 'Conteos',
+  // // Submodulo de reservas en Inventario
+  '/inventario/reservas': 'Reservas',
   // // Fallback por segmento base de inventario
   '/inventario': 'Inventario',
   '/clientes': 'Clientes',
