@@ -169,6 +169,9 @@ class InventarioMovimientosService {
         m.${schemaMovimiento.cantidad} AS cantidad,
         ${schemaMovimiento.referencia ? `CAST(m.${schemaMovimiento.referencia} AS TEXT)` : 'NULL::text'} AS referencia_documento,
         ${schemaMovimiento.observaciones ? `CAST(m.${schemaMovimiento.observaciones} AS TEXT)` : 'NULL::text'} AS observaciones,
+        ${schemaMovimiento.motivo ? `CAST(m.${schemaMovimiento.motivo} AS TEXT)` : 'NULL::text'} AS motivo,
+        ${schemaMovimiento.refTipo ? `CAST(m.${schemaMovimiento.refTipo} AS TEXT)` : 'NULL::text'} AS ref_tipo,
+        ${schemaMovimiento.refId ? `m.${schemaMovimiento.refId}` : 'NULL::int'} AS ref_id,
         ${schemaMovimiento.codUsuario ? `m.${schemaMovimiento.codUsuario}` : 'NULL::int'} AS cod_usuario,
         ${schemaMovimiento.codUsuario ? 'usu.nombre_usuario' : 'NULL::text'} AS nombre_usuario
       ${selectBase}

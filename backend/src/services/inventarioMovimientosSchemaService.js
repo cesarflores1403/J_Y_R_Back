@@ -53,7 +53,7 @@ class InventarioMovimientosSchemaService {
       tableName: 'movimiento_inventario',
       columns: columnas.map((c) => c.column_name),
       // // PK del movimiento (si existe con nombres esperados)
-      pk: resolverColumna(columnasSet, ['cod_mov_inventario', 'cod_movimiento', 'id_movimiento']),
+      pk: resolverColumna(columnasSet, ['cod_mov_inv', 'cod_mov_inventario', 'cod_movimiento', 'id_movimiento']),
       // // Referencia a inventario y/o producto/ubicacion (segun schema real)
       codInventario: resolverColumna(columnasSet, ['cod_inventario']),
       codProducto: resolverColumna(columnasSet, ['cod_producto']),
@@ -73,7 +73,11 @@ class InventarioMovimientosSchemaService {
         'num_documento',
         'n_documento'
       ]),
-      observaciones: resolverColumna(columnasSet, ['observaciones', 'observacion', 'descripcion', 'detalle'])
+      observaciones: resolverColumna(columnasSet, ['observaciones', 'observacion', 'descripcion', 'detalle']),
+      // // Campos opcionales de trazabilidad usados por algunos schemas de movimiento
+      motivo: resolverColumna(columnasSet, ['motivo']),
+      refTipo: resolverColumna(columnasSet, ['ref_tipo', 'tipo_referencia']),
+      refId: resolverColumna(columnasSet, ['ref_id', 'id_referencia'])
     };
 
     // // Validamos campos minimos para soportar kardex y entradas
