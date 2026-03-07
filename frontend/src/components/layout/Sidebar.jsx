@@ -39,6 +39,7 @@ const menuItems = [
   ]},
   { section: 'Gestión', items: [
     { path: '/reportes', label: 'Reportes', icon: <FiBarChart2 />, roles: ['Administrador'] },
+    { path: '/usuarios', label: 'Usuarios', icon: <FiUsers />, roles: ['Administrador'] },
     { path: '/auditoria-facturacion', label: 'Auditoría Fact.', icon: <FiClock />, roles: ['Administrador'] },
   ]},
   { section: 'Fotos Carrusel', items: [
