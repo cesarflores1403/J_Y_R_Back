@@ -17,6 +17,8 @@ import BitacoraExcepcionStock from './BitacoraExcepcionStock.js';
 import BitacoraFacturacion from './BitacoraFacturacion.js';
 import NotaCredito from './NotaCredito.js';
 import DetalleNotaCredito from './DetalleNotaCredito.js';
+import OrdenCompra from './OrdenCompra.js';
+import DetalleOrdenCompra from './DetalleOrdenCompra.js';
 
 // =============================================
 // RELACIONES
@@ -108,7 +110,8 @@ NotaCredito.hasMany(DetalleNotaCredito, { foreignKey: 'cod_nota_credito', as: 'd
 DetalleNotaCredito.belongsTo(NotaCredito, { foreignKey: 'cod_nota_credito', as: 'notaCredito' });
 DetalleNotaCredito.belongsTo(DetalleFactura, { foreignKey: 'cod_detalle_factura', as: 'detalleFactura' });
 DetalleNotaCredito.belongsTo(ProductoSeq, { foreignKey: 'cod_producto', as: 'producto' });
-
+OrdenCompra.hasMany(DetalleOrdenCompra, { foreignKey: 'cod_orden_compra', as: 'detalles' });
+DetalleOrdenCompra.belongsTo(OrdenCompra, { foreignKey: 'cod_orden_compra', as: 'orden' });
 export {
   sequelize,
   Usuario,
