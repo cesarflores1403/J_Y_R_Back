@@ -36,7 +36,9 @@ const menuItems = [
   ]},
   { section: 'Compras', items: [
     { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, roles: ['Administrador', 'Bodeguero'] },
+    { path: '/compras/ordenes', label: 'Órdenes de Compra', icon: <FiShoppingCart />, roles: ['Administrador', 'Bodeguero'] },
   ]},
+  
   { section: 'Gestión', items: [
     { path: '/reportes', label: 'Reportes', icon: <FiBarChart2 />, roles: ['Administrador'] },
     { path: '/usuarios', label: 'Usuarios', icon: <FiUsers />, roles: ['Administrador'] },
