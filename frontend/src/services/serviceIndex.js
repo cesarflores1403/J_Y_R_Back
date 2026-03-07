@@ -111,3 +111,12 @@ export const notaCreditoService = {
   crear: (data) => api.post('/notas-credito', data),
   anular: (id) => api.patch(`/notas-credito/${id}/anular`),
 };
+
+export const usuarioService = {
+  listar:       (params) => api.get('/usuarios', { params }),
+  listarRoles:  ()       => api.get('/usuarios/roles'),
+  crear:        (data)   => api.post('/usuarios', data),
+  actualizar:   (id, data) => api.put(/usuarios/${id}, data),
+  toggleEstado: (id)     => api.patch(/usuarios/${id}/toggle-estado),
+  eliminar:     (id)     => api.delete(/usuarios/${id}),
+};
