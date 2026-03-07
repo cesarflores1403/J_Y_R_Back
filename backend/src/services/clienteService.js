@@ -35,7 +35,24 @@ class ClienteService {
       const existe = await Cliente.findOne({ where: { dni: datos.dni } });
       if (existe) throw Object.assign(new Error('El DNI ya está registrado'), { statusCode: 409 });
     }
+    if (datos.correo) {
+      const existeCorreo = await Cliente.findOne({ where: { correo: datos.correo } });
+      if (existeCorreo) throw Object.assign(new Error('El correo ya está registrado'), { statusCode: 409 });
+    }
     return Cliente.create(datos);
+  }
+
+  async verificarDuplicado({ dni, correo }) {
+    const resultado = { duplicado: false, campo: null, cliente: null };
+    if (dni) {
+      const existe = await Cliente.findOne({ where: { dni }, attributes: ['cod_cliente', 'nombre', 'apellido', 'dni', 'empresa'] });
+      if (existe) return { duplicado: true, campo: 'dni', cliente: existe };
+    }
+    if (correo) {
+      const existe = await Cliente.findOne({ where: { correo }, attributes: ['cod_cliente', 'nombre', 'apellido', 'correo', 'empresa'] });
+      if (existe) return { duplicado: true, campo: 'correo', cliente: existe };
+    }
+    return resultado;
   }
 
   async actualizar(id, datos) {

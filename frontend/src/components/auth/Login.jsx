@@ -5,25 +5,20 @@ import { toast } from 'react-toastify';
 import { FiUser, FiLock, FiLogIn } from 'react-icons/fi';
 import logoFull from '../../assets/img/logo1.jpeg';
 import logoClean from '../../assets/img/logo2.jpeg';
+import axios from 'axios';
 
-// Logos de marcas de carros
-import marcaToyota from '../../assets/img/marca_toyota.png';
-import marcaChevrolet from '../../assets/img/marca_chevrolet.png';
-import marcaHyundai from '../../assets/img/marca_hyundai.png';
-import marcaNissan from '../../assets/img/marca_nissan.png';
-import marcaHonda from '../../assets/img/marca_honda.png';
-import marcaSuzuki from '../../assets/img/marca_suzuki.png';
-import marcaMitsubishi from '../../assets/img/marca_mitsubishi.svg';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-const marcas = [
-  { nombre: 'Toyota', logo: marcaToyota, color: '#EB0A1E' },
-  { nombre: 'Chevrolet', logo: marcaChevrolet, color: '#D4AF37' },
-  { nombre: 'Hyundai', logo: marcaHyundai, color: '#002C5F' },
-  { nombre: 'Nissan', logo: marcaNissan, color: '#C3002F' },
-  { nombre: 'Honda', logo: marcaHonda, color: '#CC0000' },
-  { nombre: 'Suzuki', logo: marcaSuzuki, color: '#E4002B' },
-  { nombre: 'Mitsubishi', logo: marcaMitsubishi, color: '#E60012' },
-];
+// Colores por marca (opcional – se usa si el título coincide)
+const coloresMarca = {
+  Toyota: '#EB0A1E',
+  Chevrolet: '#D4AF37',
+  Hyundai: '#002C5F',
+  Nissan: '#C3002F',
+  Honda: '#CC0000',
+  Suzuki: '#E4002B',
+  Mitsubishi: '#E60012',
+};
 
 const Login = () => {
   const [nombreUsuario, setNombreUsuario] = useState('');
@@ -31,16 +26,40 @@ const Login = () => {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [slides, setSlides] = useState([]);
   const { iniciarSesion } = useAuth();
   const navigate = useNavigate();
 
-  // Auto-slide cada 1 segundo
+  // Cargar imágenes del carrusel SOLO desde la BD
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % marcas.length);
-    }, 1000);
-    return () => clearInterval(timer);
+    const cargarSlides = async () => {
+      try {
+        const { data } = await axios.get(`${API_BASE}/api/carrusel`);
+        if (data.ok && data.datos.length > 0) {
+          const imagenesDB = data.datos.map(img => ({
+            nombre: img.titulo || '',
+            logo: img.imagen_url.startsWith('http')
+              ? img.imagen_url
+              : `${API_BASE}${img.imagen_url}`,
+            color: coloresMarca[img.titulo] || '#dc2626',
+          }));
+          setSlides(imagenesDB);
+        }
+      } catch (err) {
+        console.error('Error cargando carrusel:', err);
+      }
+    };
+    cargarSlides();
   }, []);
+
+  // Auto-slide cada 2.25 segundos
+  useEffect(() => {
+    if (slides.length === 0) return;
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides.length);
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [slides.length]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -68,7 +87,7 @@ const Login = () => {
 
         {/* Indicadores superiores */}
         <div className="login-carousel-indicators">
-          {marcas.map((_, i) => (
+          {slides.map((_, i) => (
             <button
               key={i}
               className={`login-indicator ${i === currentSlide ? 'active' : ''}`}
@@ -79,9 +98,9 @@ const Login = () => {
 
         {/* Slides */}
         <div className="login-carousel-track">
-          {marcas.map((marca, i) => (
+          {slides.map((marca, i) => (
             <div
-              key={marca.nombre}
+              key={`${marca.nombre}-${i}`}
               className={`login-slide ${i === currentSlide ? 'active' : ''}`}
             >
               <div className="login-slide-glow" style={{ background: marca.color }} />

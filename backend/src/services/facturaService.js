@@ -5,6 +5,9 @@ import Cliente from '../models/Cliente.js';
 import ProductoSeq from '../models/ProductoSeq.js';
 import Usuario from '../models/Usuario.js';
 import Pago from '../models/Pago.js';
+import BitacoraAnulacion from '../models/BitacoraAnulacion.js';
+import BitacoraExcepcionStock from '../models/BitacoraExcepcionStock.js';
+import bitacoraFacturacionService from './bitacoraFacturacionService.js';
 import { Op } from 'sequelize';
 
 class FacturaService {
@@ -64,16 +67,26 @@ class FacturaService {
       ]
     });
     if (!factura) throw Object.assign(new Error('Factura no encontrada'), { statusCode: 404 });
-    return factura;
+
+    // Importar datos de empresa
+    const empresa = (await import('../config/empresa.js')).default;
+
+    // Estructura extendida para frontend/PDF
+    return {
+      factura,
+      empresa,
+    };
   }
 
   // =============================================
   // CREAR FACTURA (transacción: factura + detalles + inventario)
   // HU-FAC-03: Cálculo ISV y totales por línea con redondeo a 2 decimales
   // HU-FAC-04: Descuentos por línea (% o monto) y/o descuento global por factura
+  // HU-FAC-09: Validación de stock con permiso de excepción para Administrador
   // =============================================
-  async crear(datos, codUsuario) {
+  async crear(datos, codUsuario, opciones = {}) {
     const { cod_cliente, metodo_pago, ref_pago, items, descuento_global, tipo_descuento_global } = datos;
+    const { rol = '', forzar_sin_stock = false, justificacion_stock = '' } = opciones;
 
     // Función de redondeo preciso a 2 decimales
     const round2 = (n) => Math.round((parseFloat(n) + Number.EPSILON) * 100) / 100;
@@ -111,6 +124,8 @@ class FacturaService {
       let isvGeneral = 0;
       const detallesCalculados = [];
 
+      const productosConDeficit = []; // HU-FAC-09: acumular productos sin stock
+
       for (const item of items) {
         // Validar item
         if (!item.cod_producto || !item.cantidad || item.cantidad <= 0) {
@@ -142,18 +157,32 @@ class FacturaService {
           );
         }
 
-        // Verificar stock en inventario
+        // HU-FAC-09: Verificar stock en inventario con control de excepción
         const [invResult] = await sequelize.query(
           'SELECT stock FROM inventario WHERE cod_producto = :codProd LIMIT 1',
           { replacements: { codProd: item.cod_producto }, type: sequelize.QueryTypes.SELECT, transaction: t }
         );
 
         const stockActual = invResult ? parseInt(invResult.stock) : 0;
+        item._stockActual = stockActual;
+        item._nombreProducto = producto.nombre_producto;
+
         if (stockActual < item.cantidad) {
-          throw Object.assign(
-            new Error(`Stock insuficiente para "${producto.nombre_producto}". Disponible: ${stockActual}, solicitado: ${item.cantidad}`),
-            { statusCode: 400 }
-          );
+          if (!forzar_sin_stock) {
+            // Recopilar TODOS los productos con stock insuficiente antes de lanzar error
+            if (!item._stockInsuficiente) item._stockInsuficiente = true;
+          }
+        }
+
+        // HU-FAC-09: Si stock insuficiente sin forzar, acumular para reportar
+        if (stockActual < item.cantidad && !forzar_sin_stock) {
+          productosConDeficit.push({
+            cod_producto: item.cod_producto,
+            nombre_producto: producto.nombre_producto,
+            stock_disponible: stockActual,
+            cantidad_solicitada: item.cantidad,
+            deficit: item.cantidad - stockActual
+          });
         }
 
         const precioUnitario = round2(producto.precio_venta);
@@ -199,6 +228,22 @@ class FacturaService {
           subtotal: subtotalItem,
           total: totalItem
         });
+      }
+
+      // HU-FAC-09: Si hay productos con déficit de stock y NO se forzó, lanzar error especial
+      if (productosConDeficit.length > 0) {
+        await t.rollback();
+        const esAdmin = rol === 'Administrador';
+        const err = new Error(
+          esAdmin
+            ? `Stock insuficiente en ${productosConDeficit.length} producto(s). Como Administrador puedes autorizar la venta sin stock.`
+            : `Stock insuficiente en ${productosConDeficit.length} producto(s). No tienes permiso para vender sin existencia. Contacta al Administrador.`
+        );
+        err.statusCode = 409;
+        err.codigo = 'STOCK_INSUFICIENTE';
+        err.productos = productosConDeficit;
+        err.puede_forzar = esAdmin;
+        throw err;
       }
 
       // --- Descuento global de factura (HU-FAC-04) ---
@@ -261,44 +306,184 @@ class FacturaService {
         );
       }
 
+      // HU-FAC-09: Si se forzó sin stock → registrar excepciones en bitácora
+      if (forzar_sin_stock) {
+        const excepcionesRegistrar = [];
+        for (const item of items) {
+          if (item._stockActual < item.cantidad) {
+            excepcionesRegistrar.push({
+              cod_factura: factura.cod_factura,
+              cod_usuario: codUsuario,
+              cod_producto: item.cod_producto,
+              nombre_producto: item._nombreProducto,
+              stock_disponible: item._stockActual,
+              cantidad_vendida: item.cantidad,
+              deficit: item.cantidad - item._stockActual,
+              justificacion: justificacion_stock || 'Autorizado por Administrador'
+            });
+          }
+        }
+        if (excepcionesRegistrar.length > 0) {
+          await BitacoraExcepcionStock.bulkCreate(excepcionesRegistrar, { transaction: t });
+        }
+      }
+
       await t.commit();
+
+      // HU-FAC-10: Registrar en bitácora de auditoría
+      try {
+        await bitacoraFacturacionService.registrar({
+          evento: 'FACTURA_CREADA',
+          entidad: 'FACTURA',
+          cod_factura: factura.cod_factura,
+          cod_usuario: codUsuario,
+          detalle: {
+            total: totalGeneral,
+            items: items.length,
+            cod_cliente,
+            descuento: descuentoTotal,
+            forzado_sin_stock: forzar_sin_stock || false
+          }
+        });
+        if (forzar_sin_stock) {
+          await bitacoraFacturacionService.registrar({
+            evento: 'EXCEPCION_STOCK',
+            entidad: 'FACTURA',
+            cod_factura: factura.cod_factura,
+            cod_usuario: codUsuario,
+            detalle: {
+              justificacion: justificacion_stock,
+              productos_con_deficit: productosConDeficit.length > 0 ? productosConDeficit : items.filter(i => i._stockActual < i.cantidad).map(i => ({
+                cod_producto: i.cod_producto,
+                nombre: i._nombreProducto,
+                stock: i._stockActual,
+                cantidad: i.cantidad
+              }))
+            }
+          });
+        }
+      } catch (logErr) { console.error('⚠️ Error al registrar bitácora (crear):', logErr.message); }
 
       // Retornar factura completa
       return this.obtenerPorId(factura.cod_factura);
 
     } catch (error) {
-      await t.rollback();
+      if (error.codigo !== 'STOCK_INSUFICIENTE') {
+        await t.rollback().catch(() => {});
+      }
       throw error;
     }
   }
 
   // =============================================
-  // ANULAR FACTURA (restaurar inventario)
+  // HU-FAC-07: ANULAR FACTURA con control completo
+  // - Motivo obligatorio
+  // - Revertir inventario
+  // - Marcar pagos como reversados (nota interna)
+  // - Bitácora: usuario, fecha, motivo, factura
   // =============================================
-  async anular(id) {
+  async anular(id, { motivo, cod_usuario }) {
+    if (!motivo || !motivo.trim()) {
+      throw Object.assign(new Error('El motivo de anulación es obligatorio'), { statusCode: 400 });
+    }
+    if (!cod_usuario) {
+      throw Object.assign(new Error('Se requiere el usuario que anula'), { statusCode: 400 });
+    }
+
     const factura = await Factura.findByPk(id, {
-      include: [{ model: DetalleFactura, as: 'detalles' }]
+      include: [
+        { model: DetalleFactura, as: 'detalles' },
+        { model: Pago, as: 'pagos' }
+      ]
     });
     if (!factura) throw Object.assign(new Error('Factura no encontrada'), { statusCode: 404 });
     if (!factura.estado) throw Object.assign(new Error('La factura ya está anulada'), { statusCode: 400 });
 
     const t = await sequelize.transaction();
     try {
-      // Restaurar inventario
+      // 1) Revertir inventario
+      let inventarioReversado = false;
       for (const detalle of factura.detalles) {
         if (detalle.cod_producto) {
           await sequelize.query(
             'UPDATE inventario SET stock = stock + :cant, fecha_ult_mov = NOW() WHERE cod_producto = :codProd',
             { replacements: { cant: detalle.cantidad, codProd: detalle.cod_producto }, transaction: t }
           );
+          inventarioReversado = true;
         }
       }
 
-      // Marcar como anulada
-      await factura.update({ estado: false }, { transaction: t });
+      // 2) Marcar pagos activos como reversados (nota interna)
+      const pagosActivos = (factura.pagos || []).filter(p => p.estado);
+      let montoPagosReversados = 0;
+      for (const pago of pagosActivos) {
+        montoPagosReversados += parseFloat(pago.monto) || 0;
+        await pago.update({
+          estado: false,
+          observacion: `[REVERSADO por anulación FAC-${String(id).padStart(6, '0')}] ${pago.observacion || ''} | Motivo: ${motivo.trim()}`
+        }, { transaction: t });
+      }
+
+      // 3) Marcar factura como anulada con datos de auditoría
+      await factura.update({
+        estado: false,
+        motivo_anulacion: motivo.trim(),
+        anulada_por: cod_usuario,
+        fecha_anulacion: new Date(),
+        estado_pago: 'ANULADA',
+        total_pagado: 0,
+        saldo: 0
+      }, { transaction: t });
+
+      // 4) Registrar en bitácora
+      const snapshot = factura.detalles.map(d => ({
+        cod_producto: d.cod_producto,
+        cantidad: d.cantidad,
+        precio_unitario: d.precio_unitario,
+        subtotal: d.subtotal,
+        isv: d.isv,
+        total: d.total
+      }));
+
+      await BitacoraAnulacion.create({
+        cod_factura: id,
+        cod_usuario,
+        motivo: motivo.trim(),
+        inventario_reversado: inventarioReversado,
+        pagos_reversados: pagosActivos.length,
+        monto_pagos_reversados: montoPagosReversados,
+        detalle_json: JSON.stringify(snapshot)
+      }, { transaction: t });
+
       await t.commit();
 
-      return { mensaje: 'Factura anulada correctamente' };
+      // HU-FAC-10: Registrar en bitácora de auditoría
+      try {
+        await bitacoraFacturacionService.registrar({
+          evento: 'FACTURA_ANULADA',
+          entidad: 'FACTURA',
+          cod_factura: parseInt(id),
+          cod_usuario,
+          detalle: {
+            motivo: motivo.trim(),
+            inventario_reversado: inventarioReversado,
+            pagos_reversados: pagosActivos.length,
+            monto_pagos_reversados: montoPagosReversados,
+            total_factura: parseFloat(factura.total)
+          }
+        });
+      } catch (logErr) { console.error('⚠️ Error al registrar bitácora (anular):', logErr.message); }
+
+      return {
+        mensaje: 'Factura anulada correctamente',
+        resumen: {
+          factura: `FAC-${String(id).padStart(6, '0')}`,
+          motivo: motivo.trim(),
+          inventario_reversado: inventarioReversado,
+          pagos_reversados: pagosActivos.length,
+          monto_pagos_reversados: montoPagosReversados
+        }
+      };
     } catch (error) {
       await t.rollback();
       throw error;
@@ -336,6 +521,22 @@ class FacturaService {
       await factura.destroy({ transaction: t });
 
       await t.commit();
+
+      // HU-FAC-10: Registrar en bitácora de auditoría
+      try {
+        await bitacoraFacturacionService.registrar({
+          evento: 'FACTURA_ELIMINADA',
+          entidad: 'FACTURA',
+          cod_factura: parseInt(id),
+          cod_usuario: null,
+          detalle: {
+            estado_previo: factura.estado ? 'ACTIVA' : 'ANULADA',
+            total: parseFloat(factura.total),
+            items: factura.detalles.length
+          }
+        });
+      } catch (logErr) { console.error('⚠️ Error al registrar bitácora (eliminar):', logErr.message); }
+
       return { mensaje: 'Factura eliminada permanentemente' };
     } catch (error) {
       await t.rollback();

@@ -18,6 +18,9 @@ const pageNames = {
   '/proveedores': 'Proveedores',
   '/reportes': 'Reportes',
   '/facturas': 'Facturacion',
+  '/auditoria-facturacion': 'Auditoría de Facturación',
+  '/notas-credito': 'Notas de Crédito',
+  '/carrusel': 'Carrusel',
 };
 
 const Layout = () => {

@@ -2,14 +2,26 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { facturaService } from '../../services/serviceIndex.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { toast } from 'react-toastify';
-import { FiPlus, FiSearch, FiX, FiTrash2, FiEye, FiFileText, FiArrowLeft, FiPrinter, FiAlertTriangle, FiXCircle } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiX, FiTrash2, FiEye, FiFileText, FiArrowLeft, FiPrinter, FiAlertTriangle, FiXCircle, FiUserPlus, FiEdit2 } from 'react-icons/fi';
 import logoClean from '../../assets/img/logo2.jpeg';
 import logoFull from '../../assets/img/logo1.jpeg';
 import BuscadorProducto from './BuscadorProducto.jsx';
+import ModalClienteRapido from './ModalClienteRapido.jsx';
 
 const formatMoney = (v) => {
   const n = parseFloat(v) || 0;
   return `L ${n.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const normalizeEstado = (v) => {
+  if (v === true) return true;
+  if (v === false) return false;
+  if (v === 1 || v === '1') return true;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    return ['activa', 'activo', 'true', '1', 'si', 'sí'].includes(s);
+  }
+  return Boolean(v);
 };
 
 // ==========================================
@@ -26,7 +38,7 @@ const ListaFacturas = ({ onNueva, onVer }) => {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const { data } = await facturaService.listar({ pagina, limite: 15, buscar });
+      const { data } = await facturaService.listar({ pagina, limite: 10, buscar });
       if (data.ok) {
         setFacturas(data.datos);
         setTotalPaginas(data.totalPaginas);
@@ -40,18 +52,25 @@ const ListaFacturas = ({ onNueva, onVer }) => {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const [modalAnular, setModalAnular] = useState(null); // { id, numero } de la factura a gestionar
+  const [modalAnular, setModalAnular] = useState(null); // { id, numero, estado }
+  const [motivoAnulacion, setMotivoAnulacion] = useState('');
 
   const abrirModalAnular = (f) => {
     setModalAnular({ id: f.cod_factura, numero: `FAC-${String(f.cod_factura).padStart(6, '0')}`, estado: f.estado });
+    setMotivoAnulacion('');
   };
 
   const anular = async () => {
     if (!modalAnular) return;
+    if (!motivoAnulacion.trim()) {
+      toast.warn('Debes ingresar el motivo de anulación');
+      return;
+    }
     try {
-      await facturaService.anular(modalAnular.id);
-      toast.success('Factura anulada correctamente');
+      const { data } = await facturaService.anular(modalAnular.id, motivoAnulacion.trim());
+      toast.success(data?.mensaje || 'Factura anulada correctamente');
       setModalAnular(null);
+      setMotivoAnulacion('');
       cargar();
     } catch (err) {
       toast.error(err.response?.data?.mensaje || 'Error al anular');
@@ -116,8 +135,8 @@ const ListaFacturas = ({ onNueva, onVer }) => {
                     <td>{formatMoney(f.isv)}</td>
                     <td><strong>{formatMoney(f.total)}</strong></td>
                     <td>
-                      <span className={`badge ${f.estado ? 'bg-success' : 'bg-danger'}`}>
-                        {f.estado ? 'Activa' : 'Anulada'}
+                      <span className={`badge ${normalizeEstado(f.estado) ? 'bg-success' : 'bg-danger'}`}>
+                        {normalizeEstado(f.estado) ? 'Activa' : 'Anulada'}
                       </span>
                     </td>
                     <td>
@@ -172,28 +191,42 @@ const ListaFacturas = ({ onNueva, onVer }) => {
                 <h5 className="modal-title"><FiAlertTriangle className="me-2" />Gestionar Factura</h5>
                 <button type="button" className="btn-close btn-close-white" onClick={() => setModalAnular(null)} />
               </div>
-              <div className="modal-body text-center py-4">
-                <h5 className="mb-3">{modalAnular.numero}</h5>
+              <div className="modal-body py-4">
+                <h5 className="text-center mb-3">{modalAnular.numero}</h5>
                 {modalAnular.estado ? (
-                  <p className="text-muted mb-0">
-                    ¿Qué deseas hacer con esta factura?<br />
-                    <strong>Anular:</strong> Se marca como anulada y se restaura el inventario.<br />
-                    <strong>Eliminar:</strong> Se borra permanentemente de la base de datos.
-                  </p>
+                  <>
+                    <p className="text-muted text-center mb-3">
+                      ¿Qué deseas hacer con esta factura?<br />
+                      <strong>Anular:</strong> Se marca como anulada, se restaura el inventario y se reversan los pagos.<br />
+                      <strong>Eliminar:</strong> Se borra permanentemente de la base de datos.
+                    </p>
+                    <div className="mb-2">
+                      <label className="form-label fw-bold">Motivo de anulación <span className="text-danger">*</span></label>
+                      <textarea
+                        className="form-control"
+                        rows="3"
+                        placeholder="Ingrese el motivo de anulación (obligatorio)..."
+                        value={motivoAnulacion}
+                        onChange={(e) => setMotivoAnulacion(e.target.value)}
+                        maxLength={500}
+                      />
+                      <small className="text-muted">{motivoAnulacion.length}/500</small>
+                    </div>
+                  </>
                 ) : (
-                  <p className="text-muted mb-0">
+                  <p className="text-muted text-center mb-0">
                     Esta factura ya está <span className="badge bg-danger">Anulada</span>.<br />
                     ¿Deseas eliminarla permanentemente de la base de datos?
                   </p>
                 )}
               </div>
               <div className="modal-footer justify-content-between">
-                <button className="btn btn-secondary" onClick={() => setModalAnular(null)}>
+                <button className="btn btn-secondary" onClick={() => { setModalAnular(null); setMotivoAnulacion(''); }}>
                   Cancelar
                 </button>
                 <div className="d-flex gap-2">
                   {modalAnular.estado && (
-                    <button className="btn btn-warning" onClick={anular}>
+                    <button className="btn btn-warning" onClick={anular} disabled={!motivoAnulacion.trim()}>
                       <FiXCircle className="me-1" />Anular
                     </button>
                   )}
@@ -215,6 +248,7 @@ const ListaFacturas = ({ onNueva, onVer }) => {
 // ==========================================
 const DetalleFactura = ({ codFactura, onVolver }) => {
   const [factura, setFactura] = useState(null);
+  const [empresa, setEmpresa] = useState({});
   const [cargando, setCargando] = useState(true);
   const printRef = useRef(null);
 
@@ -223,7 +257,13 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
       setCargando(true);
       try {
         const { data } = await facturaService.obtener(codFactura);
-        if (data.ok) setFactura(data.datos);
+        if (data.ok) {
+          // data.datos puede ser { factura, empresa } o la factura directamente
+          const payload = data.datos;
+          const f = payload.factura || payload;
+          setFactura(f);
+          setEmpresa(payload.empresa || {});
+        }
       } catch {
         toast.error('Error al cargar factura');
       } finally {
@@ -247,6 +287,9 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
   const numFactura = `FAC-${String(factura.cod_factura).padStart(6, '0')}`;
   const cantidadItems = factura.detalles?.reduce((a, d) => a + (parseInt(d.cantidad) || 0), 0) || 0;
 
+  // Normalizar estado (acepta '1', 'ACTIVA', true, etc.)
+  const estadoActivo = normalizeEstado(factura.estado);
+
   return (
     <div>
       {/* ---- Botones (no se imprimen) ---- */}
@@ -261,8 +304,8 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
 
       {/* ======== FACTURA IMPRIMIBLE ======== */}
       <div ref={printRef} className="inv">
-        {/* Marca de agua si anulada */}
-        {!factura.estado && <div className="inv-void-watermark">ANULADA</div>}
+          {/* Marca de agua si anulada */}
+          {!estadoActivo && <div className="inv-void-watermark">ANULADA</div>}
 
         {/* ---- Barra roja superior decorativa ---- */}
         <div className="inv-topbar" />
@@ -287,16 +330,17 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
           {/* ======= DATOS EMPRESA + FACTURA META ======= */}
           <div className="inv-meta-row">
             <div className="inv-empresa-datos">
-              <div className="inv-dato"><span>RTN:</span> 0801-1990-00001</div>
-              <div className="inv-dato"><span>Dirección:</span> Col. Kennedy, Tegucigalpa, Honduras</div>
-              <div className="inv-dato"><span>Teléfono:</span> +504 9999-9999</div>
-              <div className="inv-dato"><span>Email:</span> info@jyr-accesorios.com</div>
+              <div className="inv-dato"><span>R.T.N.:</span> {empresa.rtn || '---'}</div>
+              <div className="inv-dato"><span>Dirección:</span> {empresa.direccion || '---'}</div>
+              <div className="inv-dato"><span>Celular:</span> {empresa.telefono || '---'}</div>
+              <div className="inv-dato"><span>E-mail:</span> {empresa.correo || '---'}</div>
+              {empresa.cai && <div className="inv-dato"><span>CAI:</span> {empresa.cai}</div>}
             </div>
             <div className="inv-meta-datos">
               <table className="inv-meta-table">
                 <tbody>
-                  <tr><td>Fecha:</td><td>{fechaEmision}</td></tr>
-                  <tr><td>Hora:</td><td>{horaEmision}</td></tr>
+                  <tr><td>Fecha:</td><td>{new Date().toLocaleDateString('es-HN', { year: 'numeric', month: 'long', day: 'numeric' })}</td></tr>
+                  <tr><td>Hora:</td><td>{new Date().toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit' })}</td></tr>
                   <tr><td>Vendedor:</td><td>{factura.usuario?.nombre_usuario || '-'}</td></tr>
                   <tr><td>Estado:</td><td>
                     <span className={`inv-status ${factura.estado ? 'inv-status-ok' : 'inv-status-void'}`}>
@@ -392,6 +436,13 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
 
           {/* ======= PIE DE FACTURA ======= */}
           <div className="inv-footer">
+            {empresa.rango_autorizado && (
+              <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, marginBottom: 8 }}>
+                Rango autorizado: {empresa.rango_autorizado}
+                {empresa.fecha_limite_emision && <> / Fecha límite de emisión: {new Date(empresa.fecha_limite_emision + 'T00:00:00').toLocaleDateString('es-HN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</>}
+              </div>
+            )}
+            <div style={{ textAlign: 'center', fontSize: '9px', color: '#737373', marginBottom: 8 }}>Original: Cliente / Copia: O.T. Emisor</div>
             <div className="inv-footer-top">
               <div className="inv-footer-col">
                 <div className="inv-sign-line" />
@@ -407,7 +458,6 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
               <div className="inv-footer-text">
                 <strong>¡Gracias por su preferencia!</strong>
                 <span>J & R Accesorios & Reparaciones — La calidad que tu vehículo merece</span>
-                <span className="inv-legal">Este documento es una representación impresa de la factura electrónica.</span>
               </div>
             </div>
           </div>
@@ -433,6 +483,13 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
   const [metodoPago, setMetodoPago] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [showClienteDropdown, setShowClienteDropdown] = useState(false);
+  // HU-FAC-09: Modal de excepción de stock
+  const [modalStock, setModalStock] = useState(null);
+  const [justificacionStock, setJustificacionStock] = useState('');
+  // HU-FAC-11: Modal de cliente rápido
+  const [modalCliente, setModalCliente] = useState(false);
+  const [clienteEditar, setClienteEditar] = useState(null);
+  const { usuario } = useAuth();
 
   // Buscar clientes
   useEffect(() => {
@@ -501,27 +558,25 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
     };
   }, { subtotalBruto: 0, descuento: 0, subtotal: 0, isv: 0, total: 0 });
 
+  // HU-FAC-09: Validación de stock previa (solo bloquea cantidad <= 0, stock se valida en backend)
   const validarItems = () => {
     for (const item of items) {
       if (item.cantidad <= 0) return 'La cantidad de cada producto debe ser mayor a 0';
-      if (item.cantidad > item.stock) return `Stock insuficiente para "${item.nombre_producto}" (disponible: ${item.stock})`;
     }
     return null;
   };
 
-  const guardar = async () => {
-    if (!clienteSeleccionado) { toast.error('Selecciona un cliente'); return; }
-    if (items.length === 0) { toast.error('Agrega al menos un producto'); return; }
-    const errorItems = validarItems();
-    if (errorItems) { toast.error(errorItems); return; }
-
+  // HU-FAC-09: Función interna para enviar la factura al backend
+  const enviarFactura = async (forzar = false, justificacion = '') => {
     setGuardando(true);
     try {
       const payload = {
         cod_cliente: clienteSeleccionado.cod_cliente,
         metodo_pago: metodoPago ? parseInt(metodoPago) : null,
         ref_pago: refPago || null,
-        items: items.map(i => ({ cod_producto: i.cod_producto, cantidad: i.cantidad, descuento: i.descuento || 0 }))
+        items: items.map(i => ({ cod_producto: i.cod_producto, cantidad: i.cantidad, descuento: i.descuento || 0 })),
+        forzar_sin_stock: forzar,
+        justificacion_stock: justificacion
       };
       const { data } = await facturaService.crear(payload);
       if (data.ok) {
@@ -529,13 +584,57 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
         onCreada(data.datos?.cod_factura);
       }
     } catch (err) {
-      toast.error(err.response?.data?.mensaje || 'Error al crear factura');
+      const resp = err.response?.data;
+      // HU-FAC-09: Interceptar error de stock insuficiente
+      if (resp?.codigo === 'STOCK_INSUFICIENTE') {
+        if (resp.puede_forzar) {
+          // Mostrar modal de autorización al Administrador
+          setModalStock({ productos: resp.productos, mensaje: resp.mensaje });
+          setJustificacionStock('');
+        } else {
+          // Cajero sin permiso — mostrar detalle del déficit
+          const detalle = resp.productos?.map(p =>
+            `• ${p.nombre_producto}: disponible ${p.stock_disponible}, solicitado ${p.cantidad_solicitada}`
+          ).join('\n') || '';
+          toast.error(
+            <div>
+              <strong>Stock insuficiente</strong>
+              <div style={{ fontSize: '0.85em', whiteSpace: 'pre-line', marginTop: 4 }}>{detalle}</div>
+              <div style={{ fontSize: '0.8em', marginTop: 6, color: '#ffc107' }}>
+                Contacta al Administrador para autorizar la venta sin stock.
+              </div>
+            </div>,
+            { autoClose: 8000 }
+          );
+        }
+      } else {
+        toast.error(resp?.mensaje || 'Error al crear factura');
+      }
     } finally {
       setGuardando(false);
     }
   };
 
+  const guardar = async () => {
+    if (!clienteSeleccionado) { toast.error('Selecciona un cliente'); return; }
+    if (items.length === 0) { toast.error('Agrega al menos un producto'); return; }
+    const errorItems = validarItems();
+    if (errorItems) { toast.error(errorItems); return; }
+    await enviarFactura(false, '');
+  };
+
+  // HU-FAC-09: Confirmar venta forzada sin stock (solo Admin)
+  const confirmarForzarStock = async () => {
+    if (!justificacionStock.trim()) {
+      toast.warn('Debes ingresar una justificación para autorizar la venta sin stock');
+      return;
+    }
+    setModalStock(null);
+    await enviarFactura(true, justificacionStock.trim());
+  };
+
   return (
+    <>
     <div>
       <button className="btn btn-outline-secondary mb-3" onClick={onVolver}><FiArrowLeft className="me-2" />Volver</button>
       <h3 className="mb-4"><FiFileText className="me-2" />Nueva Factura</h3>
@@ -554,9 +653,15 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
                     {clienteSeleccionado.dni && <span className="text-muted ms-2">DNI: {clienteSeleccionado.dni}</span>}
                     {clienteSeleccionado.empresa && <span className="text-muted ms-2">| {clienteSeleccionado.empresa}</span>}
                   </div>
-                  <button className="btn btn-sm btn-outline-danger" onClick={() => setClienteSeleccionado(null)}>
-                    <FiX />
-                  </button>
+                  <div className="d-flex gap-1">
+                    <button className="btn btn-sm btn-outline-primary" title="Editar cliente"
+                      onClick={() => { setClienteEditar(clienteSeleccionado); setModalCliente(true); }}>
+                      <FiEdit2 />
+                    </button>
+                    <button className="btn btn-sm btn-outline-danger" onClick={() => setClienteSeleccionado(null)}>
+                      <FiX />
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="position-relative">
@@ -566,6 +671,10 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
                       value={buscarCliente}
                       onChange={(e) => { setBuscarCliente(e.target.value); setShowClienteDropdown(true); }}
                       onFocus={() => setShowClienteDropdown(true)} />
+                    <button className="btn btn-outline-info btn-sm" type="button" title="Crear nuevo cliente"
+                      onClick={() => { setClienteEditar(null); setModalCliente(true); }}>
+                      <FiUserPlus className="me-1" />Nuevo
+                    </button>
                   </div>
                   {showClienteDropdown && clientes.length > 0 && (
                     <div className="position-absolute w-100 bg-white border rounded shadow-sm mt-1" style={{ zIndex: 1050, maxHeight: 200, overflowY: 'auto' }}>
@@ -704,6 +813,94 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
         </div>
       </div>
     </div>
+
+    {/* ══════ Modal Stock Insuficiente ══════ */}
+      {modalStock && (
+        <div className="modal-backdrop-custom" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,.55)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{
+            background: '#1e1e2f', color: '#e0e0e0', borderRadius: 12,
+            width: '95%', maxWidth: 560, padding: '28px 32px',
+            boxShadow: '0 8px 32px rgba(0,0,0,.45)', border: '1px solid #ff9800'
+          }}>
+            <h5 style={{ color: '#ff9800', marginBottom: 16 }}>
+              <FiAlertTriangle className="me-2" style={{ verticalAlign: '-2px' }} />
+              Stock Insuficiente — Autorización Requerida
+            </h5>
+            <p className="small mb-3" style={{ color: '#ccc' }}>
+              Los siguientes productos no tienen stock suficiente. Como <strong>Administrador</strong>, puedes autorizar la venta registrando una justificación.
+            </p>
+
+            <div className="table-responsive mb-3">
+              <table className="table table-sm table-dark table-bordered mb-0" style={{ fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ color: '#ff9800' }}>
+                    <th>Producto</th>
+                    <th className="text-center">Disponible</th>
+                    <th className="text-center">Solicitado</th>
+                    <th className="text-center">Déficit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {modalStock.productos.map((p, i) => (
+                    <tr key={i}>
+                      <td>{p.nombre_producto}</td>
+                      <td className="text-center">{p.stock_disponible}</td>
+                      <td className="text-center">{p.cantidad_solicitada}</td>
+                      <td className="text-center text-danger fw-bold">-{p.deficit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label small" style={{ color: '#ccc' }}>
+                Justificación <span className="text-danger">*</span>
+              </label>
+              <textarea
+                className="form-control form-control-sm"
+                rows={3}
+                placeholder="Indique el motivo por el cual se autoriza la venta sin stock suficiente..."
+                value={justificacionStock}
+                onChange={(e) => setJustificacionStock(e.target.value)}
+                style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }}
+              />
+            </div>
+
+            <div className="d-flex justify-content-end gap-2">
+              <button className="btn btn-outline-secondary btn-sm" onClick={() => { setModalStock(null); setJustificacionStock(''); }}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-warning btn-sm fw-bold"
+                disabled={!justificacionStock.trim() || guardando}
+                onClick={confirmarForzarStock}
+              >
+                {guardando ? <span className="spinner-border spinner-border-sm me-1" /> : <FiAlertTriangle className="me-1" />}
+                Autorizar Venta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════ Modal Cliente Rápido (HU-FAC-11) ══════ */}
+      <ModalClienteRapido
+        visible={modalCliente}
+        onCerrar={() => { setModalCliente(false); setClienteEditar(null); }}
+        onClienteCreado={(cliente) => {
+          setClienteSeleccionado(cliente);
+          setBuscarCliente('');
+          setShowClienteDropdown(false);
+        }}
+        clienteEditar={clienteEditar}
+      />
+
+    </>
   );
 };
 

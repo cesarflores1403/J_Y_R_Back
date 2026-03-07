@@ -10,12 +10,16 @@ import Clientes from '../components/clientes/Clientes.jsx';
 import Proveedores from '../components/proveedores/Proveedores.jsx';
 import Reportes from '../components/reportes/Reportes.jsx';
 import Facturas from '../components/facturas/Facturas.jsx';
+import Cotizaciones from '../components/cotizaciones/Cotizaciones.jsx';
+import CarruselPage from '../components/dashboard/CarruselPage.jsx';
 import ProductoPage from '../pages/ProductoPage.jsx';
 import Ubicaciones from '../components/ubicaciones/Ubicaciones.jsx';
 import Categorias from '../components/categorias/Categorias.jsx';
 import Existencias from '../components/inventario/Existencias.jsx';
 import InventarioKardexPage from '../components/inventario/InventarioKardexPage.jsx';
 import InventarioEntradasPage from '../components/inventario/InventarioEntradasPage.jsx';
+import AuditoriaFacturacion from '../components/auditoria/AuditoriaFacturacion.jsx';
+import NotasCredito from '../components/notascredito/NotasCredito.jsx';
 
 const PrivateRoute = ({ children, roles }) => {
   const { autenticado, usuario, cargando } = useAuth();
@@ -41,8 +45,12 @@ const App = () => {
             <Route path="inventario/entradas" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioEntradasPage /></PrivateRoute>} />
             <Route path="clientes" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Clientes /></PrivateRoute>} />
             <Route path="facturas" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Facturas /></PrivateRoute>} />
+            <Route path="cotizaciones" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Cotizaciones /></PrivateRoute>} />
             <Route path="proveedores" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><Proveedores /></PrivateRoute>} />
             <Route path="reportes" element={<PrivateRoute roles={['Administrador']}><Reportes /></PrivateRoute>} />
+            <Route path="carrusel" element={<PrivateRoute roles={['Administrador']}><CarruselPage /></PrivateRoute>} />
+            <Route path="auditoria-facturacion" element={<PrivateRoute roles={['Administrador']}><AuditoriaFacturacion /></PrivateRoute>} />
+            <Route path="notas-credito" element={<PrivateRoute roles={['Administrador', 'Cajero']}><NotasCredito /></PrivateRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

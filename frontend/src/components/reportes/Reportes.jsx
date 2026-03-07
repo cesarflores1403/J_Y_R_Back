@@ -94,7 +94,29 @@ const Reportes = () => {
                             <td>{formatMoney(f.subtotal)}</td>
                             <td>{formatMoney(f.isv)}</td>
                             <td><strong>{formatMoney(f.total)}</strong></td>
-                            <td><span className={`badge ${f.estado ? 'bg-success' : 'bg-danger'}`}>{f.estado ? 'Activa' : 'Anulada'}</span></td>
+                            <td>
+                              <span className={`badge ${(() => {
+                                const v = f.estado;
+                                if (v === true) return 'bg-success';
+                                if (v === false) return 'bg-danger';
+                                if (v === 1 || v === '1') return 'bg-success';
+                                if (typeof v === 'string') {
+                                  const s = v.trim().toLowerCase();
+                                  return ['activa', 'activo', 'true', '1', 'si', 'sí'].includes(s) ? 'bg-success' : 'bg-danger';
+                                }
+                                return v ? 'bg-success' : 'bg-danger';
+                              })()}`}>{(() => {
+                                const v = f.estado;
+                                if (v === true) return 'Activa';
+                                if (v === false) return 'Anulada';
+                                if (v === 1 || v === '1') return 'Activa';
+                                if (typeof v === 'string') {
+                                  const s = v.trim().toLowerCase();
+                                  return ['activa', 'activo', 'true', '1', 'si', 'sí'].includes(s) ? 'Activa' : 'Anulada';
+                                }
+                                return v ? 'Activa' : 'Anulada';
+                              })()}</span>
+                            </td>
                           </tr>
                         ))}
                       </tbody>

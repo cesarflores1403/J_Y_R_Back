@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { getInitials } from '../../utils/helpers.js';
 import {
   FiGrid, FiUsers, FiTruck, FiPackage,
-  FiBarChart2, FiLogOut, FiFileText, FiMapPin, FiDatabase, FiList, FiPlusCircle, FiTag
+  FiBarChart2, FiLogOut, FiFileText, FiMapPin, FiDatabase, FiList, FiPlusCircle, FiTag, FiImage, FiClipboard, FiClock
 } from 'react-icons/fi';
 import logoClean from '../../assets/img/logo2.jpeg';
 
@@ -15,6 +15,8 @@ const menuItems = [
   { section: 'Comercial', items: [
     { path: '/clientes', label: 'Clientes', icon: <FiUsers />, roles: ['Administrador', 'Cajero'] },
     { path: '/facturas', label: 'Facturación', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
+    { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiClipboard />, roles: ['Administrador', 'Cajero'] },
+    { path: '/notas-credito', label: 'Notas de Crédito', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
   ]},
   { section: 'Inventario', items: [
     { path: '/productos', label: 'Productos', icon: <FiPackage />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
@@ -29,6 +31,10 @@ const menuItems = [
   ]},
   { section: 'Gestión', items: [
     { path: '/reportes', label: 'Reportes', icon: <FiBarChart2 />, roles: ['Administrador'] },
+    { path: '/auditoria-facturacion', label: 'Auditoría Fact.', icon: <FiClock />, roles: ['Administrador'] },
+  ]},
+  { section: 'Fotos Carrusel', items: [
+    { path: '/carrusel', label: 'Carrusel', icon: <FiImage />, roles: ['Administrador'] },
   ]},
 ];
 

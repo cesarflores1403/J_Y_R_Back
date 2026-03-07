@@ -20,16 +20,34 @@ export const obtener = async (req, res) => {
 
 export const crear = async (req, res) => {
   try {
-    const factura = await facturaService.crear(req.body, req.usuario.cod_usuario);
+    // HU-FAC-09: Pasar rol y opciones de forzar stock
+    const opciones = {
+      rol: req.usuario.rol,
+      forzar_sin_stock: req.body.forzar_sin_stock || false,
+      justificacion_stock: req.body.justificacion_stock || ''
+    };
+    const factura = await facturaService.crear(req.body, req.usuario.cod_usuario, opciones);
     res.status(201).json({ ok: true, datos: factura, mensaje: 'Factura creada correctamente' });
   } catch (error) {
+    // HU-FAC-09: Error especial con datos de stock
+    if (error.codigo === 'STOCK_INSUFICIENTE') {
+      return res.status(409).json({
+        ok: false,
+        codigo: error.codigo,
+        mensaje: error.message,
+        productos: error.productos,
+        puede_forzar: error.puede_forzar
+      });
+    }
     res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });
   }
 };
 
 export const anular = async (req, res) => {
   try {
-    const resultado = await facturaService.anular(req.params.id);
+    const { motivo } = req.body || {};
+    const cod_usuario = req.usuario?.cod_usuario;
+    const resultado = await facturaService.anular(req.params.id, { motivo, cod_usuario });
     res.json({ ok: true, ...resultado });
   } catch (error) {
     res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });

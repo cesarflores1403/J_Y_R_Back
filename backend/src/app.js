@@ -87,6 +87,16 @@ app.get('/health/db', async (req, res, next) => {
 // RUTAS API
 // =======================
 
+// =======================
+// ARCHIVOS ESTÁTICOS (uploads)
+// =======================
+import path from 'path';
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+}, express.static(path.resolve('uploads')));
+
 app.use('/api', routes); // // Prefijo global de la API
 
 // =======================

@@ -1,0 +1,259 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-toastify';
+import { FiSave, FiX, FiUserPlus, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
+import { clienteService } from '../../services/serviceIndex.js';
+
+// ==========================================
+// MODAL CREACIÓN/EDICIÓN RÁPIDA DE CLIENTE
+// Usado desde NuevaFactura (HU-FAC-11)
+// ==========================================
+const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar = null }) => {
+  const [form, setForm] = useState({
+    nombre: '',
+    apellido: '',
+    dni: '',
+    empresa: '',
+    telefono: '',
+    correo: '',
+    direccion: ''
+  });
+  const [errores, setErrores] = useState({});
+  const [guardando, setGuardando] = useState(false);
+  const [duplicado, setDuplicado] = useState(null);
+  const [verificando, setVerificando] = useState(false);
+  const nombreRef = useRef(null);
+  const dniTimerRef = useRef(null);
+  const correoTimerRef = useRef(null);
+
+  // Prellenar si es edición
+  useEffect(() => {
+    if (clienteEditar) {
+      setForm({
+        nombre: clienteEditar.nombre || '',
+        apellido: clienteEditar.apellido || '',
+        dni: clienteEditar.dni || '',
+        empresa: clienteEditar.empresa || '',
+        telefono: clienteEditar.telefono || '',
+        correo: clienteEditar.correo || '',
+        direccion: clienteEditar.direccion || ''
+      });
+    } else {
+      setForm({ nombre: '', apellido: '', dni: '', empresa: '', telefono: '', correo: '', direccion: '' });
+    }
+    setErrores({});
+    setDuplicado(null);
+  }, [clienteEditar, visible]);
+
+  // Focus al abrir
+  useEffect(() => {
+    if (visible && nombreRef.current) {
+      setTimeout(() => nombreRef.current?.focus(), 200);
+    }
+  }, [visible]);
+
+  // Verificar duplicado por DNI (debounce)
+  useEffect(() => {
+    if (dniTimerRef.current) clearTimeout(dniTimerRef.current);
+    if (!form.dni || form.dni.length < 5) { setDuplicado(null); return; }
+    // No verificar si estamos editando el mismo cliente
+    dniTimerRef.current = setTimeout(async () => {
+      try {
+        setVerificando(true);
+        const resp = await clienteService.verificarDuplicado({ dni: form.dni });
+        const data = resp.data?.datos || resp.data;
+        if (data?.duplicado && (!clienteEditar || data.cliente.cod_cliente !== clienteEditar.cod_cliente)) {
+          setDuplicado({ campo: 'DNI', cliente: data.cliente });
+        } else {
+          setDuplicado(null);
+        }
+      } catch { /* silenciar */ }
+      finally { setVerificando(false); }
+    }, 500);
+    return () => clearTimeout(dniTimerRef.current);
+  }, [form.dni, clienteEditar]);
+
+  // Verificar duplicado por correo (debounce)
+  useEffect(() => {
+    if (correoTimerRef.current) clearTimeout(correoTimerRef.current);
+    if (!form.correo || form.correo.length < 5) return;
+    correoTimerRef.current = setTimeout(async () => {
+      try {
+        const resp = await clienteService.verificarDuplicado({ correo: form.correo });
+        const data = resp.data?.datos || resp.data;
+        if (data?.duplicado && (!clienteEditar || data.cliente.cod_cliente !== clienteEditar.cod_cliente)) {
+          setDuplicado({ campo: 'Correo', cliente: data.cliente });
+        }
+      } catch { /* silenciar */ }
+    }, 500);
+    return () => clearTimeout(correoTimerRef.current);
+  }, [form.correo, clienteEditar]);
+
+  const handleChange = (campo, valor) => {
+    setForm(prev => ({ ...prev, [campo]: valor }));
+    if (errores[campo]) setErrores(prev => ({ ...prev, [campo]: null }));
+  };
+
+  // Validaciones mínimas
+  const validar = () => {
+    const errs = {};
+    if (!form.nombre.trim()) errs.nombre = 'El nombre es requerido';
+    if (form.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo)) errs.correo = 'Correo inválido';
+    if (form.dni && form.dni.trim().length < 5) errs.dni = 'El DNI debe tener al menos 5 caracteres';
+    setErrores(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  // Guardar cliente
+  const guardar = async () => {
+    if (!validar()) return;
+    setGuardando(true);
+    try {
+      let resp;
+      if (clienteEditar) {
+        resp = await clienteService.actualizar(clienteEditar.cod_cliente, form);
+      } else {
+        resp = await clienteService.crear(form);
+      }
+      const cliente = resp.data?.datos || resp.data;
+      toast.success(clienteEditar ? 'Cliente actualizado' : 'Cliente creado y seleccionado');
+      onClienteCreado(cliente);
+      onCerrar();
+    } catch (err) {
+      const msg = err.response?.data?.mensaje || err.message;
+      if (msg.includes('DNI ya está registrado')) {
+        setErrores(prev => ({ ...prev, dni: 'Este DNI ya está registrado' }));
+      } else if (msg.includes('correo ya está registrado')) {
+        setErrores(prev => ({ ...prev, correo: 'Este correo ya está registrado' }));
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // Seleccionar el duplicado existente
+  const seleccionarDuplicado = () => {
+    if (duplicado?.cliente) {
+      onClienteCreado(duplicado.cliente);
+      onCerrar();
+      toast.info('Cliente existente seleccionado');
+    }
+  };
+
+  if (!visible) return null;
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,.55)', zIndex: 9999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    }}>
+      <div style={{
+        background: '#1e1e2f', color: '#e0e0e0', borderRadius: 12,
+        width: '95%', maxWidth: 580, padding: '24px 28px',
+        boxShadow: '0 8px 32px rgba(0,0,0,.45)', border: '1px solid #444',
+        maxHeight: '90vh', overflowY: 'auto'
+      }}>
+        {/* Header */}
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="mb-0" style={{ color: '#4fc3f7' }}>
+            <FiUserPlus className="me-2" />
+            {clienteEditar ? 'Editar Cliente' : 'Nuevo Cliente Rápido'}
+          </h5>
+          <button className="btn btn-sm btn-outline-secondary" onClick={onCerrar} style={{ border: 'none' }}>
+            <FiX size={20} />
+          </button>
+        </div>
+
+        {/* Aviso de duplicado */}
+        {duplicado && (
+          <div className="alert alert-warning py-2 px-3 d-flex align-items-center justify-content-between" style={{ fontSize: '0.82rem', background: '#3a2a00', border: '1px solid #ff9800', color: '#ffcc80' }}>
+            <div>
+              <FiAlertCircle className="me-1" />
+              Ya existe un cliente con este {duplicado.campo}: <strong>{duplicado.cliente.nombre} {duplicado.cliente.apellido || ''}</strong>
+              {duplicado.cliente.empresa && ` (${duplicado.cliente.empresa})`}
+            </div>
+            <button className="btn btn-warning btn-sm ms-2" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+              onClick={seleccionarDuplicado}>
+              Usar existente
+            </button>
+          </div>
+        )}
+
+        {/* Formulario */}
+        <div className="row g-2">
+          <div className="col-6">
+            <label className="form-label small mb-1">Nombre <span className="text-danger">*</span></label>
+            <input ref={nombreRef} type="text" className={`form-control form-control-sm ${errores.nombre ? 'is-invalid' : ''}`}
+              value={form.nombre} onChange={e => handleChange('nombre', e.target.value)}
+              placeholder="Nombre del cliente"
+              style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }}
+              onKeyDown={e => e.key === 'Enter' && guardar()} />
+            {errores.nombre && <div className="invalid-feedback">{errores.nombre}</div>}
+          </div>
+          <div className="col-6">
+            <label className="form-label small mb-1">Apellido</label>
+            <input type="text" className="form-control form-control-sm"
+              value={form.apellido} onChange={e => handleChange('apellido', e.target.value)}
+              placeholder="Apellido"
+              style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+          </div>
+          <div className="col-6">
+            <label className="form-label small mb-1">
+              DNI / Identidad
+              {verificando && <span className="spinner-border spinner-border-sm ms-1" style={{ width: 12, height: 12 }} />}
+            </label>
+            <input type="text" className={`form-control form-control-sm ${errores.dni ? 'is-invalid' : ''}`}
+              value={form.dni} onChange={e => handleChange('dni', e.target.value)}
+              placeholder="0801-1990-12345"
+              style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+            {errores.dni && <div className="invalid-feedback">{errores.dni}</div>}
+          </div>
+          <div className="col-6">
+            <label className="form-label small mb-1">Empresa</label>
+            <input type="text" className="form-control form-control-sm"
+              value={form.empresa} onChange={e => handleChange('empresa', e.target.value)}
+              placeholder="Empresa (opcional)"
+              style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+          </div>
+          <div className="col-6">
+            <label className="form-label small mb-1">Teléfono</label>
+            <input type="text" className="form-control form-control-sm"
+              value={form.telefono} onChange={e => handleChange('telefono', e.target.value)}
+              placeholder="9999-9999"
+              style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+          </div>
+          <div className="col-6">
+            <label className="form-label small mb-1">Correo</label>
+            <input type="email" className={`form-control form-control-sm ${errores.correo ? 'is-invalid' : ''}`}
+              value={form.correo} onChange={e => handleChange('correo', e.target.value)}
+              placeholder="correo@ejemplo.com"
+              style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+            {errores.correo && <div className="invalid-feedback">{errores.correo}</div>}
+          </div>
+          <div className="col-12">
+            <label className="form-label small mb-1">Dirección</label>
+            <input type="text" className="form-control form-control-sm"
+              value={form.direccion} onChange={e => handleChange('direccion', e.target.value)}
+              placeholder="Dirección (opcional)"
+              style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div className="d-flex justify-content-end gap-2 mt-3">
+          <button className="btn btn-outline-secondary btn-sm" onClick={onCerrar}>
+            Cancelar
+          </button>
+          <button className="btn btn-info btn-sm fw-bold" onClick={guardar} disabled={guardando}>
+            {guardando ? <span className="spinner-border spinner-border-sm me-1" /> : <FiSave className="me-1" />}
+            {clienteEditar ? 'Actualizar' : 'Guardar y Seleccionar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ModalClienteRapido;

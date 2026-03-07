@@ -2,12 +2,13 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { validarCampos } from '../middlewares/validar.js';
 import { autenticar } from '../middlewares/auth.js';
-import { listar, obtener, crear, actualizar, eliminar } from '../controllers/clienteController.js';
+import { listar, obtener, crear, actualizar, eliminar, verificarDuplicado } from '../controllers/clienteController.js';
 
 const router = Router();
 
 router.use(autenticar);
 
+router.get('/verificar-duplicado', verificarDuplicado);
 router.get('/', listar);
 router.get('/:id', obtener);
 

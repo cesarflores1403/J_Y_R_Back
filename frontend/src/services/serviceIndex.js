@@ -14,6 +14,7 @@ export const clienteService = {
   crear: (data) => api.post('/clientes', data),
   actualizar: (id, data) => api.put(`/clientes/${id}`, data),
   eliminar: (id) => api.delete(`/clientes/${id}`),
+  verificarDuplicado: (params) => api.get('/clientes/verificar-duplicado', { params }),
 };
 
 // ==================== PROVEEDORES ====================
@@ -48,7 +49,7 @@ export const facturaService = {
   listar: (params) => api.get('/facturas', { params }),
   obtener: (id) => api.get(`/facturas/${id}`),
   crear: (data) => api.post('/facturas', data),
-  anular: (id) => api.patch(`/facturas/${id}/anular`),
+  anular: (id, motivo) => api.patch(`/facturas/${id}/anular`, { motivo }),
   eliminar: (id) => api.delete(`/facturas/${id}`),
   productosDisponibles: (params) => api.get('/facturas/productos-disponibles', { params }),
   clientesDisponibles: (params) => api.get('/facturas/clientes-disponibles', { params }),
@@ -70,4 +71,43 @@ export const categoriaService = {
   actualizar: (id, data) => api.put(`/categorias/${id}`, data),
   toggleEstado: (id) => api.patch(`/categorias/${id}/toggle-estado`),
   eliminar: (id) => api.delete(`/categorias/${id}`),
+};
+
+// ==================== COTIZACIONES (HU-FAC-08) ====================
+export const cotizacionService = {
+  listar: (params) => api.get('/cotizaciones', { params }),
+  obtener: (id) => api.get(`/cotizaciones/${id}`),
+  crear: (data) => api.post('/cotizaciones', data),
+  anular: (id) => api.patch(`/cotizaciones/${id}/anular`),
+  convertir: (id) => api.post(`/cotizaciones/${id}/convertir`),
+  eliminar: (id) => api.delete(`/cotizaciones/${id}`),
+  productosDisponibles: (params) => api.get('/cotizaciones/productos-disponibles', { params }),
+  clientesDisponibles: (params) => api.get('/cotizaciones/clientes-disponibles', { params }),
+};
+
+// ==================== CARRUSEL ====================
+export const carruselService = {
+  listar: () => api.get('/carrusel'),
+  listarTodas: () => api.get('/carrusel/todas'),
+  subir: (formData) => api.post('/carrusel', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  actualizar: (codImagen, data) => api.put(`/carrusel/${codImagen}`, data),
+  eliminar: (codImagen) => api.delete(`/carrusel/${codImagen}`),
+};
+
+// ==================== AUDITORÍA FACTURACIÓN (HU-FAC-10) ====================
+export const auditoriaFacturacionService = {
+  listar: (params) => api.get('/auditoria-facturacion', { params }),
+  tiposEvento: () => api.get('/auditoria-facturacion/tipos-evento'),
+  exportarCSV: (params) => api.get('/auditoria-facturacion/exportar-csv', { params, responseType: 'blob' }),
+};
+
+// ==================== NOTAS DE CRÉDITO (HU-FAC-12) ====================
+export const notaCreditoService = {
+  listar: (params) => api.get('/notas-credito', { params }),
+  obtener: (id) => api.get(`/notas-credito/${id}`),
+  detallesFactura: (codFactura) => api.get(`/notas-credito/factura/${codFactura}/detalles`),
+  crear: (data) => api.post('/notas-credito', data),
+  anular: (id) => api.patch(`/notas-credito/${id}/anular`),
 };
