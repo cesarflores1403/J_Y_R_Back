@@ -25,6 +25,7 @@ import AuditoriaFacturacion from '../components/auditoria/AuditoriaFacturacion.j
 import NotasCredito from '../components/notascredito/NotasCredito.jsx';
 import Usuarios from '../components/usuarios/Usuarios.jsx';
 import RecuperarPassword from '../components/auth/RecuperarPassword.jsx';
+import OrdenesCompra from '../components/compras/OrdenesCompra.jsx';
 const PrivateRoute = ({ children, roles }) => {
   const { autenticado, usuario, cargando } = useAuth();
   if (cargando) return <div className="jyr-spinner" style={{ minHeight: '100vh' }} />;
@@ -64,6 +65,7 @@ const App = () => {
             <Route path="auditoria-facturacion" element={<PrivateRoute roles={['Administrador']}><AuditoriaFacturacion /></PrivateRoute>} />
             <Route path="notas-credito" element={<PrivateRoute roles={['Administrador', 'Cajero']}><NotasCredito /></PrivateRoute>} />
             <Route path="usuarios" element={<PrivateRoute roles={['Administrador']}><Usuarios /></PrivateRoute>} />
+            <Route path="compras/ordenes" element={<PrivateRoute roles={['Administrador','Bodeguero']}><OrdenesCompra /></PrivateRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
