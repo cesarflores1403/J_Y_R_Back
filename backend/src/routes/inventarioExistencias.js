@@ -5,6 +5,7 @@ import { validarCampos } from '../middlewares/validar.js';
 import { listarExistencias, actualizarMinMax } from '../controllers/inventarioExistenciasController.js';
 import { listarMovimientos } from '../controllers/inventarioMovimientosController.js';
 import { registrarEntrada } from '../controllers/inventarioEntradasController.js';
+import { registrarSalida } from '../controllers/inventarioSalidasController.js';
 
 const router = Router();
 
@@ -204,5 +205,49 @@ router.post('/entradas', [
   // // Respuesta 400 si falla cualquier validacion
   validarCampos
 ], registrarEntrada);
+
+// // POST /api/inventario/salidas
+// // Registra una salida de inventario por venta confirmada con validacion de payload
+router.post('/salidas', [
+  // // Relacion producto-ubicacion obligatoria para resolver una existencia exacta
+  body('cod_producto')
+    .exists()
+    .withMessage('cod_producto es requerido')
+    .bail()
+    .isInt({ min: 1 })
+    .withMessage('cod_producto debe ser un entero mayor a 0')
+    .toInt(),
+  body('cod_ubicacion')
+    .exists()
+    .withMessage('cod_ubicacion es requerido')
+    .bail()
+    .isInt({ min: 1 })
+    .withMessage('cod_ubicacion debe ser un entero mayor a 0')
+    .toInt(),
+  // // Cantidad de salida estrictamente positiva para evitar descuentos invalidos
+  body('cantidad')
+    .exists()
+    .withMessage('cantidad es requerida')
+    .bail()
+    .isInt({ min: 1 })
+    .withMessage('cantidad debe ser un entero mayor a 0')
+    .toInt(),
+  // // Referencia de venta/documento requerida para trazabilidad en kardex
+  body('referencia')
+    .exists()
+    .withMessage('referencia es requerida')
+    .bail()
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('referencia debe tener entre 1 y 200 caracteres'),
+  // // Observaciones opcionales con limite para proteger almacenamiento y payload
+  body('observaciones')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('observaciones no puede exceder 500 caracteres'),
+  // // Respuesta 400 estandar si falla cualquier validacion de entrada
+  validarCampos
+], registrarSalida);
 
 export default router;
