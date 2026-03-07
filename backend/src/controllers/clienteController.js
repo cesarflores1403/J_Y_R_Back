@@ -44,3 +44,12 @@ export const eliminar = async (req, res) => {
     res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });
   }
 };
+
+export const verificarDuplicado = async (req, res) => {
+  try {
+    const resultado = await clienteService.verificarDuplicado(req.query);
+    res.json({ ok: true, datos: resultado });
+  } catch (error) {
+    res.status(500).json({ ok: false, mensaje: error.message });
+  }
+};

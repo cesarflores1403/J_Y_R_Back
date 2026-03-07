@@ -10,6 +10,13 @@ import ProductoSeq from './ProductoSeq.js';
 import Isv from './Isv.js';
 import Pago from './Pago.js';
 import CategoriaProducto from './CategoriaProducto.js';
+import BitacoraAnulacion from './BitacoraAnulacion.js';
+import Cotizacion from './Cotizacion.js';
+import DetalleCotizacion from './DetalleCotizacion.js';
+import BitacoraExcepcionStock from './BitacoraExcepcionStock.js';
+import BitacoraFacturacion from './BitacoraFacturacion.js';
+import NotaCredito from './NotaCredito.js';
+import DetalleNotaCredito from './DetalleNotaCredito.js';
 
 // =============================================
 // RELACIONES
@@ -61,6 +68,47 @@ Pago.belongsTo(Usuario, { foreignKey: 'cod_usuario', as: 'usuario' });
 CategoriaProducto.hasMany(ProductoSeq, { foreignKey: 'cod_categoria', as: 'productos' });
 ProductoSeq.belongsTo(CategoriaProducto, { foreignKey: 'cod_categoria', as: 'categoria' });
 
+// HU-FAC-07: BitacoraAnulacion
+Factura.hasMany(BitacoraAnulacion, { foreignKey: 'cod_factura', as: 'bitacoraAnulaciones' });
+BitacoraAnulacion.belongsTo(Factura, { foreignKey: 'cod_factura', as: 'factura' });
+Usuario.hasMany(BitacoraAnulacion, { foreignKey: 'cod_usuario', as: 'anulaciones' });
+BitacoraAnulacion.belongsTo(Usuario, { foreignKey: 'cod_usuario', as: 'usuario' });
+
+// HU-FAC-08: Cotización
+Cliente.hasMany(Cotizacion, { foreignKey: 'cod_cliente', as: 'cotizaciones' });
+Cotizacion.belongsTo(Cliente, { foreignKey: 'cod_cliente', as: 'cliente' });
+Usuario.hasMany(Cotizacion, { foreignKey: 'cod_usuario', as: 'cotizaciones' });
+Cotizacion.belongsTo(Usuario, { foreignKey: 'cod_usuario', as: 'usuario' });
+Cotizacion.hasMany(DetalleCotizacion, { foreignKey: 'cod_cotizacion', as: 'detalles' });
+DetalleCotizacion.belongsTo(Cotizacion, { foreignKey: 'cod_cotizacion', as: 'cotizacion' });
+ProductoSeq.hasMany(DetalleCotizacion, { foreignKey: 'cod_producto', as: 'detallesCotizacion' });
+DetalleCotizacion.belongsTo(ProductoSeq, { foreignKey: 'cod_producto', as: 'producto' });
+Cotizacion.belongsTo(Factura, { foreignKey: 'cod_factura', as: 'facturaGenerada' });
+
+// HU-FAC-09: BitacoraExcepcionStock
+Factura.hasMany(BitacoraExcepcionStock, { foreignKey: 'cod_factura', as: 'excepcionesStock' });
+BitacoraExcepcionStock.belongsTo(Factura, { foreignKey: 'cod_factura', as: 'factura' });
+Usuario.hasMany(BitacoraExcepcionStock, { foreignKey: 'cod_usuario', as: 'excepcionesStockAutorizadas' });
+BitacoraExcepcionStock.belongsTo(Usuario, { foreignKey: 'cod_usuario', as: 'usuario' });
+ProductoSeq.hasMany(BitacoraExcepcionStock, { foreignKey: 'cod_producto', as: 'excepcionesStock' });
+BitacoraExcepcionStock.belongsTo(ProductoSeq, { foreignKey: 'cod_producto', as: 'producto' });
+
+// HU-FAC-10: BitacoraFacturacion (auditoría general)
+Factura.hasMany(BitacoraFacturacion, { foreignKey: 'cod_factura', as: 'bitacoraAcciones' });
+BitacoraFacturacion.belongsTo(Factura, { foreignKey: 'cod_factura', as: 'factura' });
+Usuario.hasMany(BitacoraFacturacion, { foreignKey: 'cod_usuario', as: 'accionesFacturacion' });
+BitacoraFacturacion.belongsTo(Usuario, { foreignKey: 'cod_usuario', as: 'usuario' });
+
+// HU-FAC-12: Nota de Crédito / Devolución
+Factura.hasMany(NotaCredito, { foreignKey: 'cod_factura', as: 'notasCredito' });
+NotaCredito.belongsTo(Factura, { foreignKey: 'cod_factura', as: 'factura' });
+Usuario.hasMany(NotaCredito, { foreignKey: 'cod_usuario', as: 'notasCredito' });
+NotaCredito.belongsTo(Usuario, { foreignKey: 'cod_usuario', as: 'usuario' });
+NotaCredito.hasMany(DetalleNotaCredito, { foreignKey: 'cod_nota_credito', as: 'detalles' });
+DetalleNotaCredito.belongsTo(NotaCredito, { foreignKey: 'cod_nota_credito', as: 'notaCredito' });
+DetalleNotaCredito.belongsTo(DetalleFactura, { foreignKey: 'cod_detalle_factura', as: 'detalleFactura' });
+DetalleNotaCredito.belongsTo(ProductoSeq, { foreignKey: 'cod_producto', as: 'producto' });
+
 export {
   sequelize,
   Usuario,
@@ -73,5 +121,12 @@ export {
   ProductoSeq,
   Isv,
   Pago,
-  CategoriaProducto
+  CategoriaProducto,
+  BitacoraAnulacion,
+  Cotizacion,
+  DetalleCotizacion,
+  BitacoraExcepcionStock,
+  BitacoraFacturacion,
+  NotaCredito,
+  DetalleNotaCredito
 };

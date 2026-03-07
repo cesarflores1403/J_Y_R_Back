@@ -24,7 +24,19 @@ const Factura = sequelize.define('factura', {
   saldo: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
   estado: { type: DataTypes.BOOLEAN, defaultValue: true },
   creado_en: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-  actualizado_en: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+  actualizado_en: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+  // --- Campos legales y presentación ---
+  cai: { type: DataTypes.STRING(50), allowNull: true },
+  rango_autorizado: { type: DataTypes.STRING(100), allowNull: true },
+  fecha_limite_emision: { type: DataTypes.DATE, allowNull: true },
+  valor_en_letras: { type: DataTypes.STRING(300), allowNull: true },
+  observaciones: { type: DataTypes.STRING(300), allowNull: true },
+  garantia_filtracion_agua: { type: DataTypes.BOOLEAN, allowNull: true, defaultValue: null },
+  firma: { type: DataTypes.STRING(100), allowNull: true },
+  // --- HU-FAC-07: Campos de anulación ---
+  motivo_anulacion: { type: DataTypes.TEXT, allowNull: true },
+  anulada_por: { type: DataTypes.INTEGER, allowNull: true },
+  fecha_anulacion: { type: DataTypes.DATE, allowNull: true }
 });
 
 export default Factura;

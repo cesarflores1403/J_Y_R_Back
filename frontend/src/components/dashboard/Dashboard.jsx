@@ -128,9 +128,27 @@ const Dashboard = () => {
                     <td>{f.nombre_usuario}</td>
                     <td>{formatMoney(f.total)}</td>
                     <td>
-                      <span className={`badge ${f.estado ? 'bg-success' : 'bg-danger'}`}>
-                        {f.estado ? 'Activa' : 'Anulada'}
-                      </span>
+                      <span className={`badge ${(() => {
+                        const v = f.estado;
+                        if (v === true) return 'bg-success';
+                        if (v === false) return 'bg-danger';
+                        if (v === 1 || v === '1') return 'bg-success';
+                        if (typeof v === 'string') {
+                          const s = v.trim().toLowerCase();
+                          return ['activa', 'activo', 'true', '1', 'si', 'sí'].includes(s) ? 'bg-success' : 'bg-danger';
+                        }
+                        return v ? 'bg-success' : 'bg-danger';
+                      })()}`}>{(() => {
+                        const v = f.estado;
+                        if (v === true) return 'Activa';
+                        if (v === false) return 'Anulada';
+                        if (v === 1 || v === '1') return 'Activa';
+                        if (typeof v === 'string') {
+                          const s = v.trim().toLowerCase();
+                          return ['activa', 'activo', 'true', '1', 'si', 'sí'].includes(s) ? 'Activa' : 'Anulada';
+                        }
+                        return v ? 'Activa' : 'Anulada';
+                      })()}</span>
                     </td>
                   </tr>
                 )) : (

@@ -10,6 +10,10 @@ import ubicacionesRoutes from './ubicaciones.js';
 import inventarioExistenciasRoutes from './inventarioExistencias.js';
 import pagosRoutes from './pagos.js';
 import categoriasRoutes from './categorias.js';
+import carruselRoutes from './carrusel.js';
+import cotizacionesRoutes from './cotizaciones.js';
+import bitacoraFacturacionRoutes from './bitacoraFacturacion.js';
+import notasCreditoRoutes from './notasCredito.js';
 
 const router = express.Router();
 
@@ -24,5 +28,9 @@ router.use('/isv', isvRoutes);
 router.use('/ubicaciones', ubicacionesRoutes);
 router.use('/inventario', inventarioExistenciasRoutes);
 router.use('/pagos', pagosRoutes);
+router.use('/carrusel', carruselRoutes);
+router.use('/cotizaciones', cotizacionesRoutes);
+router.use('/auditoria-facturacion', bitacoraFacturacionRoutes);
+router.use('/notas-credito', notasCreditoRoutes);
 
 export default router;

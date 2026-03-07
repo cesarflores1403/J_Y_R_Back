@@ -17,8 +17,13 @@ const metodosPago = { 1: 'Efectivo', 2: 'Tarjeta', 3: 'Transferencia' };
 const ComprobanteFactura = forwardRef(({ factura }, ref) => {
   if (!factura) return null;
 
-  const fechaEmision = factura.creado_en
-    ? new Date(factura.creado_en)
+  // Tolerancia ante distintas envolturas: { datos: { factura, empresa } } o { factura, empresa } o factura directo
+  const wrapper = factura.datos || factura;
+  const datosFactura = wrapper.factura || wrapper;
+  const empresa = wrapper.empresa || {};
+
+  const fechaEmision = datosFactura.creado_en
+    ? new Date(datosFactura.creado_en)
     : new Date();
 
   const estadoPagoTexto = {
@@ -27,13 +32,26 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
     PENDIENTE: 'PENDIENTE DE PAGO'
   };
 
+  const normalizeEstado = (v) => {
+    if (v === true) return true;
+    if (v === false) return false;
+    if (v === 1 || v === '1') return true;
+    if (typeof v === 'string') {
+      const s = v.trim().toLowerCase();
+      return ['activa', 'activo', 'true', '1', 'si', 'sí'].includes(s);
+    }
+    return Boolean(v);
+  };
+
+  const estadoActivo = normalizeEstado(datosFactura.estado);
+
   return (
     <div ref={ref} className="comprobante-factura">
       <style>{`
         .comprobante-factura {
-          width: 210mm;
+          width: 215.9mm; /* letter width */
           min-height: auto;
-          padding: 15mm 18mm;
+          padding: 12mm 15mm;
           font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
           font-size: 11px;
           color: #1a1a1a;
@@ -282,9 +300,14 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
         /* ---- @media print ---- */
         @media print {
           .comprobante-factura {
-            padding: 10mm 12mm;
+            width: 100%;
+            padding: 8mm 10mm;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+          }
+          @page {
+            size: letter portrait;
+            margin: 10mm;
           }
           .comp-tabla thead th {
             background: #1a1a1a !important;
@@ -299,24 +322,35 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
         }
       `}</style>
 
-      <div className={!factura.estado ? 'comp-anulada-watermark' : ''} style={{ position: 'relative' }}>
+      <div className={!((() => {
+        const v = datosFactura.estado;
+        if (v === true) return true;
+        if (v === false) return false;
+        if (v === 1 || v === '1') return true;
+        if (typeof v === 'string') {
+          const s = v.trim().toLowerCase();
+          return ['activa', 'activo', 'true', '1', 'si', 'sí'].includes(s);
+        }
+        return Boolean(v);
+      })()) ? 'comp-anulada-watermark' : ''} style={{ position: 'relative' }}>
 
         {/* ========== ENCABEZADO ========== */}
         <div className="comp-header">
           <div className="comp-empresa">
-            <img src="/src/assets/img/logo1.jpeg" alt="J&R" className="comp-empresa-logo" 
+            <img src="/src/assets/img/logo1.jpeg" alt={empresa.nombre || 'J&R'} className="comp-empresa-logo" 
               onError={(e) => { e.target.style.display = 'none'; }} />
             <div className="comp-empresa-info">
-              <h1>J &amp; R REPUESTOS</h1>
-              <p>Venta de repuestos automotrices</p>
-              <p>Tegucigalpa, Honduras</p>
-              <p>Tel: (504) 0000-0000 | info@jyrrepuestos.com</p>
+              <h1>{empresa.nombre || 'J&R Accesorios y Reparaciones'}</h1>
+              <p>{empresa.direccion || ''}</p>
+              <p>Celular: {empresa.telefono || '---'} | E-mail: {empresa.correo || '---'}</p>
+              <p><strong>R.T.N.</strong> {empresa.rtn || '---'}</p>
+              {empresa.cai && <p><strong>CAI:</strong> {empresa.cai}</p>}
             </div>
           </div>
           <div className="comp-factura-num">
-            <h2>FAC-{String(factura.cod_factura).padStart(4, '0')}</h2>
+            <h2>FAC-{String(datosFactura.cod_factura ?? datosFactura.cod_factura_id ?? datosFactura.id ?? '---').padStart(4, '0')}</h2>
             <p>COMPROBANTE DE FACTURA</p>
-            {!factura.estado && (
+            {!estadoActivo && (
               <span style={{ color: '#dc2626', fontWeight: 700, fontSize: 14 }}>ANULADA</span>
             )}
           </div>
@@ -326,22 +360,30 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
         <div className="comp-info-grid">
           <div className="comp-info-box">
             <h4>Datos del Cliente</h4>
-            <p><strong>Nombre:</strong> {factura.cliente?.nombre} {factura.cliente?.apellido || ''}</p>
-            {factura.cliente?.dni && <p><strong>DNI:</strong> {factura.cliente.dni}</p>}
-            {factura.cliente?.empresa && <p><strong>Empresa:</strong> {factura.cliente.empresa}</p>}
+            <p><strong>Nombre:</strong> {datosFactura.cliente?.nombre} {datosFactura.cliente?.apellido || ''}</p>
+            {datosFactura.cliente?.dni && <p><strong>DNI:</strong> {datosFactura.cliente.dni}</p>}
+            {datosFactura.cliente?.empresa && <p><strong>Empresa:</strong> {datosFactura.cliente.empresa}</p>}
+            {datosFactura.cliente?.direccion && <p><strong>Dirección:</strong> {datosFactura.cliente.direccion}</p>}
           </div>
           <div className="comp-info-box">
             <h4>Datos de la Factura</h4>
-            <p><strong>No. Factura:</strong> FAC-{String(factura.cod_factura).padStart(4, '0')}</p>
+            <p><strong>No. Factura:</strong> FAC-{String(datosFactura.cod_factura ?? datosFactura.cod_factura_id ?? datosFactura.id ?? '---').padStart(4, '0')}</p>
             <p><strong>Fecha:</strong> {fechaEmision.toLocaleDateString('es-HN', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            <p><strong>Hora:</strong> {fechaEmision.toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</p>
-            <p><strong>Cajero:</strong> {factura.usuario?.nombre_usuario || factura.usuario?.nombre || '-'}</p>
+            <p><strong>Cajero:</strong> {datosFactura.usuario?.nombre_usuario || datosFactura.usuario?.nombre || '-'}</p>
             <p>
               <strong>Estado:</strong>{' '}
-              <span className={`comp-estado-pago comp-estado-${factura.estado_pago === 'PAGADA' ? 'pagada' : factura.estado_pago === 'PARCIAL' ? 'parcial' : 'pendiente'}`}>
-                {estadoPagoTexto[factura.estado_pago] || 'PENDIENTE'}
+              <span className={`comp-estado-pago comp-estado-${datosFactura.estado_pago === 'PAGADA' ? 'pagada' : datosFactura.estado_pago === 'PARCIAL' ? 'parcial' : 'pendiente'}`}>
+                {estadoPagoTexto[datosFactura.estado_pago] || 'PENDIENTE'}
               </span>
+              {' '}
+              <small style={{ marginLeft: 8, color: estadoActivo ? '#059669' : '#dc2626', fontWeight: 700 }}>{estadoActivo ? 'Activa' : 'Anulada'}</small>
             </p>
+            {datosFactura.valor_en_letras && <p><strong>Valor en letras:</strong> {datosFactura.valor_en_letras}</p>}
+            {datosFactura.observaciones && <p><strong>Observaciones:</strong> {datosFactura.observaciones}</p>}
+            {datosFactura.garantia_filtracion_agua !== null && (
+              <p><strong>Garantía filtración agua:</strong> {datosFactura.garantia_filtracion_agua ? 'Sí' : 'No'}</p>
+            )}
+            {datosFactura.firma && <p><strong>Firma:</strong> {datosFactura.firma}</p>}
           </div>
         </div>
 
@@ -350,7 +392,7 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
           <thead>
             <tr>
               <th style={{ width: '5%' }}>#</th>
-              <th style={{ width: '35%' }}>Producto</th>
+              <th style={{ width: '35%' }}>Descripción</th>
               <th className="text-center" style={{ width: '8%' }}>Cant.</th>
               <th className="text-right" style={{ width: '13%' }}>P. Unitario</th>
               <th className="text-right" style={{ width: '13%' }}>Descuento</th>
@@ -359,10 +401,10 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
             </tr>
           </thead>
           <tbody>
-            {factura.detalles?.map((d, i) => (
+            {datosFactura.detalles?.map((d, i) => (
               <tr key={i}>
                 <td>{i + 1}</td>
-                <td>{d.producto?.nombre_producto || `Producto #${d.cod_producto}`}</td>
+                <td>{d.producto?.nombre_producto || d.descripcion || `Producto #${d.cod_producto}`}</td>
                 <td className="text-center">{d.cantidad}</td>
                 <td className="text-right">{formatMoney(d.precio_unitario)}</td>
                 <td className="text-right">
@@ -383,41 +425,79 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
           <div className="comp-totales">
             <div className="comp-totales-row">
               <span>Subtotal:</span>
-              <span>{formatMoney(factura.subtotal)}</span>
+              <span>{formatMoney(datosFactura.subtotal)}</span>
             </div>
-            {parseFloat(factura.descuento || 0) > 0 && (
+            {parseFloat(datosFactura.descuento || 0) > 0 && (
               <div className="comp-totales-row descuento">
                 <span>Descuento total:</span>
-                <span>-{formatMoney(factura.descuento)}</span>
+                <span>-{formatMoney(datosFactura.descuento)}</span>
               </div>
             )}
-            {parseFloat(factura.monto_descuento_global || 0) > 0 && (
+            {parseFloat(datosFactura.monto_descuento_global || 0) > 0 && (
               <div className="comp-totales-row descuento">
                 <span>
-                  Desc. global ({factura.tipo_descuento_global === 'PORCENTAJE' ? `${factura.descuento_global}%` : `L ${factura.descuento_global}`}):
+                  Desc. global ({datosFactura.tipo_descuento_global === 'PORCENTAJE' ? `${datosFactura.descuento_global}%` : `L ${datosFactura.descuento_global}`}):
                 </span>
-                <span>-{formatMoney(factura.monto_descuento_global)}</span>
+                <span>-{formatMoney(datosFactura.monto_descuento_global)}</span>
               </div>
             )}
             <div className="comp-totales-row isv">
               <span>ISV:</span>
-              <span>{formatMoney(factura.isv)}</span>
+              <span>{formatMoney(datosFactura.isv)}</span>
             </div>
+            {/* Importe gravado, exento, exonerado */}
+            {datosFactura.importe_gravado_15 && (
+              <div className="comp-totales-row">
+                <span>Importe gravado 15% L.:</span>
+                <span>{formatMoney(datosFactura.importe_gravado_15)}</span>
+              </div>
+            )}
+            {datosFactura.importe_gravado_18 && (
+              <div className="comp-totales-row">
+                <span>Importe gravado 18% L.:</span>
+                <span>{formatMoney(datosFactura.importe_gravado_18)}</span>
+              </div>
+            )}
+            {datosFactura.importe_exento && (
+              <div className="comp-totales-row">
+                <span>Importe exento L.:</span>
+                <span>{formatMoney(datosFactura.importe_exento)}</span>
+              </div>
+            )}
+            {datosFactura.importe_exonerado && (
+              <div className="comp-totales-row">
+                <span>Importe exonerado L.:</span>
+                <span>{formatMoney(datosFactura.importe_exonerado)}</span>
+              </div>
+            )}
+            {/* ISV 15% y 18% */}
+            {datosFactura.isv_15 && (
+              <div className="comp-totales-row">
+                <span>15% I.S.V. L.:</span>
+                <span>{formatMoney(datosFactura.isv_15)}</span>
+              </div>
+            )}
+            {datosFactura.isv_18 && (
+              <div className="comp-totales-row">
+                <span>18% I.S.V. L.:</span>
+                <span>{formatMoney(datosFactura.isv_18)}</span>
+              </div>
+            )}
             <div className="comp-totales-row total">
-              <span>TOTAL:</span>
-              <span>{formatMoney(factura.total)}</span>
+              <span>TOTAL A PAGAR L.:</span>
+              <span>{formatMoney(datosFactura.total)}</span>
             </div>
 
             {/* Pagado y saldo */}
-            {factura.estado && (
+            {datosFactura.estado && (
               <>
                 <div className="comp-totales-row pagado">
                   <span>Total pagado:</span>
-                  <span>{formatMoney(factura.total_pagado || 0)}</span>
+                  <span>{formatMoney(datosFactura.total_pagado || 0)}</span>
                 </div>
-                <div className={`comp-totales-row ${parseFloat(factura.saldo || factura.total) > 0 ? 'saldo' : 'saldo-cero'}`}>
+                <div className={`comp-totales-row ${parseFloat(datosFactura.saldo || datosFactura.total) > 0 ? 'saldo' : 'saldo-cero'}`}>
                   <span>Saldo pendiente:</span>
-                  <span>{formatMoney(factura.saldo ?? factura.total)}</span>
+                  <span>{formatMoney(datosFactura.saldo ?? datosFactura.total)}</span>
                 </div>
               </>
             )}
@@ -425,7 +505,7 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
         </div>
 
         {/* ========== MÉTODOS DE PAGO REGISTRADOS ========== */}
-        {factura.pagos && factura.pagos.filter(p => p.estado).length > 0 && (
+        {datosFactura.pagos && datosFactura.pagos.filter(p => p.estado).length > 0 && (
           <div className="comp-pagos">
             <h4>Pagos Registrados</h4>
             <table className="comp-pagos-tabla">
@@ -439,7 +519,7 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
                 </tr>
               </thead>
               <tbody>
-                {factura.pagos.filter(p => p.estado).map((p, i) => (
+                {datosFactura.pagos.filter(p => p.estado).map((p, i) => (
                   <tr key={p.cod_pago}>
                     <td>{i + 1}</td>
                     <td>{new Date(p.fecha_pago).toLocaleString('es-HN', { dateStyle: 'short', timeStyle: 'short' })}</td>
@@ -455,11 +535,17 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
 
         {/* ========== FOOTER ========== */}
         <div className="comp-footer">
-          <p>Comprobante generado el {new Date().toLocaleString('es-HN', { dateStyle: 'long', timeStyle: 'short' })}</p>
-          {factura.descuento_aplicado_por && (
-            <p>Descuento autorizado por usuario #{factura.descuento_aplicado_por}</p>
+          {empresa.rango_autorizado && (
+            <p style={{ fontWeight: 600, color: '#1a1a1a', fontSize: '10px' }}>
+              Rango autorizado: {empresa.rango_autorizado}
+              {empresa.fecha_limite_emision && <> / Fecha límite de emisión: {new Date(empresa.fecha_limite_emision + 'T00:00:00').toLocaleDateString('es-HN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</>}
+            </p>
           )}
-          <p>Este documento es un comprobante de la transacción realizada.</p>
+          <p style={{ fontSize: '9px' }}>Original: Cliente / Copia: O.T. Emisor</p>
+          <p>Comprobante generado el {new Date().toLocaleString('es-HN', { dateStyle: 'long', timeStyle: 'short' })}</p>
+          {datosFactura.descuento_aplicado_por && (
+            <p>Descuento autorizado por usuario #{datosFactura.descuento_aplicado_por}</p>
+          )}
           <p className="comp-footer-thanks">¡Gracias por su compra!</p>
         </div>
 

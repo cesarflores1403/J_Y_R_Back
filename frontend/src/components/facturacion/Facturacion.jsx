@@ -390,7 +390,7 @@ const Facturacion = () => {
   // ========== IMPRIMIR / PDF COMPROBANTE (HU-FAC-06) ==========
   const handlePrint = useReactToPrint({
     content: () => comprobanteRef.current,
-    documentTitle: comprobanteFactura ? `Factura_FAC-${String(comprobanteFactura.cod_factura).padStart(4, '0')}` : 'Comprobante',
+    documentTitle: comprobanteFactura ? `Factura_FAC-${String((comprobanteFactura.factura || comprobanteFactura).cod_factura).padStart(4, '0')}` : 'Comprobante',
     onAfterPrint: () => toast.info('Comprobante generado'),
     pageStyle: `
       @page { size: letter; margin: 10mm 8mm; }
@@ -405,8 +405,21 @@ const Facturacion = () => {
       const { data } = await facturaService.obtener(codFactura);
       if (data.ok) {
         setComprobanteFactura(data.datos);
-        // Esperar a que se renderice el comprobante antes de imprimir
-        setTimeout(() => { handlePrint(); }, 300);
+        toast.info('Comprobante cargado. Generando impresión...');
+        // Esperar a que se renderice el comprobante antes de imprimir (hasta 3s)
+        const waitForRenderAndPrint = async () => {
+          const start = Date.now();
+          while (Date.now() - start < 3000) {
+            if (comprobanteRef.current && comprobanteRef.current.innerText && comprobanteRef.current.innerText.trim().length > 20) {
+              handlePrint();
+              return;
+            }
+            await new Promise(r => setTimeout(r, 100));
+          }
+          // Fallback: imprimir de todos modos
+          handlePrint();
+        };
+        waitForRenderAndPrint();
       }
     } catch {
       toast.error('Error al cargar datos para el comprobante');

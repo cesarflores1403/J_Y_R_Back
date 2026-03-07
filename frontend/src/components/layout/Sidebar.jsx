@@ -15,6 +15,8 @@ const menuItems = [
   { section: 'Comercial', items: [
     { path: '/clientes', label: 'Clientes', icon: <FiUsers />, roles: ['Administrador', 'Cajero'] },
     { path: '/facturas', label: 'Facturación', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
+    { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiClipboard />, roles: ['Administrador', 'Cajero'] },
+    { path: '/notas-credito', label: 'Notas de Crédito', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
   ]},
   { section: 'Inventario', items: [
     { path: '/productos', label: 'Productos', icon: <FiPackage />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
@@ -37,6 +39,10 @@ const menuItems = [
   ]},
   { section: 'Gestión', items: [
     { path: '/reportes', label: 'Reportes', icon: <FiBarChart2 />, roles: ['Administrador'] },
+    { path: '/auditoria-facturacion', label: 'Auditoría Fact.', icon: <FiClock />, roles: ['Administrador'] },
+  ]},
+  { section: 'Fotos Carrusel', items: [
+    { path: '/carrusel', label: 'Carrusel', icon: <FiImage />, roles: ['Administrador'] },
   ]},
 ];
 

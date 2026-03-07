@@ -33,8 +33,12 @@ const validarCrearFactura = [
 // Solo Administrador y Cajero pueden crear facturas
 router.post('/', autorizar('Administrador', 'Cajero'), validarCrearFactura, crear);
 
-// Solo Administrador puede anular
-router.patch('/:id/anular', autorizar('Administrador'), anular);
+// Solo Administrador puede anular (HU-FAC-07: motivo obligatorio)
+const validarAnularFactura = [
+  body('motivo').notEmpty().withMessage('El motivo de anulación es obligatorio'),
+  validarCampos
+];
+router.patch('/:id/anular', autorizar('Administrador'), validarAnularFactura, anular);
 
 // Solo Administrador puede eliminar permanentemente
 router.delete('/:id', autorizar('Administrador'), eliminar);
