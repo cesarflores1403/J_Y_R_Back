@@ -120,3 +120,14 @@ export const usuarioService = {
   toggleEstado: (id)     => api.patch(/usuarios/${id}/toggle-estado),
   eliminar:     (id)     => api.delete(/usuarios/${id}),
 };
+
+export const comprasService = {
+  listar:        (params) => api.get('/compras', { params }),
+  obtener:       (id)     => api.get(/compras/${id}),
+  crear:         (data)   => api.post('/compras', data),
+  cambiarEstado: (id, data) => api.patch(/compras/${id}/estado, data),
+  eliminar:      (id)     => api.delete(/compras/${id}),
+  historial:     (id)     => api.get(/compras/${id}/historial),
+  listarEstados: ()       => api.get('/compras/estados'),
+  productosDisponibles: (params) => api.get('/compras/productos-disponibles', { params }),
+};
