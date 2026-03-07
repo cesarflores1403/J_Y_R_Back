@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { proveedorService } from '../../services/serviceIndex.js';
 import { toast } from 'react-toastify';
-import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight, FiTrash2 } from 'react-icons/fi';
 
 const camposIniciales = { nombre_proveedor: '', telefono: '', correo: '', pais: '', es_internacional: false, validado: '' };
 
@@ -78,6 +78,17 @@ const Proveedores = () => {
     }
   };
 
+  const eliminar = async (id) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este proveedor? Esta acción no se puede deshacer.')) return;
+    try {
+      await proveedorService.eliminar(id);
+      toast.success('Proveedor eliminado');
+      cargar();
+    } catch (err) {
+      toast.error(err.response?.data?.mensaje || 'Error al eliminar proveedor');
+    }
+  };
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -128,9 +139,12 @@ const Proveedores = () => {
                     </td>
                     <td>
                       <button className="btn btn-sm btn-outline-primary me-1" onClick={() => abrirEditar(p)}><FiEdit2 /></button>
-                      <button className="btn btn-sm btn-outline-warning" onClick={() => toggleEstado(p.cod_proveedor)}
+                      <button className="btn btn-sm btn-outline-warning me-1" onClick={() => toggleEstado(p.cod_proveedor)}
                         title={p.estado_proveedor ? 'Desactivar' : 'Activar'}>
                         {p.estado_proveedor ? <FiToggleRight /> : <FiToggleLeft />}
+                      </button>
+                      <button className="btn btn-sm btn-outline-danger" onClick={() => eliminar(p.cod_proveedor)} title="Eliminar">
+                        <FiTrash2 />
                       </button>
                     </td>
                   </tr>
@@ -144,19 +158,21 @@ const Proveedores = () => {
       {/* Paginación */}
       {totalPaginas > 1 && (
         <div className="d-flex justify-content-center mt-3">
-          <nav><ul className="pagination pagination-sm">
-            <li className={`page-item ${pagina <= 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPagina(p => p - 1)}>Anterior</button>
-            </li>
-            {[...Array(totalPaginas)].map((_, i) => (
-              <li key={i} className={`page-item ${pagina === i + 1 ? 'active' : ''}`}>
-                <button className="page-link" onClick={() => setPagina(i + 1)}>{i + 1}</button>
+          <nav>
+            <ul className="pagination">
+              <li className={`page-item ${pagina <= 1 ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPagina(p => p - 1)}>Anterior</button>
               </li>
-            ))}
-            <li className={`page-item ${pagina >= totalPaginas ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPagina(p => p + 1)}>Siguiente</button>
-            </li>
-          </ul></nav>
+              {[...Array(totalPaginas)].map((_, i) => (
+                <li key={i} className={`page-item ${pagina === i + 1 ? 'active' : ''}`}>
+                  <button className="page-link" onClick={() => setPagina(i + 1)}>{i + 1}</button>
+                </li>
+              ))}
+              <li className={`page-item ${pagina >= totalPaginas ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPagina(p => p + 1)}>Siguiente</button>
+              </li>
+            </ul>
+          </nav>
         </div>
       )}
 
