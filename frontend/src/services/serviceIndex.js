@@ -116,18 +116,18 @@ export const usuarioService = {
   listar:       (params) => api.get('/usuarios', { params }),
   listarRoles:  ()       => api.get('/usuarios/roles'),
   crear:        (data)   => api.post('/usuarios', data),
-  actualizar:   (id, data) => api.put(/usuarios/${id}, data),
-  toggleEstado: (id)     => api.patch(/usuarios/${id}/toggle-estado),
-  eliminar:     (id)     => api.delete(/usuarios/${id}),
+  actualizar:   (id, data) => api.put(`/usuarios/${id}`, data),
+  toggleEstado: (id)     => api.patch(`/usuarios/${id}/toggle-estado`),
+  eliminar:     (id)     => api.delete(`/usuarios/${id}`),
 };
 
 export const comprasService = {
   listar:        (params) => api.get('/compras', { params }),
-  obtener:       (id)     => api.get(/compras/${id}),
+  obtener:       (id)     => api.get(`/compras/${id}`),
   crear:         (data)   => api.post('/compras', data),
-  cambiarEstado: (id, data) => api.patch(/compras/${id}/estado, data),
-  eliminar:      (id)     => api.delete(/compras/${id}),
-  historial:     (id)     => api.get(/compras/${id}/historial),
+  cambiarEstado: (id, data) => api.patch(`/compras/${id}/estado`, data),
+  eliminar:      (id)     => api.delete(`/compras/${id}`),
+  historial:     (id)     => api.get(`/compras/${id}/historial`),
   listarEstados: ()       => api.get('/compras/estados'),
   productosDisponibles: (params) => api.get('/compras/productos-disponibles', { params }),
 };

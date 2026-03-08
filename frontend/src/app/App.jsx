@@ -21,6 +21,8 @@ import InventarioEntradasPage from '../components/inventario/InventarioEntradasP
 import InventarioSalidasPage from '../components/inventario/InventarioSalidasPage.jsx';
 import InventarioBajasPage from '../components/inventario/InventarioBajasPage.jsx';
 import InventarioTransferenciasPage from '../components/inventario/InventarioTransferenciasPage.jsx';
+import InventarioConteosPage from '../components/inventario/InventarioConteosPage.jsx';
+import InventarioReservasPage from '../components/inventario/InventarioReservasPage.jsx';
 import AuditoriaFacturacion from '../components/auditoria/AuditoriaFacturacion.jsx';
 import NotasCredito from '../components/notascredito/NotasCredito.jsx';
 import Usuarios from '../components/usuarios/Usuarios.jsx';
