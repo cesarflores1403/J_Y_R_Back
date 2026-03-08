@@ -21,6 +21,25 @@ export const listarExistencias = async (req, res, next) => {
   }
 };
 
+// // GET /api/inventario/alertas/stock-bajo
+// // Lista alertas de reposicion usando regla stock_disponible <= stock_minimo
+export const listarAlertasStockBajo = async (req, res, next) => {
+  try {
+    // // Delegamos la logica y filtros al servicio de inventario
+    const data = await inventarioExistenciasService.listarAlertasStockBajo(req.query);
+
+    // // Respuesta estandar del proyecto para consultas exitosas
+    return sendOk(res, {
+      status: 200,
+      message: 'Alertas de reposicion obtenidas correctamente',
+      data
+    });
+  } catch (error) {
+    // // Error controlado/inesperado se delega al middleware global
+    next(error);
+  }
+};
+
 // // PUT /api/inventario/existencias/:id
 // // Actualiza unicamente stock_minimo y stock_maximo
 export const actualizarMinMax = async (req, res, next) => {

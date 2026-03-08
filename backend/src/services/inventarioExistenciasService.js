@@ -122,6 +122,31 @@ const mapearFilaExistencia = (fila) => {
   };
 };
 
+// // Normaliza nivel de alerta de reposicion para consumo en UI/integraciones
+const construirNivelAlerta = (estadoStock) => {
+  // // SIN_EXISTENCIA se considera la alerta mas urgente
+  if (estadoStock === 'SIN_EXISTENCIA') return 'CRITICA';
+  // // CRITICO por debajo o igual al minimo configurado
+  if (estadoStock === 'CRITICO') return 'STOCK_BAJO';
+  // // BAJO se conserva como alerta preventiva si el flujo la incluye
+  if (estadoStock === 'BAJO') return 'PREVENTIVA';
+  // // Fallback para datos no esperados
+  return 'INFORMATIVA';
+};
+
+// // Mapea una fila de alerta reutilizando calculos base de existencias
+const mapearFilaAlerta = (fila) => {
+  // // Reutilizamos normalizacion central para evitar divergencias de calculo
+  const base = mapearFilaExistencia(fila);
+  if (!base) return null;
+
+  return {
+    ...base,
+    // // Alias explicito para identificar severidad en frontend/API
+    nivel_alerta: construirNivelAlerta(base.estado_stock)
+  };
+};
+
 // // Construye SELECT base reutilizable con fallback si stock_reservado no existe en BD
 const construirSelectExistenciasBase = ({ usarColumnaStockReservado = true } = {}) => `
   SELECT
@@ -303,6 +328,169 @@ class InventarioExistenciasService {
       page,
       limit,
       totalPages
+    };
+  }
+
+  // // Lista alertas de reposicion aplicando regla stock_disponible <= stock_minimo
+  async listarAlertasStockBajo(query = {}) {
+    // // Reutilizamos resolver de paginacion compatible con aliases existentes
+    const { page, limit, offset } = resolverPaginacion(query);
+
+    // // Filtros exactos opcionales
+    const codProducto = query.cod_producto ? Number(query.cod_producto) : null;
+    const codUbicacion = query.cod_ubicacion ? Number(query.cod_ubicacion) : null;
+    // // Filtros textuales opcionales para producto y ubicacion
+    const producto = normalizarTexto(query.producto);
+    const ubicacion = normalizarTexto(query.ubicacion);
+    // // Mantiene patron del modulo: excluir inactivos salvo request explicita
+    const includeInactive = parsearBoolean(query.includeInactive);
+    // // Permite filtrar solo alertas criticas (sin existencia disponible)
+    const soloCriticos = parsearBoolean(query.solo_criticos ?? query.soloCriticos);
+
+    // // Construimos condiciones comunes reutilizando la semantica del listado de existencias
+    const whereBaseParts = ['1=1'];
+    const replacements = {};
+
+    // // Por defecto solo productos activos para coherencia del modulo
+    if (!includeInactive) {
+      whereBaseParts.push("p.estado_producto = 'Activo'");
+    }
+
+    // // Filtro exacto por producto cuando aplica
+    if (codProducto !== null) {
+      whereBaseParts.push('i.cod_producto = :codProducto');
+      replacements.codProducto = codProducto;
+    }
+
+    // // Filtro exacto por ubicacion cuando aplica
+    if (codUbicacion !== null) {
+      whereBaseParts.push('i.cod_ubicacion = :codUbicacion');
+      replacements.codUbicacion = codUbicacion;
+    }
+
+    // // Filtro textual por id/nombre de producto
+    if (producto) {
+      whereBaseParts.push(`
+        (
+          CAST(p.cod_producto AS TEXT) ILIKE :producto
+          OR p.nombre_producto ILIKE :producto
+        )
+      `);
+      replacements.producto = `%${producto}%`;
+    }
+
+    // // Filtro textual por id/qr/detalle de ubicacion
+    if (ubicacion) {
+      whereBaseParts.push(`
+        (
+          CAST(u.cod_ubicacion AS TEXT) ILIKE :ubicacion
+          OR COALESCE(u.codigo_qr, '') ILIKE :ubicacion
+          OR COALESCE(u.pasillo, '') ILIKE :ubicacion
+          OR COALESCE(u.estanteria, '') ILIKE :ubicacion
+          OR COALESCE(u.nivel_1, '') ILIKE :ubicacion
+          OR COALESCE(u.nivel_2, '') ILIKE :ubicacion
+        )
+      `);
+      replacements.ubicacion = `%${ubicacion}%`;
+    }
+
+    // // Helper local para ejecutar query con/sin columna stock_reservado
+    const ejecutarConsultaAlertas = async ({ usarColumnaStockReservado }) => {
+      // // Expresion de stock disponible segun soporte real del schema
+      const exprStockDisponible = usarColumnaStockReservado
+        ? '(i.stock - COALESCE(i.stock_reservado, 0))'
+        : '(i.stock - 0)';
+
+      // // Regla principal HU: disponible <= minimo configurado
+      const whereAlertaParts = [
+        `${exprStockDisponible} <= COALESCE(i.stock_minimo, 0)`
+      ];
+
+      // // Filtro opcional de criticidad extrema (sin disponible)
+      if (soloCriticos) {
+        whereAlertaParts.push(`${exprStockDisponible} <= 0`);
+      }
+
+      // // WHERE final combinando filtros base + regla de alerta
+      const whereSql = [...whereBaseParts, ...whereAlertaParts].join(' AND ');
+
+      // // Conteo total para paginacion de alertas
+      const [countRow] = await sequelize.query(`
+        SELECT COUNT(*)::int AS total
+        FROM inventario i
+        INNER JOIN producto p ON p.cod_producto = i.cod_producto
+        INNER JOIN ubicacion u ON u.cod_ubicacion = i.cod_ubicacion
+        WHERE ${whereSql}
+      `, {
+        replacements,
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      // // Total de alertas para meta de respuesta
+      const total = Number(countRow?.total || 0);
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+
+      // // Listado paginado priorizando criticidad y menor disponibilidad
+      const filasCrudas = await sequelize.query(`
+        ${construirSelectExistenciasBase({ usarColumnaStockReservado })}
+        WHERE ${whereSql}
+        ORDER BY
+          CASE WHEN ${exprStockDisponible} <= 0 THEN 0 ELSE 1 END ASC,
+          ${exprStockDisponible} ASC,
+          p.nombre_producto ASC,
+          i.cod_inventario ASC
+        LIMIT :limite OFFSET :offset
+      `, {
+        replacements: {
+          ...replacements,
+          limite: limit,
+          offset
+        },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      // // Enriquecemos cada fila con estado_stock y nivel_alerta consistente
+      const datos = filasCrudas
+        .map(mapearFilaAlerta)
+        .filter(Boolean);
+
+      return {
+        datos,
+        total,
+        totalPages
+      };
+    };
+
+    // // Intentamos primero con columna stock_reservado real si existe
+    let resultado;
+    try {
+      resultado = await ejecutarConsultaAlertas({ usarColumnaStockReservado: true });
+    } catch (error) {
+      // // Fallback para esquemas legacy donde stock_reservado aun no existe
+      if (!esErrorColumnaNoExiste(error, 'stock_reservado')) {
+        throw error;
+      }
+      resultado = await ejecutarConsultaAlertas({ usarColumnaStockReservado: false });
+    }
+
+    // // Contrato de salida compatible con el resto de listados de inventario
+    return {
+      data: resultado.datos,
+      meta: {
+        total: resultado.total,
+        page,
+        limit,
+        totalPages: resultado.totalPages
+      },
+      // // Aliases legacy para integraciones internas existentes
+      datos: resultado.datos,
+      total: resultado.total,
+      pagina: page,
+      limite: limit,
+      totalPaginas: resultado.totalPages,
+      page,
+      limit,
+      totalPages: resultado.totalPages
     };
   }
 

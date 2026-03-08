@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import { autenticar } from '../middlewares/auth.js';
 import { validarCampos } from '../middlewares/validar.js';
-import { listarExistencias, actualizarMinMax } from '../controllers/inventarioExistenciasController.js';
+import { listarExistencias, listarAlertasStockBajo, actualizarMinMax } from '../controllers/inventarioExistenciasController.js';
 import { listarMovimientos } from '../controllers/inventarioMovimientosController.js';
 import { registrarEntrada } from '../controllers/inventarioEntradasController.js';
 import { registrarSalida } from '../controllers/inventarioSalidasController.js';
@@ -74,6 +74,76 @@ router.get('/existencias', [
   // // Ejecuta respuesta 400 si alguna validacion falla
   validarCampos
 ], listarExistencias);
+
+// // GET /api/inventario/alertas/stock-bajo
+// // Lista alertas de reposicion segun regla stock_disponible <= stock_minimo
+router.get('/alertas/stock-bajo', [
+  // // Compatibilidad: page (nuevo alias de pagina)
+  query('page')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('page debe ser un entero mayor o igual a 1')
+    .toInt(),
+  // // Compatibilidad: limit (nuevo alias de limite)
+  query('limit')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limit debe ser un entero entre 1 y 100')
+    .toInt(),
+  // // Filtro exacto por producto (id)
+  query('cod_producto')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_producto debe ser un entero mayor a 0')
+    .toInt(),
+  // // Filtro exacto por ubicacion (id)
+  query('cod_ubicacion')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_ubicacion debe ser un entero mayor a 0')
+    .toInt(),
+  // // Filtro textual por producto (id/nombre)
+  query('producto')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('producto debe tener entre 1 y 100 caracteres'),
+  // // Filtro textual por ubicacion (id/qr/detalle)
+  query('ubicacion')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('ubicacion debe tener entre 1 y 100 caracteres'),
+  // // Alias legacy de paginacion: pagina
+  query('pagina')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('pagina debe ser un entero mayor o igual a 1')
+    .toInt(),
+  // // Alias legacy de paginacion: limite
+  query('limite')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limite debe ser un entero entre 1 y 100')
+    .toInt(),
+  // // Permite incluir inactivos solo si se solicita explicitamente
+  query('includeInactive')
+    .optional({ values: 'falsy' })
+    .isBoolean()
+    .withMessage('includeInactive debe ser true o false'),
+  // // Permite filtrar solo alertas criticas (sin stock disponible)
+  query('solo_criticos')
+    .optional({ values: 'falsy' })
+    .isBoolean()
+    .withMessage('solo_criticos debe ser true o false'),
+  // // Alias camelCase para integraciones que lo utilicen
+  query('soloCriticos')
+    .optional({ values: 'falsy' })
+    .isBoolean()
+    .withMessage('soloCriticos debe ser true o false'),
+  // // Ejecuta respuesta 400 si alguna validacion falla
+  validarCampos
+], listarAlertasStockBajo);
 
 // // GET /api/inventario/movimientos
 // // Kardex de movimientos con filtros y paginacion (HU3)
