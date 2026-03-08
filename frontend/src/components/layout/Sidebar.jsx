@@ -4,7 +4,8 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { getInitials } from '../../utils/helpers.js';
 import {
   FiGrid, FiUsers, FiTruck, FiPackage,
-  FiBarChart2, FiLogOut, FiFileText, FiMapPin, FiDatabase, FiList, FiPlusCircle, FiMinusCircle, FiAlertTriangle, FiTag, FiRepeat, FiClipboard, FiLock
+  FiBarChart2, FiLogOut, FiFileText, FiMapPin, FiDatabase, FiList, FiPlusCircle, FiMinusCircle, FiAlertTriangle, FiTag, FiRepeat, FiClipboard, FiLock,
+  FiShoppingCart
 } from 'react-icons/fi';
 import logoClean from '../../assets/img/logo2.jpeg';
 
