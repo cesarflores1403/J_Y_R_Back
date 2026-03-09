@@ -2,13 +2,15 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { autenticar, autorizar } from '../middlewares/auth.js';
 import { listar, listarTodas, subir, actualizar, eliminar } from '../controllers/carruselController.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = express.Router();
 
 /* ── Configuración de Multer ── */
-const uploadsDir = path.resolve('uploads');
+const uploadsDir = path.resolve(__dirname, '../../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

@@ -1,6 +1,9 @@
 import CarruselImagen from '../models/CarruselImagen.js';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 class CarruselService {
 
@@ -54,7 +57,7 @@ class CarruselService {
 
     // Eliminar archivo físico si existe
     try {
-      const uploadsDir = path.resolve('uploads');
+      const uploadsDir = path.resolve(__dirname, '../../uploads');
       const filePath = path.join(uploadsDir, path.basename(imagen.imagen_url));
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
