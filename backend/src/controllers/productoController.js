@@ -66,7 +66,8 @@ export const updateProducto = async (req, res, next) => {
       unidad_medida: 'Unidad de medida',
       precio_venta: 'Precio de venta',
       cod_isv: 'ISV',
-      estado_producto: 'Estado'
+      estado_producto: 'Estado',
+      cod_ubicacion: 'Ubicación'
     };
     const camposTexto = camposActualizados.map(c => nombresLegibles[c] || c).join(', ');
 
@@ -118,6 +119,56 @@ export const cambiarEstado = async (req, res, next) => {
       status: 200,
       message: mensajes[estado] || 'Estado actualizado.',
       data: { cod_producto, estado }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// =======================
+// HU-08: SUBIR / REEMPLAZAR IMAGEN DE PRODUCTO
+// =======================
+export const subirImagen = async (req, res, next) => {
+  try {
+    const cod_producto = Number(req.params.codProducto);
+
+    if (!cod_producto || isNaN(cod_producto) || cod_producto < 1) {
+      return res.status(400).json({ ok: false, message: 'cod_producto inválido.', data: null });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ ok: false, message: 'No se envió ninguna imagen.', data: null });
+    }
+
+    const imagen_url = await productoService.subirImagen(cod_producto, req.file);
+
+    return sendOk(res, {
+      status: 200,
+      message: 'Imagen del producto actualizada correctamente.',
+      data: { cod_producto, imagen_url }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// =======================
+// HU-08: ELIMINAR IMAGEN DE PRODUCTO
+// =======================
+export const eliminarImagen = async (req, res, next) => {
+  try {
+    const cod_producto = Number(req.params.codProducto);
+
+    if (!cod_producto || isNaN(cod_producto) || cod_producto < 1) {
+      return res.status(400).json({ ok: false, message: 'cod_producto inválido.', data: null });
+    }
+
+    await productoService.eliminarImagen(cod_producto);
+
+    return sendOk(res, {
+      status: 200,
+      message: 'Imagen del producto eliminada correctamente.',
+      data: { cod_producto }
     });
   } catch (err) {
     next(err);

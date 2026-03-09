@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'; // // Hooks
+import { useEffect, useState, useRef } from 'react'; // // Hooks
 import { useIsv } from '../../hooks/useIsv.js'; // // Hook catálogo ISV
 import { useCategorias } from '../../hooks/useCategorias.js'; // // Hook catálogo Categorías (HU-07)
+import { useUbicaciones } from '../../hooks/useUbicaciones.js'; // // HU-10: Hook ubicaciones
+import { FiCamera, FiX } from 'react-icons/fi';
 
-const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
+const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit, onSubirImagen }) => {
   const { catalogoIsv, loadingIsv } = useIsv(); // // Catálogo ISV desde BD
   const { categorias, loadingCategorias } = useCategorias(); // // Categorías dinámicas (HU-07)
+  const { ubicaciones, loadingUbicaciones } = useUbicaciones(); // // HU-10: Ubicaciones
 
   const [form, setForm] = useState({
     cod_categoria: '',
@@ -13,15 +16,25 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
     precio_venta: '',
     cod_isv: '',
     estado_producto: 'Activo',
+    cod_ubicacion: '',
   }); // // Estado form
 
   const [fieldErrors, setFieldErrors] = useState({}); // // Errores por campo
   const [formError, setFormError] = useState(''); // // Error general
   const isEdit = Boolean(selected?.cod_producto); // // Modo edición
 
+  // HU-08: Estado de imagen
+  const [imagenFile, setImagenFile] = useState(null); // // Archivo seleccionado
+  const [imagenPreview, setImagenPreview] = useState(null); // // Preview URL
+  const fileInputRef = useRef(null);
+
   // // Si seleccionan un producto, precarga el form
   useEffect(() => {
-    if (!isEdit) return;
+    if (!isEdit) {
+      setImagenFile(null);
+      setImagenPreview(null);
+      return;
+    }
 
     setForm({
       cod_categoria: selected.cod_categoria ?? '',
@@ -32,8 +45,61 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       estado_producto: typeof selected.estado_producto === 'boolean'
         ? (selected.estado_producto ? 'Activo' : 'Inactivo')
         : (selected.estado_producto || 'Activo'),
+      cod_ubicacion: selected.cod_ubicacion ?? '',
     });
+
+    // HU-08: Mostrar imagen actual si existe
+    if (selected.imagen_url) {
+      const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+      setImagenPreview(`${API_URL}${selected.imagen_url}`);
+    } else {
+      setImagenPreview(null);
+    }
+    setImagenFile(null);
   }, [isEdit, selected]);
+
+  // HU-08: Limpiar URL de preview al desmontar
+  useEffect(() => {
+    return () => {
+      if (imagenPreview && imagenPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagenPreview);
+      }
+    };
+  }, [imagenPreview]);
+
+  // HU-08: Handler de selección de imagen
+  const handleImagenChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const tiposPermitidos = ['image/jpeg', 'image/png'];
+    if (!tiposPermitidos.includes(file.type)) {
+      setFormError('Solo se permiten imágenes JPG o PNG.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setFormError('La imagen no puede exceder 2 MB.');
+      e.target.value = '';
+      return;
+    }
+
+    setImagenFile(file);
+    if (imagenPreview && imagenPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagenPreview);
+    }
+    setImagenPreview(URL.createObjectURL(file));
+    setFormError('');
+  };
+
+  const handleRemoveImagen = () => {
+    setImagenFile(null);
+    if (imagenPreview && imagenPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(imagenPreview);
+    }
+    setImagenPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -108,6 +174,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
     precio_venta: Number(form.precio_venta),
     cod_isv: Number(form.cod_isv),
     estado_producto: form.estado_producto,
+    cod_ubicacion: form.cod_ubicacion ? Number(form.cod_ubicacion) : null,
   });
 
   // =====================================================
@@ -124,6 +191,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       precio_venta: Number(form.precio_venta),
       cod_isv: Number(form.cod_isv),
       estado_producto: form.estado_producto,
+      cod_ubicacion: form.cod_ubicacion ? Number(form.cod_ubicacion) : null,
     };
 
     const fields = [
@@ -133,6 +201,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       'precio_venta',
       'cod_isv',
       'estado_producto',
+      'cod_ubicacion',
     ];
 
     // // Detecta TODOS los campos que cambiaron
@@ -149,7 +218,7 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
       }
     }
 
-    if (Object.keys(changedData).length === 0) {
+    if (Object.keys(changedData).length === 0 && !imagenFile) {
       throw new Error('No hay cambios para actualizar.');
     }
 
@@ -173,11 +242,23 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
 
     try {
       if (isEdit) {
+        // HU-08: Si se seleccionó nueva imagen, subirla
+        if (imagenFile && onSubirImagen) {
+          await onSubirImagen(selected.cod_producto, imagenFile);
+        }
+
         const payload = buildUpdatePayload(); // // HU-05: PUT múltiples campos
-        await onSubmit(payload); // // Ejecuta UPDATE (await para esperar respuesta)
+        if (payload.datos && Object.keys(payload.datos).length > 0) {
+          await onSubmit(payload); // // Ejecuta UPDATE solo si hay campos cambiados
+        }
       } else {
         const payload = buildCreatePayload(); // // POST
-        await onSubmit(payload); // // Ejecuta CREATE (await para esperar respuesta)
+        const productoCreado = await onSubmit(payload); // // Ejecuta CREATE (await para esperar respuesta)
+
+        // HU-08: Si se seleccionó imagen, subirla al producto recién creado
+        if (imagenFile && productoCreado?.cod_producto && onSubirImagen) {
+          await onSubirImagen(productoCreado.cod_producto, imagenFile);
+        }
 
         // // Limpia form luego de crear exitosamente
         setForm({
@@ -187,7 +268,9 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
           precio_venta: '',
           cod_isv: '',
           estado_producto: 'Activo',
+          cod_ubicacion: '',
         });
+        handleRemoveImagen();
       }
     } catch (err) {
       setFormError(err.message || 'Error en el formulario');
@@ -336,6 +419,109 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit }) => {
                 <option value="Inactivo">🚫 Inactivo</option>
                 <option value="Descontinuado">⚠️ Descontinuado</option>
               </select>
+            </div>
+          </div>
+
+          {/* HU-10: Ubicación en bodega */}
+          <div className="jyr-form-group">
+            <label className="jyr-form-label">Ubicación en bodega</label>
+            <select
+              className="jyr-form-control jyr-form-select"
+              name="cod_ubicacion"
+              value={form.cod_ubicacion}
+              onChange={onChange}
+              disabled={saving || loadingUbicaciones}
+            >
+              <option value="">-- Sin ubicación asignada --</option>
+              {ubicaciones
+                .filter(u => u.estado_ubi === 'ACTIVA')
+                .map((u) => (
+                  <option key={u.cod_ubicacion} value={u.cod_ubicacion}>
+                    Pasillo {u.pasillo} — Estantería {u.estanteria} — Nivel {u.nivel_1}{u.nivel_2 ? ` — Nivel 2: ${u.nivel_2}` : ''}{u.descripcion ? ` (${u.descripcion})` : ''}
+                  </option>
+                ))}
+            </select>
+            <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)' }}>
+              Estante/posición donde se almacena el producto
+            </span>
+          </div>
+
+          {/* HU-08: Sección de imagen */}
+          <div className="jyr-form-group">
+            <label className="jyr-form-label">Imagen del producto</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {imagenPreview ? (
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <img
+                    src={imagenPreview}
+                    alt="Preview"
+                    style={{
+                      width: 72, height: 72, objectFit: 'cover',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '2px solid var(--jyr-gray-200)'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImagen}
+                    title="Quitar imagen"
+                    style={{
+                      position: 'absolute', top: -6, right: -6,
+                      background: 'var(--jyr-danger, #dc2626)', color: '#fff',
+                      border: 'none', borderRadius: '50%',
+                      width: 20, height: 20, fontSize: 12,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', padding: 0
+                    }}
+                  >
+                    <FiX size={12} />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    width: 72, height: 72, borderRadius: 'var(--radius-sm)',
+                    border: '2px dashed var(--jyr-gray-300)',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', color: 'var(--jyr-gray-400)',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--jyr-red)'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--jyr-gray-300)'}
+                >
+                  <FiCamera size={22} />
+                  <span style={{ fontSize: 10, marginTop: 2 }}>Subir</span>
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/jpeg,image/png"
+                  style={{ display: 'none' }}
+                  onChange={handleImagenChange}
+                />
+                <button
+                  type="button"
+                  className="jyr-btn jyr-btn-sm jyr-btn-outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={saving}
+                  style={{ fontSize: 12 }}
+                >
+                  <FiCamera size={13} style={{ marginRight: 4 }} />
+                  {imagenPreview ? 'Cambiar imagen' : 'Seleccionar imagen'}
+                </button>
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--jyr-gray-400)' }}>
+                  JPG o PNG. Máx 2 MB.
+                </p>
+                {imagenFile && (
+                  <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--jyr-success, #16a34a)', fontWeight: 500 }}>
+                    {imagenFile.name}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

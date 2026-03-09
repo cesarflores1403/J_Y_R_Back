@@ -19,6 +19,7 @@ import NotaCredito from './NotaCredito.js';
 import DetalleNotaCredito from './DetalleNotaCredito.js';
 import OrdenCompra from './OrdenCompra.js';
 import DetalleOrdenCompra from './DetalleOrdenCompra.js';
+import Ubicacion from './Ubicacion.js';
 
 // =============================================
 // RELACIONES
@@ -112,6 +113,11 @@ DetalleNotaCredito.belongsTo(DetalleFactura, { foreignKey: 'cod_detalle_factura'
 DetalleNotaCredito.belongsTo(ProductoSeq, { foreignKey: 'cod_producto', as: 'producto' });
 OrdenCompra.hasMany(DetalleOrdenCompra, { foreignKey: 'cod_orden_compra', as: 'detalles' });
 DetalleOrdenCompra.belongsTo(OrdenCompra, { foreignKey: 'cod_orden_compra', as: 'orden' });
+
+// HU-10: Ubicacion -> Producto (bodega)
+Ubicacion.hasMany(ProductoSeq, { foreignKey: 'cod_ubicacion', as: 'productos' });
+ProductoSeq.belongsTo(Ubicacion, { foreignKey: 'cod_ubicacion', as: 'ubicacion' });
+
 export {
   sequelize,
   Usuario,

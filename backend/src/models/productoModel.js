@@ -23,9 +23,13 @@ export const getProducto = async () => {
            p.unidad_medida, p.precio_venta, p.cod_isv,
            COALESCE(i.porcentaje, 0) AS isv_porcentaje,
            COALESCE(i.descripcion, 'Sin ISV') AS isv_descripcion,
-           p.estado_producto
+           p.estado_producto, p.imagen_url, p.cod_ubicacion,
+           u.pasillo AS ubi_pasillo, u.estanteria AS ubi_estanteria,
+           u.nivel_1 AS ubi_nivel_1, u.nivel_2 AS ubi_nivel_2,
+           u.codigo_qr AS ubi_codigo_qr
     FROM producto p
     LEFT JOIN catalogo_isv i ON p.cod_isv = i.cod_isv
+    LEFT JOIN ubicacion u ON p.cod_ubicacion = u.cod_ubicacion
     ORDER BY p.cod_producto
   `;
   const result = await pool.query(query);
@@ -65,6 +69,23 @@ export const createProducto = async (datos) => {
     producto.codigo_producto = formatCodProducto(producto.cod_producto);
   }
   return producto;
+};
+
+// =======================
+// HU-08: Obtener imagen_url de un producto
+// =======================
+export const getImagenProducto = async (cod_producto) => {
+  const query = `SELECT imagen_url FROM producto WHERE cod_producto = $1`;
+  const result = await pool.query(query, [cod_producto]);
+  return result.rows[0] || null;
+};
+
+// =======================
+// HU-08: Actualizar imagen_url de un producto
+// =======================
+export const updateImagenProducto = async (cod_producto, imagen_url) => {
+  const query = `UPDATE producto SET imagen_url = $1 WHERE cod_producto = $2`;
+  await pool.query(query, [imagen_url, cod_producto]);
 };
 
 // =======================

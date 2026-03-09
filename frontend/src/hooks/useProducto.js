@@ -43,6 +43,7 @@ export const useProducto = () => {
           : 'Producto creado correctamente ✅'
       );
       await cargar(); // // Refresca lista
+      return productoCreado; // // HU-08: retornar para que el form pueda subir imagen
     } catch (e) {
       setError(e.message || 'Error al crear producto'); // // Error
     } finally {
@@ -111,6 +112,44 @@ export const useProducto = () => {
     }
   };
 
+  // =======================
+  // HU-08: Subir / reemplazar imagen de producto
+  // =======================
+  const subirImagen = async (cod_producto, file) => {
+    try {
+      setSaving(true);
+      limpiarMensajes();
+
+      await productoApi.subirImagen(cod_producto, file);
+      const codigoFmt = `PROD-${String(cod_producto).padStart(4, '0')}`;
+      setSuccess(`Imagen de ${codigoFmt} actualizada correctamente \u2705`);
+      await cargar();
+    } catch (e) {
+      setError(e.message || 'Error al subir imagen del producto');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // =======================
+  // HU-08: Eliminar imagen de producto
+  // =======================
+  const eliminarImagenProducto = async (cod_producto) => {
+    try {
+      setSaving(true);
+      limpiarMensajes();
+
+      await productoApi.eliminarImagen(cod_producto);
+      const codigoFmt = `PROD-${String(cod_producto).padStart(4, '0')}`;
+      setSuccess(`Imagen de ${codigoFmt} eliminada correctamente \u2705`);
+      await cargar();
+    } catch (e) {
+      setError(e.message || 'Error al eliminar imagen del producto');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     cargar(); // // Carga inicial
   }, []);
@@ -128,6 +167,8 @@ export const useProducto = () => {
     actualizar, // // Acción PUT
     eliminar, // // Acción DELETE
     cambiarEstado, // // Cambiar estado (Activo/Inactivo/Descontinuado)
+    subirImagen, // // HU-08: Subir/reemplazar imagen
+    eliminarImagenProducto, // // HU-08: Eliminar imagen
   };
 };
 

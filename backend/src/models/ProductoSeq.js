@@ -21,6 +21,16 @@ const ProductoSeq = sequelize.define('producto', {
     validate: {
       isIn: [['Activo', 'Inactivo', 'Descontinuado']]
     }
+  },
+  imagen_url: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    defaultValue: null
+  },
+  cod_ubicacion: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null
   }
 });
 

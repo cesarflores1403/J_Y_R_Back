@@ -49,6 +49,10 @@ export const validarCrearProducto = [
     .optional()
     .isIn(['Activo', 'Inactivo', 'Descontinuado']).withMessage('Estado inválido. Valores: Activo, Inactivo, Descontinuado.'),
 
+  body('cod_ubicacion')
+    .optional({ values: 'null' })
+    .isInt({ min: 1 }).withMessage('La ubicación debe ser un número entero válido.'),
+
   validarCampos, // // Middleware que retorna errores 400
 ];
 
@@ -67,7 +71,7 @@ export const validarActualizarProducto = [
       const keys = Object.keys(datos);
       if (keys.length === 0) throw new Error('datos no puede estar vacío.');
 
-      const camposPermitidos = ['cod_categoria', 'nombre_producto', 'unidad_medida', 'precio_venta', 'cod_isv', 'estado_producto'];
+      const camposPermitidos = ['cod_categoria', 'nombre_producto', 'unidad_medida', 'precio_venta', 'cod_isv', 'estado_producto', 'cod_ubicacion'];
 
       // Validar cada campo enviado
       for (const campo of keys) {
@@ -102,6 +106,9 @@ export const validarActualizarProducto = [
             break;
           case 'estado_producto':
             if (!['Activo', 'Inactivo', 'Descontinuado'].includes(valor)) throw new Error('estado_producto inválido.');
+            break;
+          case 'cod_ubicacion':
+            if (valor !== null && (!Number.isInteger(Number(valor)) || Number(valor) < 1)) throw new Error('cod_ubicacion debe ser un entero positivo o null.');
             break;
         }
       }
