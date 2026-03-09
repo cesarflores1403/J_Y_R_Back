@@ -28,11 +28,13 @@ import NotasCredito from '../components/notascredito/NotasCredito.jsx';
 import Usuarios from '../components/usuarios/Usuarios.jsx';
 import RecuperarPassword from '../components/auth/RecuperarPassword.jsx';
 import OrdenesCompra from '../components/compras/OrdenesCompra.jsx';
+import ConfigEmpresa from '../components/configuracion/ConfigEmpresa.jsx';
 const PrivateRoute = ({ children, roles }) => {
   const { autenticado, usuario, cargando } = useAuth();
   if (cargando) return <div className="jyr-spinner" style={{ minHeight: '100vh' }} />;
   if (!autenticado) return <Navigate to="/login" />;
-  if (roles && !roles.includes(usuario?.rol)) return <Navigate to="/" />;
+  // Super Administrador tiene acceso total a todas las rutas
+  if (roles && usuario?.rol !== 'Super Administrador' && !roles.includes(usuario?.rol)) return <Navigate to="/" />;
   return children;
 };
 
@@ -69,6 +71,7 @@ const App = () => {
             <Route path="notas-credito" element={<PrivateRoute roles={['Administrador', 'Cajero']}><NotasCredito /></PrivateRoute>} />
             <Route path="usuarios" element={<PrivateRoute roles={['Administrador']}><Usuarios /></PrivateRoute>} />
             <Route path="compras/ordenes" element={<PrivateRoute roles={['Administrador','Bodeguero']}><OrdenesCompra /></PrivateRoute>} />
+            <Route path="config-empresa" element={<PrivateRoute roles={['Super Administrador']}><ConfigEmpresa /></PrivateRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

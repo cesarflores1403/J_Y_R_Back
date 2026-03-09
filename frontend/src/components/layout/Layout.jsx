@@ -28,7 +28,11 @@ const pageNames = {
   '/facturas': 'Facturacion',
   '/auditoria-facturacion': 'Auditoría de Facturación',
   '/notas-credito': 'Notas de Crédito',
+  '/cotizaciones': 'Cotizaciones',
+  '/usuarios': 'Usuarios',
+  '/compras/ordenes': 'Órdenes de Compra',
   '/carrusel': 'Carrusel',
+  '/config-empresa': 'Configuración de Empresa',
 };
 
 const Layout = () => {

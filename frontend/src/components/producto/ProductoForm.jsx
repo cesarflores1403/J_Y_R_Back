@@ -147,6 +147,8 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit, onSubirImagen 
       errors.precio_venta = 'El precio de venta es obligatorio.';
     } else if (isNaN(precio)) {
       errors.precio_venta = 'El precio debe ser un número válido.';
+    } else if (precio < 0) {
+      errors.precio_venta = 'No se permiten números negativos.';
     } else if (precio <= 0) {
       errors.precio_venta = 'El precio de venta debe ser mayor a 0.';
     } else if (precio > 999999.99) {
@@ -369,8 +371,9 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit, onSubirImagen 
                 name="precio_venta"
                 type="number"
                 step="0.01"
-                min="0.01"
+                min="0"
                 max="999999.99"
+                onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                 placeholder="0.00"
                 value={form.precio_venta}
                 onChange={onChange}
