@@ -41,7 +41,8 @@ const App = () => {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<Login />} /> 
+          <Route path="/recuperar-password" element={<RecuperarPassword />} />
           <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="productos" element={<ProductoPage />} />
