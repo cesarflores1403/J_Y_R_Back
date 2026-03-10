@@ -1,4 +1,4 @@
-import { useState } from 'react'; // // Estado local
+import { useState, useRef } from 'react'; // // Estado local
 import Alert from '../components/common/Alert.jsx'; // // Alert
 import ProductoForm from '../components/producto/ProductoForm.jsx'; // // Form
 import ProductoList from '../components/producto/ProductoList.jsx'; // // Tabla
@@ -31,6 +31,7 @@ const ProductoPage = () => {
 
   const [selected, setSelected] = useState(null);
   const [fichaProducto, setFichaProducto] = useState(null); // // HU-09: producto para ficha
+  const formRef = useRef(null);
 
   // HU-09: Mapa de categorías para la ficha
   const categoriasMap = {};
@@ -39,7 +40,10 @@ const ProductoPage = () => {
   // HU-09: Determinar si el usuario puede editar
   const puedeEditar = ['Administrador', 'Bodeguero', 'Cajero'].includes(usuario?.rol);
 
-  const handleEdit = (p) => setSelected(p);
+  const handleEdit = (p) => {
+    setSelected(p);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
   const handleCancelEdit = () => setSelected(null);
 
   const handleSubmit = async (payload) => {
@@ -75,7 +79,7 @@ const ProductoPage = () => {
       <Alert type="danger" message={error} onClose={() => setError('')} />
 
       <div className="row g-4">
-        <div className="col-12">
+        <div className="col-12" ref={formRef}>
           <ProductoForm
             saving={saving}
             onSubmit={handleSubmit}
