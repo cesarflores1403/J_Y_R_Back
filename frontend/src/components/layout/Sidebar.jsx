@@ -48,6 +48,9 @@ const menuItems = [
   { section: 'Fotos Carrusel', items: [
     { path: '/carrusel', label: 'Carrusel', icon: <FiImage />, roles: ['Administrador'] },
   ]},
+  { section: 'Configuración', items: [
+    { path: '/config-empresa', label: 'Datos Factura', icon: <FiFileText />, roles: ['Super Administrador'] },
+  ]},
 ];
 
 const Sidebar = () => {
@@ -73,7 +76,7 @@ const Sidebar = () => {
       <nav className="jyr-sidebar-nav">
         {menuItems.map((section) => {
           const visibleItems = section.items.filter(
-            item => item.roles.includes(usuario?.rol)
+            item => usuario?.rol === 'Super Administrador' || item.roles.includes(usuario?.rol)
           );
           if (visibleItems.length === 0) return null;
 

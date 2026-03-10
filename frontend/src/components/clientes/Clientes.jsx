@@ -51,6 +51,21 @@ const Clientes = () => {
 
   const guardar = async (e) => {
     e.preventDefault();
+
+    // Validaciones
+    if (!form.nombre.trim()) return toast.warn('El nombre es obligatorio');
+    if (form.nombre.trim().length > 10) return toast.warn('El nombre no puede exceder 10 caracteres');
+    if (!form.apellido.trim()) return toast.warn('El apellido es obligatorio');
+    if (!form.dni.trim()) return toast.warn('El DNI es obligatorio');
+    if (!/^\d{13}$/.test(form.dni.trim())) return toast.warn('El DNI debe tener exactamente 13 dígitos numéricos');
+    if (!form.empresa.trim()) return toast.warn('La empresa es obligatoria');
+    if (form.empresa.trim().length > 15) return toast.warn('La empresa no puede exceder 15 caracteres');
+    if (!form.telefono.trim()) return toast.warn('El teléfono es obligatorio');
+    if (!/^\d{8}$/.test(form.telefono.trim())) return toast.warn('El teléfono debe tener exactamente 8 dígitos numéricos');
+    if (!form.correo.trim()) return toast.warn('El correo es obligatorio');
+    if (!form.direccion.trim()) return toast.warn('La dirección es obligatoria');
+    if (form.direccion.trim().length > 40) return toast.warn('La dirección no puede exceder 40 caracteres');
+
     setGuardando(true);
     try {
       if (editando) {
@@ -165,37 +180,45 @@ const Clientes = () => {
                     <div className="col-md-6">
                       <label className="form-label">Nombre *</label>
                       <input type="text" className="form-control" value={form.nombre}
-                        onChange={(e) => setForm({...form, nombre: e.target.value})} required />
+                        onChange={(e) => setForm({...form, nombre: e.target.value})} required maxLength={10} />
+                      <small className="text-muted">{form.nombre.length}/10</small>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label">Apellido</label>
+                      <label className="form-label">Apellido *</label>
                       <input type="text" className="form-control" value={form.apellido}
-                        onChange={(e) => setForm({...form, apellido: e.target.value})} />
+                        onChange={(e) => setForm({...form, apellido: e.target.value})} required maxLength={10} />
+                      <small className="text-muted">{form.apellido.length}/10</small>
                     </div>
                     <div className="col-md-4">
-                      <label className="form-label">DNI</label>
+                      <label className="form-label">DNI *</label>
                       <input type="text" className="form-control" value={form.dni}
-                        onChange={(e) => setForm({...form, dni: e.target.value})} />
+                        onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 13) setForm({...form, dni: v}); }}
+                        required maxLength={13} placeholder="13 dígitos" />
+                      <small className="text-muted">{form.dni.length}/13</small>
                     </div>
                     <div className="col-md-4">
-                      <label className="form-label">Empresa</label>
+                      <label className="form-label">Empresa *</label>
                       <input type="text" className="form-control" value={form.empresa}
-                        onChange={(e) => setForm({...form, empresa: e.target.value})} />
+                        onChange={(e) => setForm({...form, empresa: e.target.value})} required maxLength={15} />
+                      <small className="text-muted">{form.empresa.length}/15</small>
                     </div>
                     <div className="col-md-4">
-                      <label className="form-label">Teléfono</label>
+                      <label className="form-label">Teléfono *</label>
                       <input type="text" className="form-control" value={form.telefono}
-                        onChange={(e) => setForm({...form, telefono: e.target.value})} />
+                        onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 8) setForm({...form, telefono: v}); }}
+                        required maxLength={8} placeholder="8 dígitos" />
+                      <small className="text-muted">{form.telefono.length}/8</small>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label">Correo</label>
+                      <label className="form-label">Correo *</label>
                       <input type="email" className="form-control" value={form.correo}
-                        onChange={(e) => setForm({...form, correo: e.target.value})} />
+                        onChange={(e) => setForm({...form, correo: e.target.value})} required />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label">Dirección</label>
+                      <label className="form-label">Dirección *</label>
                       <input type="text" className="form-control" value={form.direccion}
-                        onChange={(e) => setForm({...form, direccion: e.target.value})} />
+                        onChange={(e) => setForm({...form, direccion: e.target.value})} required maxLength={40} />
+                      <small className="text-muted">{form.direccion.length}/40</small>
                     </div>
                   </div>
                 </div>

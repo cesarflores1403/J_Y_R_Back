@@ -52,6 +52,8 @@ export const autorizar = (...rolesPermitidos) => {
       return res.status(401).json({ ok: false, mensaje: 'No autenticado' });
     }
     const rolUsuario = req.usuario.rol;
+    // Super Administrador tiene acceso total a todas las rutas
+    if (rolUsuario === 'Super Administrador') return next();
     if (!rolesPermitidos.includes(rolUsuario)) {
       return res.status(403).json({
         ok: false,

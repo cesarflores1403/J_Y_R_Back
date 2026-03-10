@@ -8,6 +8,7 @@ import Pago from '../models/Pago.js';
 import BitacoraAnulacion from '../models/BitacoraAnulacion.js';
 import BitacoraExcepcionStock from '../models/BitacoraExcepcionStock.js';
 import bitacoraFacturacionService from './bitacoraFacturacionService.js';
+import empresaConfigService from './empresaConfigService.js';
 import { Op } from 'sequelize';
 
 class FacturaService {
@@ -68,8 +69,8 @@ class FacturaService {
     });
     if (!factura) throw Object.assign(new Error('Factura no encontrada'), { statusCode: 404 });
 
-    // Importar datos de empresa
-    const empresa = (await import('../config/empresa.js')).default;
+    // Obtener datos de empresa desde BD
+    const empresa = await empresaConfigService.obtener();
 
     // Estructura extendida para frontend/PDF
     return {

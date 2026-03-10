@@ -107,7 +107,7 @@ export const auditoriaFacturacionService = {
 export const notaCreditoService = {
   listar: (params) => api.get('/notas-credito', { params }),
   obtener: (id) => api.get(`/notas-credito/${id}`),
-detallesFactura: (codFactura) => api.get(`/notas-credito/factura/${codFactura}/detalles`),
+  detallesFactura: (codFactura) => api.get(`/notas-credito/factura/${codFactura}/detalles`),
   crear: (data) => api.post('/notas-credito', data),
   anular: (id) => api.patch(`/notas-credito/${id}/anular`),
 };
@@ -130,4 +130,10 @@ export const comprasService = {
   historial:     (id)     => api.get(`/compras/${id}/historial`),
   listarEstados: ()       => api.get('/compras/estados'),
   productosDisponibles: (params) => api.get('/compras/productos-disponibles', { params }),
+};
+
+// ==================== EMPRESA CONFIG (Super Admin) ====================
+export const empresaConfigService = {
+  obtener: () => api.get('/empresa-config'),
+  actualizar: (data) => api.put('/empresa-config', data),
 };
