@@ -1,7 +1,8 @@
-import { useState, useMemo, useRef } from 'react';
-import { FiEdit2, FiTrash2, FiSearch, FiChevronUp, FiChevronDown, FiFilter, FiCamera, FiX, FiEye } from 'react-icons/fi';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { FiEdit2, FiTrash2, FiSearch, FiChevronUp, FiChevronDown, FiFilter, FiCamera, FiX, FiEye, FiCopy, FiPackage } from 'react-icons/fi';
 import Pagination from '../common/Pagination.jsx';
 import { useCategorias } from '../../hooks/useCategorias.js'; // // HU-07: Categorías dinámicas
+import { toast } from 'react-toastify';
 
 // =====================================================
 // HU-06: Listado con búsqueda, filtros, paginación y ordenamiento
@@ -16,7 +17,7 @@ const estadoBadge = {
   Descontinuado: { className: 'jyr-badge jyr-badge-warning', label: 'Descontinuado' },
 };
 
-const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSubirImagen, onEliminarImagen, onVerFicha }) => {
+const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCambiarEstadoMasivo, onSubirImagen, onEliminarImagen, onVerFicha, onDuplicate }) => {
   // HU-07: Categorías dinámicas desde BD
   const { categorias } = useCategorias();
   const fileInputRef = useRef(null); // // HU-08: ref para input file oculto
@@ -39,6 +40,15 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
   const [ordenarPor, setOrdenarPor] = useState('cod_producto');
   const [ordenDir, setOrdenDir] = useState('asc');
   const [pagina, setPagina] = useState(1);
+  const [seleccionados, setSeleccionados] = useState([]); // HU-15: selección múltiple
+  const [estadoMasivo, setEstadoMasivo] = useState(''); // HU-15: nuevo estado masivo
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirmar',
+    action: null,
+  });
 
   // Normalizar estado (compatibilidad con boolean legacy)
   const getEstado = (p) => {
@@ -121,6 +131,22 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
     return productosOrdenados.slice(start, start + ITEMS_PER_PAGE);
   }, [productosOrdenados, pagina]);
 
+  const productosPaginaElegibles = useMemo(() => {
+    if (!estadoMasivo) return productosPagina;
+    return productosPagina.filter((p) => getEstado(p) !== estadoMasivo);
+  }, [productosPagina, estadoMasivo]);
+
+  // Si ya se eligió un estado masivo, quitar de la selección los que ya están en ese estado
+  useEffect(() => {
+    if (!estadoMasivo) return;
+
+    setSeleccionados((prev) => prev.filter((id) => {
+      const prod = productos.find((p) => p.cod_producto === id);
+      if (!prod) return false;
+      return getEstado(prod) !== estadoMasivo;
+    }));
+  }, [estadoMasivo, productos]);
+
   // Reset página al cambiar filtros/búsqueda
   const handleBusqueda = (val) => {
     setBusqueda(val);
@@ -166,21 +192,77 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
 
   const handleDelete = (p) => {
     const codigo = p.codigo_producto || `PROD-${String(p.cod_producto).padStart(4, '0')}`;
-    const ok = window.confirm(`¿Eliminar el producto ${codigo} - ${p.nombre_producto}?`);
-    if (!ok) return;
-    if (onDelete) onDelete({ cod_producto: p.cod_producto });
+
+    setConfirmModal({
+      open: true,
+      title: 'Eliminar producto',
+      message: `¿Está seguro de eliminar el producto ${codigo} - ${p.nombre_producto}? Esta acción no se puede deshacer.`,
+      confirmText: 'Eliminar',
+      action: () => onDelete && onDelete({ cod_producto: p.cod_producto })
+    });
   };
 
   const handleEstadoChange = (p, nuevoEstado) => {
     if (nuevoEstado === getEstado(p)) return;
     const mensajes = {
-      Inactivo: `¿Inactivar "${p.nombre_producto}"? Ya no estará disponible para venta.`,
-      Descontinuado: `¿Marcar "${p.nombre_producto}" como descontinuado? No se podrá vender.`,
-      Activo: `¿Reactivar "${p.nombre_producto}"? Volverá a estar disponible para venta.`,
+      Inactivo: `¿Está seguro de inactivar "${p.nombre_producto}"? Ya no estará disponible para venta.`,
+      Descontinuado: `¿Está seguro de marcar "${p.nombre_producto}" como descontinuado? No se podrá vender.`,
+      Activo: `¿Está seguro de reactivar "${p.nombre_producto}"? Volverá a estar disponible para venta.`,
     };
-    const ok = window.confirm(mensajes[nuevoEstado] || `¿Cambiar estado a "${nuevoEstado}"?`);
-    if (!ok) return;
-    if (onCambiarEstado) onCambiarEstado(p.cod_producto, nuevoEstado);
+    setConfirmModal({
+      open: true,
+      title: 'Cambiar estado',
+      message: mensajes[nuevoEstado] || `¿Cambiar estado a "${nuevoEstado}"?`,
+      confirmText: 'Cambiar',
+      action: () => onCambiarEstado && onCambiarEstado(p.cod_producto, nuevoEstado)
+    });
+  };
+
+  // =====================================================
+  // HU-15: Selección múltiple + acción masiva
+  // =====================================================
+  const toggleSeleccion = (codProducto) => {
+    setSeleccionados((prev) =>
+      prev.includes(codProducto)
+        ? prev.filter((id) => id !== codProducto)
+        : [...prev, codProducto]
+    );
+  };
+
+  const todosSeleccionadosPagina = productosPaginaElegibles.length > 0
+    && productosPaginaElegibles.every((p) => seleccionados.includes(p.cod_producto));
+
+  const sinElegiblesEnPagina = productosPaginaElegibles.length === 0;
+
+  const toggleSeleccionPagina = () => {
+    if (todosSeleccionadosPagina) {
+      setSeleccionados((prev) => prev.filter((id) => !productosPaginaElegibles.some((p) => p.cod_producto === id)));
+      return;
+    }
+
+    setSeleccionados((prev) => {
+      const set = new Set(prev);
+      productosPaginaElegibles.forEach((p) => set.add(p.cod_producto));
+      return Array.from(set);
+    });
+  };
+
+  const ejecutarCambioMasivo = async () => {
+    if (!estadoMasivo || seleccionados.length === 0 || !onCambiarEstadoMasivo) return;
+
+    setConfirmModal({
+      open: true,
+      title: 'Cambio masivo de estado',
+      message: `Se cambiará el estado de ${seleccionados.length} producto(s) a "${estadoMasivo}". ¿Desea continuar?`,
+      confirmText: 'Aplicar cambios',
+      action: async () => {
+        const res = await onCambiarEstadoMasivo(seleccionados, estadoMasivo);
+        if (res) {
+          setSeleccionados([]);
+          setEstadoMasivo('');
+        }
+      }
+    });
   };
 
   // =====================================================
@@ -200,14 +282,14 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
     // Validar tipo
     const tiposPermitidos = ['image/jpeg', 'image/png'];
     if (!tiposPermitidos.includes(file.type)) {
-      window.alert('Solo se permiten imágenes JPG o PNG.');
+      toast.error('Solo se permiten imágenes JPG o PNG.');
       e.target.value = '';
       return;
     }
 
     // Validar tamaño (2 MB)
     if (file.size > 2 * 1024 * 1024) {
-      window.alert('La imagen no puede exceder 2 MB.');
+      toast.error('La imagen no puede exceder 2 MB.');
       e.target.value = '';
       return;
     }
@@ -219,16 +301,32 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
 
   const handleEliminarImagen = (p) => {
     const codigo = p.codigo_producto || `PROD-${String(p.cod_producto).padStart(4, '0')}`;
-    const ok = window.confirm(`¿Eliminar la imagen del producto ${codigo}?`);
-    if (!ok) return;
-    if (onEliminarImagen) onEliminarImagen(p.cod_producto);
+    setConfirmModal({
+      open: true,
+      title: 'Eliminar imagen',
+      message: `¿Está seguro de eliminar la imagen del producto ${codigo}?`,
+      confirmText: 'Eliminar imagen',
+      action: () => onEliminarImagen && onEliminarImagen(p.cod_producto)
+    });
+  };
+
+  const cerrarConfirmModal = () => {
+    setConfirmModal({ open: false, title: '', message: '', confirmText: 'Confirmar', action: null });
+  };
+
+  const confirmarAccion = async () => {
+    const action = confirmModal.action;
+    cerrarConfirmModal();
+    if (typeof action === 'function') {
+      await action();
+    }
   };
 
   return (
     <div className="jyr-card">
       {/* HEADER: título + contadores */}
       <div className="jyr-card-header" style={{ flexWrap: 'wrap', gap: 8 }}>
-        <h3>📦 Listado de Productos</h3>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><FiPackage size={16} /> Listado de Productos</h3>
         <div style={{ display: 'flex', gap: 6 }}>
           <span className="jyr-badge jyr-badge-dark">{productos.length} total</span>
           {hayFiltros && (
@@ -282,9 +380,9 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
           style={{ fontSize: 12, padding: '6px 10px', width: 'auto', minWidth: 130, flex: '0 0 auto' }}
         >
           <option value="">Todos los estados</option>
-          <option value="Activo">✅ Activo</option>
-          <option value="Inactivo">🚫 Inactivo</option>
-          <option value="Descontinuado">⚠️ Descontinuado</option>
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+          <option value="Descontinuado">Descontinuado</option>
         </select>
 
         {/* Limpiar filtros */}
@@ -298,6 +396,50 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
           </button>
         )}
       </div>
+
+      {seleccionados.length > 0 && (
+        <div style={{
+          padding: '10px 16px',
+          borderBottom: '1px solid var(--jyr-gray-200)',
+          background: 'var(--jyr-info-bg, #eff6ff)',
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap'
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--jyr-info, #2563eb)' }}>
+            {seleccionados.length} producto(s) seleccionado(s)
+          </span>
+
+          <span style={{ fontSize: 12, color: 'var(--jyr-gray-500)' }}>
+            Los que ya están en el estado elegido no se pueden seleccionar.
+          </span>
+
+          <select
+            className="jyr-form-control jyr-form-select"
+            value={estadoMasivo}
+            onChange={(e) => setEstadoMasivo(e.target.value)}
+            style={{ fontSize: 12, padding: '6px 10px', width: 'auto', minWidth: 170 }}
+          >
+            <option value="">Selecciona nuevo estado</option>
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+            <option value="Descontinuado">Descontinuado</option>
+          </select>
+
+          <button
+            className="jyr-btn jyr-btn-sm jyr-btn-primary"
+            onClick={ejecutarCambioMasivo}
+            disabled={!estadoMasivo}
+          >
+            Cambiar estado
+          </button>
+
+          <button
+            className="jyr-btn jyr-btn-sm jyr-btn-outline"
+            onClick={() => { setSeleccionados([]); setEstadoMasivo(''); }}
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
 
       {/* HU-08: Input oculto para seleccionar imagen */}
       <input
@@ -364,6 +506,15 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
         <table className="jyr-table">
           <thead>
             <tr>
+              <th style={{ width: 44, textAlign: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={todosSeleccionadosPagina}
+                  onChange={toggleSeleccionPagina}
+                  disabled={sinElegiblesEnPagina}
+                  title="Seleccionar todos en la página"
+                />
+              </th>
               <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('cod_producto')}>
                 Código <SortIcon campo="cod_producto" />
               </th>
@@ -392,6 +543,22 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
 
                 return (
                   <tr key={p.cod_producto} style={estado !== 'Activo' ? { opacity: 0.7 } : {}}>
+                    <td style={{ textAlign: 'center' }}>
+                      {(() => {
+                        const disabled = Boolean(estadoMasivo && getEstado(p) === estadoMasivo);
+                        return (
+                      <input
+                        type="checkbox"
+                        checked={seleccionados.includes(p.cod_producto)}
+                        onChange={() => toggleSeleccion(p.cod_producto)}
+                        disabled={disabled}
+                        title={disabled
+                          ? `${p.nombre_producto} ya está en estado ${estadoMasivo}`
+                          : `Seleccionar ${p.nombre_producto}`}
+                      />
+                        );
+                      })()}
+                    </td>
                     <td>
                       <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--jyr-red)' }}>
                         {p.codigo_producto || `PROD-${String(p.cod_producto).padStart(4, '0')}`}
@@ -488,9 +655,9 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
                             : 'var(--jyr-danger, #dc2626)'
                         }}
                       >
-                        <option value="Activo">✅ Activo</option>
-                        <option value="Inactivo">🚫 Inactivo</option>
-                        <option value="Descontinuado">⚠️ Descontinuado</option>
+                        <option value="Activo">Activo</option>
+                        <option value="Inactivo">Inactivo</option>
+                        <option value="Descontinuado">Descontinuado</option>
                       </select>
                     </td>
                     <td>
@@ -520,6 +687,13 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
                           <FiEdit2 size={14} />
                         </button>
                         <button
+                          className="jyr-btn jyr-btn-sm jyr-btn-outline"
+                          onClick={() => onDuplicate && onDuplicate(p)}
+                          title="Duplicar"
+                        >
+                          <FiCopy size={14} />
+                        </button>
+                        <button
                           className="jyr-btn jyr-btn-sm jyr-btn-outline-red"
                           onClick={() => handleDelete(p)}
                           title="Eliminar"
@@ -533,7 +707,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
               })
             ) : (
               <tr>
-                <td colSpan="10" style={{ textAlign: 'center', padding: 40, color: 'var(--jyr-gray-400)' }}>
+                <td colSpan="11" style={{ textAlign: 'center', padding: 40, color: 'var(--jyr-gray-400)' }}>
                   {hayFiltros
                     ? 'No se encontraron productos con los filtros aplicados.'
                     : 'No hay productos registrados.'
@@ -561,6 +735,46 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onSub
             totalPaginas={totalPaginas}
             onChange={setPagina}
           />
+        </div>
+      )}
+
+      {confirmModal.open && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 11000,
+            background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+          }}
+          onClick={cerrarConfirmModal}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 520,
+              background: '#fff', borderRadius: 12,
+              boxShadow: '0 20px 50px rgba(0,0,0,0.25)', overflow: 'hidden'
+            }}
+          >
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--jyr-gray-200)' }}>
+              <h5 style={{ margin: 0, fontWeight: 700 }}>{confirmModal.title}</h5>
+            </div>
+
+            <div style={{ padding: '16px 18px', color: 'var(--jyr-gray-700)', lineHeight: 1.5 }}>
+              {confirmModal.message}
+            </div>
+
+            <div style={{
+              padding: '12px 18px', borderTop: '1px solid var(--jyr-gray-200)',
+              display: 'flex', justifyContent: 'flex-end', gap: 8
+            }}>
+              <button className="jyr-btn jyr-btn-sm jyr-btn-outline" onClick={cerrarConfirmModal}>
+                Cancelar
+              </button>
+              <button className="jyr-btn jyr-btn-sm jyr-btn-primary" onClick={confirmarAccion}>
+                {confirmModal.confirmText}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

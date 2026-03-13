@@ -1,4 +1,4 @@
-import { FiX, FiEdit2, FiPackage } from 'react-icons/fi';
+import { FiX, FiEdit2, FiPackage, FiCheckCircle, FiAlertTriangle, FiXCircle } from 'react-icons/fi';
 
 // =====================================================
 // HU-09: Ficha completa del producto (modal)
@@ -18,6 +18,12 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
   const estadoColor = estado === 'Activo' ? 'var(--jyr-success, #16a34a)'
     : estado === 'Descontinuado' ? 'var(--jyr-warning, #d97706)'
     : 'var(--jyr-danger, #dc2626)';
+
+  const EstadoIcono = estado === 'Activo'
+    ? FiCheckCircle
+    : estado === 'Descontinuado'
+      ? FiAlertTriangle
+      : FiXCircle;
 
   const categoria = categoriasMap[producto.cod_categoria] || `Categoría ${producto.cod_categoria}`;
 
@@ -163,7 +169,9 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
                   Estado
                 </span>
                 <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 700, color: estadoColor }}>
-                  {estado === 'Activo' ? '✅' : estado === 'Descontinuado' ? '⚠️' : '🚫'} {estado}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <EstadoIcono size={14} /> {estado}
+                  </span>
                 </p>
               </div>
 

@@ -39,8 +39,8 @@ export const useProducto = () => {
       const codigoUnico = productoCreado?.codigo_producto || productoCreado?.cod_producto;
       setSuccess(
         codigoUnico
-          ? `Producto creado exitosamente. Código asignado: ${codigoUnico} ✅`
-          : 'Producto creado correctamente ✅'
+          ? `Producto creado exitosamente. Código asignado: ${codigoUnico}.`
+          : 'Producto creado correctamente.'
       );
       await cargar(); // // Refresca lista
       return productoCreado; // // HU-08: retornar para que el form pueda subir imagen
@@ -70,7 +70,7 @@ export const useProducto = () => {
         estado_producto: 'Estado'
       };
       const camposTexto = Object.keys(payload.datos).map(c => camposLegibles[c] || c).join(', ');
-      setSuccess(`${codigoFmt} actualizado correctamente. Campos: ${camposTexto} ✅`);
+      setSuccess(`${codigoFmt} actualizado correctamente. Campos: ${camposTexto}.`);
       await cargar(); // // Refresca lista
     } catch (e) {
       setError(e.message || 'Error al actualizar producto'); // // Error
@@ -85,7 +85,7 @@ export const useProducto = () => {
       limpiarMensajes(); // // Limpia mensajes
 
       await productoApi.remove(payload); // // DELETE (BE espera { cod_producto })
-      setSuccess('Producto eliminado correctamente ✅'); // // Éxito
+      setSuccess('Producto eliminado correctamente.'); // // Éxito
       await cargar(); // // Refresca lista
     } catch (e) {
       setError(e.message || 'Error al eliminar producto'); // // Error
@@ -103,10 +103,37 @@ export const useProducto = () => {
       limpiarMensajes();
 
       const res = await productoApi.cambiarEstado({ cod_producto, estado });
-      setSuccess(res?.message || `Estado cambiado a "${estado}" ✅`);
+      setSuccess(res?.message || `Estado cambiado a "${estado}".`);
       await cargar();
     } catch (e) {
       setError(e.message || 'Error al cambiar estado del producto');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // =======================
+  // CAMBIAR ESTADO MASIVO
+  // =======================
+  const cambiarEstadoMasivo = async (cod_productos, estado) => {
+    try {
+      setSaving(true);
+      limpiarMensajes();
+
+      const res = await productoApi.cambiarEstadoMasivo({ cod_productos, estado });
+      const resumen = res?.resumen;
+
+      if (resumen) {
+        setSuccess(`Cambio masivo completado: ${resumen.exitos} éxito(s), ${resumen.fallos} fallo(s).`);
+      } else {
+        setSuccess('Cambio masivo completado.');
+      }
+
+      await cargar();
+      return res;
+    } catch (e) {
+      setError(e.message || 'Error al cambiar estado masivo de productos');
+      return null;
     } finally {
       setSaving(false);
     }
@@ -122,7 +149,7 @@ export const useProducto = () => {
 
       await productoApi.subirImagen(cod_producto, file);
       const codigoFmt = `PROD-${String(cod_producto).padStart(4, '0')}`;
-      setSuccess(`Imagen de ${codigoFmt} actualizada correctamente \u2705`);
+      setSuccess(`Imagen de ${codigoFmt} actualizada correctamente.`);
       await cargar();
     } catch (e) {
       setError(e.message || 'Error al subir imagen del producto');
@@ -141,7 +168,7 @@ export const useProducto = () => {
 
       await productoApi.eliminarImagen(cod_producto);
       const codigoFmt = `PROD-${String(cod_producto).padStart(4, '0')}`;
-      setSuccess(`Imagen de ${codigoFmt} eliminada correctamente \u2705`);
+      setSuccess(`Imagen de ${codigoFmt} eliminada correctamente.`);
       await cargar();
     } catch (e) {
       setError(e.message || 'Error al eliminar imagen del producto');
@@ -167,6 +194,7 @@ export const useProducto = () => {
     actualizar, // // Acción PUT
     eliminar, // // Acción DELETE
     cambiarEstado, // // Cambiar estado (Activo/Inactivo/Descontinuado)
+    cambiarEstadoMasivo, // // Cambiar estado masivo
     subirImagen, // // HU-08: Subir/reemplazar imagen
     eliminarImagenProducto, // // HU-08: Eliminar imagen
   };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { cotizacionService } from '../../services/serviceIndex.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import {
   FiPlus, FiSearch, FiX, FiTrash2, FiEye, FiClipboard, FiArrowLeft,
@@ -29,6 +30,7 @@ const estadoBadge = (est) => {
 // VISTA LISTA DE COTIZACIONES
 // ==========================================
 const ListaCotizaciones = ({ onNueva, onVer }) => {
+  const confirm = useConfirm();
   const [cotizaciones, setCotizaciones] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [buscar, setBuscar] = useState('');
@@ -58,7 +60,13 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
   const [modalGestion, setModalGestion] = useState(null);
 
   const anular = async (id) => {
-    if (!window.confirm('¿Anular esta cotización? Esta acción no se puede deshacer.')) return;
+    const ok = await confirm({
+      title: 'Anular cotización',
+      message: '¿Está seguro de anular esta cotización? Esta acción no se puede deshacer.',
+      confirmText: 'Anular',
+      tone: 'danger'
+    });
+    if (!ok) return;
     try {
       const { data } = await cotizacionService.anular(id);
       toast.success(data?.mensaje || 'Cotización anulada');
@@ -69,7 +77,13 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
   };
 
   const eliminar = async (id) => {
-    if (!window.confirm('¿Eliminar permanentemente esta cotización? Esta acción no se puede deshacer.')) return;
+    const ok = await confirm({
+      title: 'Eliminar cotización',
+      message: '¿Está seguro de eliminar permanentemente esta cotización? Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar',
+      tone: 'danger'
+    });
+    if (!ok) return;
     try {
       await cotizacionService.eliminar(id);
       toast.success('Cotización eliminada');
@@ -80,7 +94,12 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
   };
 
   const convertir = async (id) => {
-    if (!window.confirm('¿Convertir esta cotización en factura? Se descontará del inventario.')) return;
+    const ok = await confirm({
+      title: 'Convertir cotización',
+      message: '¿Desea convertir esta cotización en factura? Se descontará del inventario.',
+      confirmText: 'Convertir'
+    });
+    if (!ok) return;
     try {
       const { data } = await cotizacionService.convertir(id);
       toast.success(data?.mensaje || `Factura ${data?.num_factura || ''} generada`);
@@ -208,6 +227,7 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
 // VISTA DETALLE DE COTIZACIÓN
 // ==========================================
 const DetalleCotizacion = ({ codCotizacion, onVolver, onConvertida }) => {
+  const confirm = useConfirm();
   const [cotizacion, setCotizacion] = useState(null);
   const [empresa, setEmpresa] = useState({});
   const [cargando, setCargando] = useState(true);
@@ -237,7 +257,12 @@ const DetalleCotizacion = ({ codCotizacion, onVolver, onConvertida }) => {
   const handlePrint = () => window.print();
 
   const handleConvertir = async () => {
-    if (!window.confirm('¿Convertir esta cotización en factura? Se descontará del inventario.')) return;
+    const ok = await confirm({
+      title: 'Convertir cotización',
+      message: '¿Desea convertir esta cotización en factura? Se descontará del inventario.',
+      confirmText: 'Convertir'
+    });
+    if (!ok) return;
     try {
       const { data } = await cotizacionService.convertir(codCotizacion);
       toast.success(data?.mensaje || 'Factura generada');

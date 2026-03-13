@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { FiEdit2, FiMapPin, FiPlus, FiToggleRight, FiTrash2 } from 'react-icons/fi';
 import Alert from '../common/Alert.jsx';
 import { ubicacionService } from '../../services/serviceIndex.js';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 
 const formularioInicial = {
   pasillo: '',
@@ -32,6 +33,7 @@ const Ubicaciones = () => {
   const [ubicaciones, setUbicaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
   const [error, setError] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
   const [includeInactive, setIncludeInactive] = useState(false);
@@ -115,7 +117,12 @@ const Ubicaciones = () => {
   };
 
   const desactivar = async (id) => {
-    const confirmado = window.confirm('¿Está seguro de desactivar esta ubicación?');
+    const confirmado = await confirm({
+      title: 'Desactivar ubicación',
+      message: '¿Está seguro de desactivar esta ubicación?',
+      confirmText: 'Desactivar',
+      tone: 'danger'
+    });
     if (!confirmado) return;
 
     try {
@@ -128,7 +135,12 @@ const Ubicaciones = () => {
   };
 
   const eliminar = async (id) => {
-    const confirmado = window.confirm('¿Está seguro de eliminar permanentemente esta ubicación?');
+    const confirmado = await confirm({
+      title: 'Eliminar ubicación',
+      message: '¿Está seguro de eliminar permanentemente esta ubicación?',
+      confirmText: 'Eliminar',
+      tone: 'danger'
+    });
     if (!confirmado) return;
 
     try {

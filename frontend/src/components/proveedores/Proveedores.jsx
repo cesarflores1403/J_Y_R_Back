@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { proveedorService } from '../../services/serviceIndex.js';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight, FiTrash2 } from 'react-icons/fi';
 
 const camposIniciales = { nombre_proveedor: '', telefono: '', correo: '', pais: '', es_internacional: false, validado: '' };
 
 const Proveedores = () => {
+  const confirm = useConfirm();
   const [proveedores, setProveedores] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [buscar, setBuscar] = useState('');
@@ -79,7 +81,13 @@ const Proveedores = () => {
   };
 
   const eliminar = async (id) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar este proveedor? Esta acción no se puede deshacer.')) return;
+    const ok = await confirm({
+      title: 'Eliminar proveedor',
+      message: '¿Está seguro de eliminar este proveedor? Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar',
+      tone: 'danger'
+    });
+    if (!ok) return;
     try {
       await proveedorService.eliminar(id);
       toast.success('Proveedor eliminado');

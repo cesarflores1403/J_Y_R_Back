@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import {
   FiArrowLeft, FiSearch, FiFileText, FiPlusCircle,
@@ -136,6 +137,7 @@ const ListaNotasCredito = ({ onVer, onNueva }) => {
 
 /* ========== DETALLE DE NOTA DE CRÉDITO ========== */
 const DetalleNotaCredito = ({ codNota, onVolver, onRecargar }) => {
+  const confirm = useConfirm();
   const [nota, setNota] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [anulando, setAnulando] = useState(false);
@@ -152,7 +154,13 @@ const DetalleNotaCredito = ({ codNota, onVolver, onRecargar }) => {
   }, [codNota]);
 
   const handleAnular = async () => {
-    if (!window.confirm('¿Está seguro de anular esta nota de crédito? Se revertirá el inventario si fue restaurado.')) return;
+    const ok = await confirm({
+      title: 'Anular nota de crédito',
+      message: '¿Está seguro de anular esta nota de crédito? Se revertirá el inventario si fue restaurado.',
+      confirmText: 'Anular',
+      tone: 'danger'
+    });
+    if (!ok) return;
     setAnulando(true);
     try {
       const { data } = await notaCreditoService.anular(codNota);

@@ -126,6 +126,31 @@ export const cambiarEstado = async (req, res, next) => {
 };
 
 // =======================
+// CAMBIAR ESTADO MASIVO PRODUCTOS (PATCH)
+// =======================
+export const cambiarEstadoMasivo = async (req, res, next) => {
+  try {
+    const { cod_productos, estado } = req.body;
+
+    const resultado = await productoService.cambiarEstadoMasivo({
+      cod_productos,
+      estado,
+      cod_usuario: req.usuario?.cod_usuario || null,
+      nombre_usuario: req.usuario?.nombre_usuario || null,
+      ip: req.ip || null
+    });
+
+    return sendOk(res, {
+      status: 200,
+      message: `Cambio masivo completado: ${resultado.resumen.exitos} éxito(s), ${resultado.resumen.fallos} fallo(s).`,
+      data: resultado
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// =======================
 // HU-08: SUBIR / REEMPLAZAR IMAGEN DE PRODUCTO
 // =======================
 export const subirImagen = async (req, res, next) => {

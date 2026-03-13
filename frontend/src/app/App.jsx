@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../contexts/AuthContext.jsx';
+import { ConfirmDialogProvider } from '../contexts/ConfirmDialogContext.jsx';
 import { ToastContainer } from 'react-toastify';
 
 import Login from '../components/auth/Login.jsx';
@@ -41,6 +42,7 @@ const PrivateRoute = ({ children, roles }) => {
 const App = () => {
   return (
     <AuthProvider>
+      <ConfirmDialogProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} /> 
@@ -76,6 +78,7 @@ const App = () => {
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
+      </ConfirmDialogProvider>
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} theme="dark" />
     </AuthProvider>
   );

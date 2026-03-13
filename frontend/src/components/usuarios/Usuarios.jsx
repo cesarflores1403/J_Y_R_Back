@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { usuarioService } from '../../services/serviceIndex.js';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import {
   FiPlus, FiEdit2, FiSearch, FiX, FiTrash2,
@@ -9,6 +10,7 @@ import {
 const camposIniciales = { nombre_usuario: '', contrasena: '', confirmar: '', cod_rol: '' };
 
 const Usuarios = () => {
+  const confirm = useConfirm();
   const [usuarios, setUsuarios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [buscar, setBuscar] = useState('');
@@ -106,7 +108,13 @@ const Usuarios = () => {
   };
 
   const eliminar = async (id) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.')) return;
+    const ok = await confirm({
+      title: 'Eliminar usuario',
+      message: '¿Está seguro de eliminar este usuario? Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar',
+      tone: 'danger'
+    });
+    if (!ok) return;
     try {
       await usuarioService.eliminar(id);
       toast.success('Usuario eliminado');

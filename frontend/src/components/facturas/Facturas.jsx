@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { facturaService } from '../../services/serviceIndex.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import { FiPlus, FiSearch, FiX, FiTrash2, FiEye, FiFileText, FiArrowLeft, FiPrinter, FiAlertTriangle, FiXCircle, FiUserPlus, FiEdit2 } from 'react-icons/fi';
 import logoClean from '../../assets/img/logo2.jpeg';
@@ -28,6 +29,7 @@ const normalizeEstado = (v) => {
 // VISTA LISTA DE FACTURAS
 // ==========================================
 const ListaFacturas = ({ onNueva, onVer }) => {
+  const confirm = useConfirm();
   const [facturas, setFacturas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [buscar, setBuscar] = useState('');
@@ -79,7 +81,13 @@ const ListaFacturas = ({ onNueva, onVer }) => {
 
   const eliminarDefinitivamente = async () => {
     if (!modalAnular) return;
-    if (!window.confirm(`¿ELIMINAR PERMANENTEMENTE ${modalAnular.numero}? Esta acción NO se puede deshacer.`)) return;
+    const ok = await confirm({
+      title: 'Eliminar factura',
+      message: `¿Está seguro de eliminar permanentemente ${modalAnular.numero}? Esta acción no se puede deshacer.`,
+      confirmText: 'Eliminar',
+      tone: 'danger'
+    });
+    if (!ok) return;
     try {
       await facturaService.eliminar(modalAnular.id);
       toast.success('Factura eliminada permanentemente');
@@ -216,7 +224,7 @@ const ListaFacturas = ({ onNueva, onVer }) => {
                 ) : (
                   <p className="text-muted text-center mb-0">
                     Esta factura ya está <span className="badge bg-danger">Anulada</span>.<br />
-                    ¿Deseas eliminarla permanentemente de la base de datos?
+                    ¿Desea eliminarla permanentemente de la base de datos?
                   </p>
                 )}
               </div>
