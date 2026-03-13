@@ -2,12 +2,13 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { getProducto, createProducto, updateProducto, deleteProducto, cambiarEstado, subirImagen, eliminarImagen } from '../controllers/productoController.js';
+import { getProducto, createProducto, updateProducto, deleteProducto, cambiarEstado, cambiarEstadoMasivo, subirImagen, eliminarImagen } from '../controllers/productoController.js';
 import { importarProductos, descargarPlantilla } from '../controllers/importacionController.js';
 import {
   validarCrearProducto,
   validarActualizarProducto,
   validarCambiarEstado,
+  validarCambiarEstadoMasivo,
   validarEliminarProducto
 } from '../middlewares/productoValidator.js';
 
@@ -55,6 +56,9 @@ router.put('/', validarActualizarProducto, updateProducto);
 
 // PATCH /api/v1/productos/estado — Cambiar estado (Activo/Inactivo/Descontinuado)
 router.patch('/estado', validarCambiarEstado, cambiarEstado);
+
+// PATCH /api/v1/productos/estado-masivo — Cambiar estado de múltiples productos
+router.patch('/estado-masivo', validarCambiarEstadoMasivo, cambiarEstadoMasivo);
 
 // DELETE /api/v1/productos
 router.delete('/', validarEliminarProducto, deleteProducto);

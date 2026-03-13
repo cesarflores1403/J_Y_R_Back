@@ -2,6 +2,7 @@ import * as productoModel from '../models/productoModel.js';
 import pool from '../config/db-connection.js';
 import fs from 'fs';
 import path from 'path';
+import bitacoraFacturacionService from './bitacoraFacturacionService.js';
 
 // =====================================================
 // SERVICE: Producto
@@ -174,6 +175,84 @@ export const cambiarEstado = async (cod_producto, estado) => {
     cod_producto,
     datos: { estado_producto: estado }
   });
+};
+
+// =======================
+// CAMBIAR ESTADO MASIVO PRODUCTOS
+// =======================
+export const cambiarEstadoMasivo = async ({ cod_productos, estado, cod_usuario = null, nombre_usuario = null, ip = null }) => {
+  const estadosValidos = ['Activo', 'Inactivo', 'Descontinuado'];
+  if (!estadosValidos.includes(estado)) {
+    const error = new Error(`Estado inválido. Valores permitidos: ${estadosValidos.join(', ')}`);
+    error.status = 400;
+    throw error;
+  }
+
+  const exitos = [];
+  const fallos = [];
+
+  for (const cod of cod_productos) {
+    try {
+      const id = Number(cod);
+      const existe = await pool.query(
+        'SELECT cod_producto, nombre_producto, estado_producto FROM producto WHERE cod_producto = $1',
+        [id]
+      );
+
+      if (existe.rows.length === 0) {
+        fallos.push({ cod_producto: id, motivo: 'Producto no encontrado' });
+        continue;
+      }
+
+      const actual = existe.rows[0];
+
+      await productoModel.updateProducto({
+        cod_producto: id,
+        datos: { estado_producto: estado }
+      });
+
+      exitos.push({
+        cod_producto: id,
+        nombre_producto: actual.nombre_producto,
+        estado_anterior: actual.estado_producto,
+        estado_nuevo: estado
+      });
+    } catch (err) {
+      fallos.push({ cod_producto: Number(cod), motivo: err.message || 'Error al actualizar estado' });
+    }
+  }
+
+  // Registrar en bitácora (sin bloquear la operación principal)
+  try {
+    await bitacoraFacturacionService.registrar({
+      evento: 'PRODUCTO_ESTADO_MASIVO',
+      entidad: 'PRODUCTO',
+      cod_usuario,
+      nombre_usuario,
+      ip,
+      detalle: {
+        estado_objetivo: estado,
+        total_solicitados: cod_productos.length,
+        exitos: exitos.length,
+        fallos: fallos.length,
+        codigos_exitos: exitos.map(x => x.cod_producto),
+        codigos_fallos: fallos.map(f => ({ cod_producto: f.cod_producto, motivo: f.motivo }))
+      }
+    });
+  } catch (logErr) {
+    console.error('⚠️ Error al registrar bitácora (estado masivo producto):', logErr.message);
+  }
+
+  return {
+    resumen: {
+      solicitados: cod_productos.length,
+      exitos: exitos.length,
+      fallos: fallos.length,
+      estado_objetivo: estado
+    },
+    exitos,
+    fallos
+  };
 };
 
 // =======================

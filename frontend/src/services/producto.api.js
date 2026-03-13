@@ -40,6 +40,16 @@ export const productoApi = {
     }),
 
   // =====================================================
+  // PATCH - Cambiar estado masivo
+  // payload esperado: { cod_productos: number[], estado }
+  // =====================================================
+  cambiarEstadoMasivo: (payload) =>
+    apiFetch('/api/producto/estado-masivo', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  // =====================================================
   // DELETE compatible con BE actual (body)
   // payload esperado: { cod_producto }
   // =====================================================

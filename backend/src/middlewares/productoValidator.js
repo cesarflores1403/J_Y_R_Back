@@ -135,6 +135,32 @@ export const validarCambiarEstado = [
 ];
 
 // =======================
+// CAMBIAR ESTADO MASIVO
+// =======================
+export const validarCambiarEstadoMasivo = [
+  body('cod_productos')
+    .isArray({ min: 1 }).withMessage('cod_productos debe ser un arreglo con al menos 1 producto.')
+    .custom((arr) => {
+      if (!Array.isArray(arr)) return false;
+      const ids = arr.map(Number);
+      if (ids.some(id => !Number.isInteger(id) || id < 1)) {
+        throw new Error('Todos los cod_productos deben ser enteros positivos.');
+      }
+      const unicos = new Set(ids);
+      if (unicos.size !== ids.length) {
+        throw new Error('No se permiten cod_productos repetidos.');
+      }
+      return true;
+    }),
+
+  body('estado')
+    .notEmpty().withMessage('estado es obligatorio.')
+    .isIn(['Activo', 'Inactivo', 'Descontinuado']).withMessage('Estado inválido. Valores permitidos: Activo, Inactivo, Descontinuado.'),
+
+  validarCampos,
+];
+
+// =======================
 // ELIMINAR PRODUCTO
 // =======================
 export const validarEliminarProducto = [

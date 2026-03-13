@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clienteService } from '../../services/serviceIndex.js';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX } from 'react-icons/fi';
 
 const camposIniciales = { nombre: '', apellido: '', dni: '', empresa: '', telefono: '', correo: '', direccion: '' };
 
 const Clientes = () => {
+  const confirm = useConfirm();
   const [clientes, setClientes] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [buscar, setBuscar] = useState('');
@@ -85,7 +87,13 @@ const Clientes = () => {
   };
 
   const eliminar = async (id) => {
-    if (!window.confirm('¿Eliminar este cliente?')) return;
+    const ok = await confirm({
+      title: 'Eliminar cliente',
+      message: '¿Está seguro de eliminar este cliente?',
+      confirmText: 'Eliminar',
+      tone: 'danger'
+    });
+    if (!ok) return;
     try {
       await clienteService.eliminar(id);
       toast.success('Cliente eliminado');

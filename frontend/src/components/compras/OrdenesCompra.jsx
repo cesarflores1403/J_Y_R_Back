@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { comprasService, proveedorService, facturaService } from '../../services/serviceIndex.js';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import {
   FiPlus, FiSearch, FiX, FiEye, FiShoppingCart,
@@ -423,6 +424,7 @@ const ModalNuevaOrden = ({ onClose, onGuardar }) => {
 
 // ─── Componente Principal ───────────────────────────────────
 const OrdenesCompra = () => {
+  const confirm = useConfirm();
   const [ordenes, setOrdenes] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [buscar, setBuscar] = useState('');
@@ -479,7 +481,13 @@ const OrdenesCompra = () => {
   };
 
   const cancelarOrden = async (id) => {
-    if (!window.confirm('¿Estás seguro de que deseas cancelar esta orden? Esta acción no se puede deshacer.')) return;
+    const ok = await confirm({
+      title: 'Cancelar orden',
+      message: '¿Está seguro de cancelar esta orden? Esta acción no se puede deshacer.',
+      confirmText: 'Cancelar',
+      tone: 'danger'
+    });
+    if (!ok) return;
     try {
       await comprasService.cambiarEstado(id, { cod_estado_oc: 5, observaciones: 'Orden cancelada' });
       toast.success('Orden cancelada');
@@ -490,7 +498,13 @@ const OrdenesCompra = () => {
   };
 
   const eliminarOrden = async (id) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar esta orden? Esta acción es permanente y no se puede deshacer.')) return;
+    const ok = await confirm({
+      title: 'Eliminar orden',
+      message: '¿Está seguro de eliminar esta orden? Esta acción es permanente y no se puede deshacer.',
+      confirmText: 'Eliminar',
+      tone: 'danger'
+    });
+    if (!ok) return;
     try {
       await comprasService.eliminar(id);
       toast.success('Orden eliminada');

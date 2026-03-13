@@ -75,7 +75,9 @@ const ImportarProductos = ({ onImportSuccess }) => {
   return (
     <div className="jyr-card">
       <div className="jyr-card-header">
-        <h3>📥 Importar Productos</h3>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <FiUpload size={16} /> Importar Productos
+        </h3>
       </div>
 
       <div className="jyr-card-body">

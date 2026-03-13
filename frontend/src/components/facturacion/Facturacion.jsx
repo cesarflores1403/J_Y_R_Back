@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { facturaService, pagoService } from '../../services/serviceIndex.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import {
   FiPlus, FiSearch, FiX, FiTrash2, FiFileText,
@@ -17,6 +18,7 @@ const formatMoney = (v) => {
 
 const Facturacion = () => {
   const { usuario } = useAuth();
+  const confirm = useConfirm();
 
   // ========== LISTA FACTURAS ==========
   const [facturas, setFacturas] = useState([]);
@@ -312,7 +314,13 @@ const Facturacion = () => {
 
   // ========== ANULAR FACTURA ==========
   const anularFactura = async (id) => {
-    if (!window.confirm('¿Está seguro de anular esta factura? Se restaurará el inventario.')) return;
+    const ok = await confirm({
+      title: 'Anular factura',
+      message: '¿Está seguro de anular esta factura? Se restaurará el inventario.',
+      confirmText: 'Anular',
+      tone: 'danger'
+    });
+    if (!ok) return;
     try {
       const { data } = await facturaService.anular(id);
       if (data.ok) {
@@ -372,7 +380,13 @@ const Facturacion = () => {
   };
 
   const anularPago = async (codPago) => {
-    if (!window.confirm('¿Está seguro de anular este pago?')) return;
+    const ok = await confirm({
+      title: 'Anular pago',
+      message: '¿Está seguro de anular este pago?',
+      confirmText: 'Anular',
+      tone: 'danger'
+    });
+    if (!ok) return;
     try {
       const { data } = await pagoService.anular(codPago);
       if (data.ok) {

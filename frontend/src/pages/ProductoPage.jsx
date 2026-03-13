@@ -23,12 +23,14 @@ const ProductoPage = () => {
     actualizar,
     eliminar,
     cambiarEstado,
+    cambiarEstadoMasivo,
     subirImagen,
     eliminarImagenProducto,
   } = useProducto();
 
   const [selected, setSelected] = useState(null);
   const [fichaProducto, setFichaProducto] = useState(null); // // HU-09: producto para ficha
+  const [duplicateSource, setDuplicateSource] = useState(null); // // HU-14: producto base a duplicar
   const [vista, setVista] = useState('listado'); // // listado | formulario
 
   // HU-09: Mapa de categorías para la ficha
@@ -40,10 +42,19 @@ const ProductoPage = () => {
 
   const handleEdit = (p) => {
     setSelected(p);
+    setDuplicateSource(null);
     setVista('formulario');
   };
+
+  const handleDuplicate = (p) => {
+    setSelected(null);
+    setDuplicateSource(p);
+    setVista('formulario');
+  };
+
   const handleCancelEdit = () => {
     setSelected(null);
+    setDuplicateSource(null);
     setVista('listado');
   };
 
@@ -51,9 +62,11 @@ const ProductoPage = () => {
     if (selected) {
       await actualizar(payload);
       setSelected(null);
+      setDuplicateSource(null);
       setVista('listado');
     } else {
       const productoCreado = await crear(payload); // // HU-08: retorna producto creado para subir imagen
+      setDuplicateSource(null);
       setVista('listado');
       return productoCreado;
     }
@@ -88,7 +101,7 @@ const ProductoPage = () => {
               <button
                 type="button"
                 className="btn jyr-btn-primary"
-                onClick={() => { setSelected(null); setVista('formulario'); }}
+                onClick={() => { setSelected(null); setDuplicateSource(null); setVista('formulario'); }}
               >
                 <FiPlusCircle className="me-1" /> Nuevo Producto
               </button>
@@ -108,8 +121,10 @@ const ProductoPage = () => {
               onEdit={handleEdit}
               onDelete={eliminar}
               onCambiarEstado={cambiarEstado}
+              onCambiarEstadoMasivo={cambiarEstadoMasivo}
               onSubirImagen={subirImagen}
               onEliminarImagen={eliminarImagenProducto}
+              onDuplicate={handleDuplicate}
               onVerFicha={(p) => setFichaProducto(p)}
             />
           )}
@@ -126,13 +141,14 @@ const ProductoPage = () => {
 
           <h3 className="mb-4">
             <FiPlusCircle className="me-2 text-info" />
-            {selected ? 'Editar Producto' : 'Nuevo Producto'}
+            {selected ? 'Editar Producto' : duplicateSource ? 'Duplicar Producto' : 'Nuevo Producto'}
           </h3>
 
           <ProductoForm
             saving={saving}
             onSubmit={handleSubmit}
             selected={selected}
+            duplicateFrom={duplicateSource}
             onCancelEdit={handleCancelEdit}
             onSubirImagen={subirImagen}
           />

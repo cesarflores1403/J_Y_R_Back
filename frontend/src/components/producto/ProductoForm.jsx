@@ -2,9 +2,9 @@ import { useEffect, useState, useRef } from 'react'; // // Hooks
 import { useIsv } from '../../hooks/useIsv.js'; // // Hook catálogo ISV
 import { useCategorias } from '../../hooks/useCategorias.js'; // // Hook catálogo Categorías (HU-07)
 import { useUbicaciones } from '../../hooks/useUbicaciones.js'; // // HU-10: Hook ubicaciones
-import { FiCamera, FiX } from 'react-icons/fi';
+import { FiCamera, FiX, FiEdit2, FiPlusCircle } from 'react-icons/fi';
 
-const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit, onSubirImagen }) => {
+const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit, onSubirImagen }) => {
   const { catalogoIsv, loadingIsv } = useIsv(); // // Catálogo ISV desde BD
   const { categorias, loadingCategorias } = useCategorias(); // // Categorías dinámicas (HU-07)
   const { ubicaciones, loadingUbicaciones } = useUbicaciones(); // // HU-10: Ubicaciones
@@ -28,35 +28,64 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit, onSubirImagen 
   const [imagenPreview, setImagenPreview] = useState(null); // // Preview URL
   const fileInputRef = useRef(null);
 
-  // // Si seleccionan un producto, precarga el form
+  // // Precarga para edición o duplicado
   useEffect(() => {
-    if (!isEdit) {
+    if (isEdit) {
+      setForm({
+        cod_categoria: selected.cod_categoria ?? '',
+        nombre_producto: selected.nombre_producto ?? '',
+        unidad_medida: selected.unidad_medida ?? 'UND',
+        precio_venta: selected.precio_venta ?? '',
+        cod_isv: selected.cod_isv ?? '',
+        estado_producto: typeof selected.estado_producto === 'boolean'
+          ? (selected.estado_producto ? 'Activo' : 'Inactivo')
+          : (selected.estado_producto || 'Activo'),
+        cod_ubicacion: selected.cod_ubicacion ?? '',
+      });
+
+      // HU-08: Mostrar imagen actual si existe
+      if (selected.imagen_url) {
+        const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+        setImagenPreview(`${API_URL}${selected.imagen_url}`);
+      } else {
+        setImagenPreview(null);
+      }
+      setImagenFile(null);
+      return;
+    }
+
+    if (duplicateFrom) {
+      setForm({
+        cod_categoria: duplicateFrom.cod_categoria ?? '',
+        nombre_producto: `(Copia) ${duplicateFrom.nombre_producto ?? ''}`,
+        unidad_medida: duplicateFrom.unidad_medida ?? 'UND',
+        precio_venta: duplicateFrom.precio_venta ?? '',
+        cod_isv: duplicateFrom.cod_isv ?? '',
+        estado_producto: typeof duplicateFrom.estado_producto === 'boolean'
+          ? (duplicateFrom.estado_producto ? 'Activo' : 'Inactivo')
+          : (duplicateFrom.estado_producto || 'Activo'),
+        cod_ubicacion: duplicateFrom.cod_ubicacion ?? '',
+      });
+
+      // HU-14: no copiar imagen en duplicado
       setImagenFile(null);
       setImagenPreview(null);
       return;
     }
 
     setForm({
-      cod_categoria: selected.cod_categoria ?? '',
-      nombre_producto: selected.nombre_producto ?? '',
-      unidad_medida: selected.unidad_medida ?? 'UND',
-      precio_venta: selected.precio_venta ?? '',
-      cod_isv: selected.cod_isv ?? '',
-      estado_producto: typeof selected.estado_producto === 'boolean'
-        ? (selected.estado_producto ? 'Activo' : 'Inactivo')
-        : (selected.estado_producto || 'Activo'),
-      cod_ubicacion: selected.cod_ubicacion ?? '',
+      cod_categoria: '',
+      nombre_producto: '',
+      unidad_medida: 'UND',
+      precio_venta: '',
+      cod_isv: '',
+      estado_producto: 'Activo',
+      cod_ubicacion: '',
     });
 
-    // HU-08: Mostrar imagen actual si existe
-    if (selected.imagen_url) {
-      const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
-      setImagenPreview(`${API_URL}${selected.imagen_url}`);
-    } else {
-      setImagenPreview(null);
-    }
     setImagenFile(null);
-  }, [isEdit, selected]);
+    setImagenPreview(null);
+  }, [isEdit, selected, duplicateFrom]);
 
   // HU-08: Limpiar URL de preview al desmontar
   useEffect(() => {
@@ -282,7 +311,10 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit, onSubirImagen 
   return (
     <div className="jyr-card">
       <div className="jyr-card-header">
-        <h3>{isEdit ? '✏️ Editar producto' : '➕ Crear producto'}</h3>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isEdit ? <FiEdit2 size={16} /> : <FiPlusCircle size={16} />}
+          {isEdit ? 'Editar producto' : 'Crear producto'}
+        </h3>
       </div>
 
       <div className="jyr-card-body">
@@ -418,9 +450,9 @@ const ProductoForm = ({ onSubmit, saving, selected, onCancelEdit, onSubirImagen 
                     : 'var(--jyr-danger, #dc2626)'
                 }}
               >
-                <option value="Activo">✅ Activo</option>
-                <option value="Inactivo">🚫 Inactivo</option>
-                <option value="Descontinuado">⚠️ Descontinuado</option>
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+                <option value="Descontinuado">Descontinuado</option>
               </select>
             </div>
           </div>

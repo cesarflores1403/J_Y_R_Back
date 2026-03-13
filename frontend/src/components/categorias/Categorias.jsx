@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { categoriaService } from '../../services/serviceIndex.js';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight, FiTrash2, FiTag } from 'react-icons/fi';
 
 const camposIniciales = { nombre_categoria: '', descripcion: '' };
 
 const Categorias = () => {
+  const confirm = useConfirm();
   const [categorias, setCategorias] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [buscar, setBuscar] = useState('');
@@ -75,7 +77,12 @@ const Categorias = () => {
   };
 
   const handleEliminar = async (cat) => {
-    const ok = window.confirm(`¿Eliminar la categoría "${cat.nombre_categoria}"?\nSi tiene productos asociados, no se podrá eliminar.`);
+    const ok = await confirm({
+      title: 'Eliminar categoría',
+      message: `¿Está seguro de eliminar la categoría "${cat.nombre_categoria}"? Si tiene productos asociados, no se podrá eliminar.`,
+      confirmText: 'Eliminar',
+      tone: 'danger'
+    });
     if (!ok) return;
     try {
       await categoriaService.eliminar(cat.cod_categoria);

@@ -3,6 +3,7 @@ import { facturaService } from '../../services/serviceIndex.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { FiSearch, FiPackage, FiAlertTriangle, FiX, FiPlus } from 'react-icons/fi';
 import { toast } from 'react-toastify';
+import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 
 const formatMoney = (v) => {
   const n = parseFloat(v) || 0;
@@ -24,7 +25,7 @@ const BuscadorProducto = ({ onAgregar, itemsActuales = [] }) => {
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
   const { usuario } = useAuth();
-
+  const confirm = useConfirm();
   const esAdmin = usuario?.rol === 'Administrador';
 
   // Cerrar dropdown al hacer click fuera
@@ -65,7 +66,7 @@ const BuscadorProducto = ({ onAgregar, itemsActuales = [] }) => {
     return () => clearTimeout(timer);
   }, [query, buscar]);
 
-  const handleSeleccionar = (producto) => {
+  const handleSeleccionar = async (producto) => {
     // Verificar si ya está en la factura
     const yaExiste = itemsActuales.some(i => i.cod_producto === producto.cod_producto);
     if (yaExiste) {
@@ -87,9 +88,12 @@ const BuscadorProducto = ({ onAgregar, itemsActuales = [] }) => {
 
     // Si stock = 0 pero es admin, pedir confirmación
     if (producto.stock <= 0 && esAdmin) {
-      if (!window.confirm(`"${producto.nombre_producto}" tiene stock 0. ¿Agregar de todas formas? (Permiso de Administrador)`)) {
-        return;
-      }
+      const ok = await confirm({
+        title: 'Producto sin stock',
+        message: `"${producto.nombre_producto}" tiene stock 0. ¿Desea agregarlo de todas formas? (Permiso de Administrador)`,
+        confirmText: 'Agregar'
+      });
+      if (!ok) return;
     }
 
     onAgregar({
