@@ -35,6 +35,35 @@ const formatearNumero = (valor) => {
   return Number(valor);
 };
 
+// // Unifica el codigo de producto mostrado en la UI (igual criterio que en modulo Productos)
+const formatearCodigoProducto = (fila) => {
+  if (fila?.codigo_producto && String(fila.codigo_producto).trim().length > 0) {
+    return String(fila.codigo_producto).trim();
+  }
+  const cod = Number(fila?.cod_producto);
+  if (Number.isNaN(cod) || cod <= 0) return '-';
+  return `PROD-${String(cod).padStart(4, '0')}`;
+};
+
+// // Crea una llave estable para filas con o sin cod_inventario
+const obtenerFilaKey = (fila) => {
+  if (fila?.cod_inventario) return `inv-${fila.cod_inventario}`;
+  const codProducto = fila?.cod_producto ?? 'na';
+  const codUbicacion = fila?.cod_ubicacion ?? 'na';
+  return `prod-${codProducto}-ubi-${codUbicacion}`;
+};
+
+// // Convierte cualquier valor a numero seguro para operaciones aritmeticas
+const aNumero = (valor) => {
+  const parsed = Number(valor);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
+// // Calcula disponible directamente desde stock y reservado para mantener coherencia visual
+const calcularDisponible = (fila) => (
+  aNumero(fila?.stock) - aNumero(fila?.stock_reservado)
+);
+
 const ExistenciasTabla = ({ filas, loading, onEditar }) => {
   return (
     <div className="jyr-card">
@@ -72,18 +101,18 @@ const ExistenciasTabla = ({ filas, loading, onEditar }) => {
                 </tr>
               ) : (
                 filas.map((fila) => (
-                  <tr key={fila.cod_inventario}>
+                  <tr key={obtenerFilaKey(fila)}>
                     <td>
                       <strong>{fila.nombre_producto}</strong>
-                      <div className="text-muted small">ID: {fila.cod_producto}</div>
+                      <div className="text-muted small">Codigo: {formatearCodigoProducto(fila)}</div>
                     </td>
                     <td>
                       {fila.ubicacion}
-                      <div className="text-muted small">ID: {fila.cod_ubicacion}</div>
+                      <div className="text-muted small">ID: {fila.cod_ubicacion ?? '-'}</div>
                     </td>
                     <td>{formatearNumero(fila.stock)}</td>
                     <td>{formatearNumero(fila.stock_reservado)}</td>
-                    <td>{formatearNumero(fila.stock_disponible)}</td>
+                    <td>{formatearNumero(calcularDisponible(fila))}</td>
                     <td>
                       <span className={`badge rounded-pill ${obtenerClaseEstado(fila.estado_stock)}`}>
                         {fila.estado_stock || 'N/A'}
@@ -98,7 +127,8 @@ const ExistenciasTabla = ({ filas, loading, onEditar }) => {
                         type="button"
                         className="btn btn-sm btn-outline-primary"
                         onClick={() => onEditar(fila)}
-                        title="Editar minimo y maximo"
+                        disabled={!fila.cod_inventario}
+                        title={fila.cod_inventario ? 'Editar minimo y maximo' : 'Sin registro de inventario para editar'}
                       >
                         <FiEdit2 />
                       </button>

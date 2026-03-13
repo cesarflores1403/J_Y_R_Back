@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FiAlertTriangle, FiDatabase } from 'react-icons/fi';
+import { FiAlertTriangle, FiChevronLeft, FiChevronRight, FiDatabase } from 'react-icons/fi';
 import ExistenciasFiltros from './ExistenciasFiltros.jsx';
 import ExistenciasTabla from './ExistenciasTabla.jsx';
 import ExistenciasFormMinMax from './ExistenciasFormMinMax.jsx';
-import AlertasReposicionFiltros from './AlertasReposicionFiltros.jsx';
-import AlertasReposicionTabla from './AlertasReposicionTabla.jsx';
 import { inventarioExistenciasApi } from './inventarioExistencias.api.js';
 
 // // Estado inicial de filtros del listado
@@ -13,18 +11,6 @@ const filtrosIniciales = {
   producto: '',
   cod_ubicacion: '',
   ubicacion: '',
-  pagina: 1,
-  limite: 15,
-  includeInactive: false
-};
-
-// // Estado inicial de filtros para alertas de reposicion (HU stock bajo)
-const filtrosAlertasIniciales = {
-  cod_producto: '',
-  producto: '',
-  cod_ubicacion: '',
-  ubicacion: '',
-  solo_criticos: false,
   pagina: 1,
   limite: 10,
   includeInactive: false
@@ -37,13 +23,6 @@ const obtenerMensajeError = (error, accion) => {
   // // Mensaje del backend en formato actual del proyecto
   const serverMessage = error?.response?.data?.message
     || error?.response?.data?.mensaje;
-  // // Version normalizada para detectar mensajes tecnicos que no deben mostrarse en UI
-  const serverMessageLower = String(serverMessage || '').toLowerCase();
-
-  // // Ocultamos error tecnico de columna faltante mientras se aplica el cambio de BD manual
-  if (serverMessageLower.includes('stock_reservado') && serverMessageLower.includes('does not exist')) {
-    return '';
-  }
 
   // // Error 400 de validaciones de entrada
   if (status === 400) {
@@ -65,7 +44,7 @@ const obtenerMensajeError = (error, accion) => {
 };
 
 // // Normaliza el payload del backend soportando contrato nuevo (data+meta) y legacy
-const normalizarRespuestaExistencias = (payload, fallbackLimite = 15) => {
+const normalizarRespuestaExistencias = (payload, fallbackLimite = 10) => {
   // // Si el backend ya devuelve data/meta (contrato nuevo)
   if (Array.isArray(payload?.data) && payload?.meta) {
     return {
@@ -109,6 +88,29 @@ const limpiarParamsConsulta = (params = {}) => {
   return limpio;
 };
 
+// // Normaliza el limite para que opere en bloques de 10 (10, 20, ... 100)
+const normalizarLimite = (valor, fallback = 10) => {
+  const parsed = Number.parseInt(valor, 10);
+  if (Number.isNaN(parsed)) return fallback;
+  const acotado = Math.min(100, Math.max(10, parsed));
+  return Math.ceil(acotado / 10) * 10;
+};
+
+// // Permite usar codigo visual (PROD-0023) o id numerico (23) en el filtro de producto
+const normalizarCodProducto = (valor) => {
+  if (valor === undefined || valor === null) return '';
+  const texto = String(valor).trim().toUpperCase();
+  if (!texto) return '';
+
+  // // Extraemos el bloque numerico final para soportar formatos PROD-0001 / 0001 / 1
+  const match = texto.match(/(\d+)$/);
+  if (!match) return '';
+
+  const numero = Number.parseInt(match[1], 10);
+  if (Number.isNaN(numero) || numero < 1) return '';
+  return String(numero);
+};
+
 const Existencias = () => {
   // // Lista de existencias de inventario
   const [existencias, setExistencias] = useState([]);
@@ -128,7 +130,7 @@ const Existencias = () => {
   const [meta, setMeta] = useState({
     total: 0,
     pagina: 1,
-    limite: 15,
+    limite: 10,
     totalPaginas: 1
   });
   // // Estado de modal de edicion min/max
@@ -137,23 +139,16 @@ const Existencias = () => {
   const [seleccionado, setSeleccionado] = useState(null);
   // // Error especifico del modal/form de min/max
   const [errorForm, setErrorForm] = useState('');
-  // // Lista de alertas de reposicion para stock bajo
-  const [alertas, setAlertas] = useState([]);
-  // // Estado de carga de alertas de reposicion
-  const [loadingAlertas, setLoadingAlertas] = useState(true);
-  // // Error especifico del bloque de alertas
-  const [errorAlertas, setErrorAlertas] = useState('');
-  // // Filtros editables para alertas
-  const [filtrosAlertas, setFiltrosAlertas] = useState(filtrosAlertasIniciales);
-  // // Query efectiva usada para consultar alertas
-  const [consultaAlertas, setConsultaAlertas] = useState(filtrosAlertasIniciales);
-  // // Metadata de paginacion de alertas
-  const [metaAlertas, setMetaAlertas] = useState({
-    total: 0,
-    pagina: 1,
-    limite: 10,
-    totalPaginas: 1
+  // // Resumen compacto de alertas de reposicion
+  const [resumenAlertas, setResumenAlertas] = useState({
+    criticas: 0,
+    sinExistencia: 0,
+    bajoMinimo: 0
   });
+  // // Estado de carga del panel resumen de alertas
+  const [loadingResumenAlertas, setLoadingResumenAlertas] = useState(true);
+  // // Error del panel resumen de alertas
+  const [errorResumenAlertas, setErrorResumenAlertas] = useState('');
 
   // // Carga de existencias con filtros y paginacion actual
   const cargarExistencias = useCallback(async () => {
@@ -166,7 +161,7 @@ const Existencias = () => {
       const paramsConsulta = limpiarParamsConsulta({
         ...consulta,
         page: Number(consulta.pagina || 1),
-        limit: Number(consulta.limite || 15),
+        limit: normalizarLimite(consulta.limite, 10),
       });
 
       // // Request al backend usando servicio del modulo
@@ -175,7 +170,7 @@ const Existencias = () => {
       // // Validamos contrato esperado con helper de respuesta
       if (data?.ok) {
         // // Unificamos contrato nuevo/legacy para mantener la vista incremental
-        const normalizado = normalizarRespuestaExistencias(data.data, Number(paramsConsulta.limit || 15));
+        const normalizado = normalizarRespuestaExistencias(data.data, Number(paramsConsulta.limit || 10));
         // // Cargamos filas recibidas desde backend
         setExistencias(normalizado.filas);
         // // Cargamos metadata de paginacion para UI
@@ -202,49 +197,81 @@ const Existencias = () => {
     cargarExistencias();
   }, [cargarExistencias]);
 
-  // // Carga alertas de reposicion usando regla stock_disponible <= stock_minimo
-  const cargarAlertasReposicion = useCallback(async () => {
+  // // Carga resumen compacto de alertas reutilizando endpoint existente
+  const cargarResumenAlertas = useCallback(async () => {
     try {
-      // // Activamos loading de alertas y limpiamos errores previos
-      setLoadingAlertas(true);
-      setErrorAlertas('');
+      // // Activamos loading del panel y limpiamos errores previos
+      setLoadingResumenAlertas(true);
+      setErrorResumenAlertas('');
 
-      // // Enviamos aliases nuevos y legacy para mantener coherencia del modulo
-      const paramsConsulta = limpiarParamsConsulta({
-        ...consultaAlertas,
-        page: Number(consultaAlertas.pagina || 1),
-        limit: Number(consultaAlertas.limite || 10)
+      // // Reutilizamos filtros principales (sin paginacion) para alinear contexto de la vista
+      const filtrosBase = limpiarParamsConsulta({
+        cod_producto: consulta.cod_producto,
+        producto: consulta.producto,
+        cod_ubicacion: consulta.cod_ubicacion,
+        ubicacion: consulta.ubicacion,
+        includeInactive: consulta.includeInactive
       });
 
-      // // Request al endpoint de alertas de reposicion de inventario
-      const { data } = await inventarioExistenciasApi.listarAlertasStockBajo(paramsConsulta);
+      // // Consulta 1: total de alertas de reposicion (disponible <= minimo)
+      // // Consulta 2: total sin existencia (solo criticos)
+      const [respuestaAlertas, respuestaSinExistencia] = await Promise.all([
+        inventarioExistenciasApi.listarAlertasStockBajo({
+          ...filtrosBase,
+          page: 1,
+          limit: 1
+        }),
+        inventarioExistenciasApi.listarAlertasStockBajo({
+          ...filtrosBase,
+          page: 1,
+          limit: 1,
+          solo_criticos: true
+        })
+      ]);
 
-      if (data?.ok) {
-        // // Unificamos contrato nuevo/legacy para no duplicar logica de normalizacion
-        const normalizado = normalizarRespuestaExistencias(data.data, Number(paramsConsulta.limit || 10));
-        setAlertas(normalizado.filas);
-        setMetaAlertas(normalizado.meta);
-      } else {
-        // // Manejo de respuesta invalida manteniendo contrato visual estable
-        setAlertas([]);
-        setMetaAlertas({ total: 0, pagina: 1, limite: consultaAlertas.limite, totalPaginas: 1 });
-        setErrorAlertas('Respuesta invalida del servidor al listar alertas de reposicion');
+      const payloadAlertas = respuestaAlertas?.data;
+      const payloadSinExistencia = respuestaSinExistencia?.data;
+
+      if (!payloadAlertas?.ok || !payloadSinExistencia?.ok) {
+        throw new Error('Respuesta invalida al consultar resumen de alertas');
       }
+
+      // // Tomamos totales globales desde meta del endpoint sin requerir tabla detallada
+      const metaAlertas = normalizarRespuestaExistencias(payloadAlertas.data, 1).meta;
+      const metaSinExistencia = normalizarRespuestaExistencias(payloadSinExistencia.data, 1).meta;
+
+      const totalAlertasCriticas = Number(metaAlertas.total || 0);
+      const totalSinExistencia = Number(metaSinExistencia.total || 0);
+
+      setResumenAlertas({
+        criticas: totalAlertasCriticas,
+        sinExistencia: totalSinExistencia,
+        bajoMinimo: Math.max(0, totalAlertasCriticas - totalSinExistencia)
+      });
     } catch (err) {
-      // // Error HTTP/validacion durante la consulta de alertas
-      setAlertas([]);
-      setMetaAlertas({ total: 0, pagina: 1, limite: consultaAlertas.limite, totalPaginas: 1 });
-      setErrorAlertas(obtenerMensajeError(err, 'consultar alertas de reposicion'));
+      // // Error de consulta para panel resumen
+      setResumenAlertas({
+        criticas: 0,
+        sinExistencia: 0,
+        bajoMinimo: 0
+      });
+      setErrorResumenAlertas(obtenerMensajeError(err, 'consultar resumen de alertas'));
     } finally {
-      // // Finalizamos loading de alertas
-      setLoadingAlertas(false);
+      // // Finalizamos loading del panel resumen
+      setLoadingResumenAlertas(false);
     }
-  }, [consultaAlertas]);
+  }, [
+    consulta.cod_producto,
+    consulta.producto,
+    consulta.cod_ubicacion,
+    consulta.ubicacion,
+    consulta.includeInactive
+  ]);
 
   useEffect(() => {
-    // // Carga inicial y recarga de alertas al cambiar filtros/paginacion de alertas
-    cargarAlertasReposicion();
-  }, [cargarAlertasReposicion]);
+    // // Recarga resumen de alertas cuando cambia el contexto de filtros principales
+    cargarResumenAlertas();
+  }, [cargarResumenAlertas]);
 
   // // Actualiza un campo de filtro localmente sin disparar request inmediato
   const manejarCambioFiltro = (campo, valor) => {
@@ -262,9 +289,11 @@ const Existencias = () => {
     // // Actualizamos query efectiva para que useEffect recargue datos
     setConsulta({
       ...filtros,
+      // // Normalizamos codigo de producto para que backend reciba siempre cod_producto numerico
+      cod_producto: normalizarCodProducto(filtros.cod_producto),
       // // Mantenemos claves legacy de la vista y dejamos que cargarExistencias envie aliases nuevos
       pagina: Number(filtros.pagina || 1),
-      limite: Number(filtros.limite || 15)
+      limite: normalizarLimite(filtros.limite, 10)
     });
   };
 
@@ -289,50 +318,6 @@ const Existencias = () => {
     }));
     // // Reflejamos pagina en formulario de filtros para consistencia visual
     setFiltros((prev) => ({
-      ...prev,
-      pagina: nuevaPagina
-    }));
-  };
-
-  // // Actualiza un campo de filtro de alertas sin disparar request inmediata
-  const manejarCambioFiltroAlertas = (campo, valor) => {
-    setFiltrosAlertas((prev) => ({
-      ...prev,
-      [campo]: valor
-    }));
-  };
-
-  // // Aplica filtros de alertas y reinicia pagina en 1
-  const aplicarFiltrosAlertas = () => {
-    setErrorAlertas('');
-    setConsultaAlertas({
-      ...filtrosAlertas,
-      pagina: 1,
-      limite: Number(filtrosAlertas.limite || 10)
-    });
-    setFiltrosAlertas((prev) => ({
-      ...prev,
-      pagina: 1
-    }));
-  };
-
-  // // Limpia filtros de alertas y recarga consulta base
-  const limpiarFiltrosAlertas = () => {
-    setErrorAlertas('');
-    setFiltrosAlertas(filtrosAlertasIniciales);
-    setConsultaAlertas(filtrosAlertasIniciales);
-  };
-
-  // // Navega paginacion del bloque de alertas respetando limites actuales
-  const cambiarPaginaAlertas = (nuevaPagina) => {
-    if (nuevaPagina < 1) return;
-    if (nuevaPagina > metaAlertas.totalPaginas) return;
-
-    setConsultaAlertas((prev) => ({
-      ...prev,
-      pagina: nuevaPagina
-    }));
-    setFiltrosAlertas((prev) => ({
       ...prev,
       pagina: nuevaPagina
     }));
@@ -385,6 +370,41 @@ const Existencias = () => {
     }
   };
 
+  // // Rango mostrado en paginacion para UX compacta tipo "Mostrando X-Y de N"
+  const inicioMostrado = meta.total > 0
+    ? ((meta.pagina - 1) * meta.limite) + 1
+    : 0;
+  const finMostrado = meta.total > 0
+    ? Math.min(meta.pagina * meta.limite, meta.total)
+    : 0;
+
+  // // Construye paginas visibles con elipsis para navegacion compacta
+  const construirPaginasVisibles = (paginaActual, totalPaginas, maxVisibles = 5) => {
+    if (totalPaginas <= 1) return [1];
+    if (totalPaginas <= maxVisibles) {
+      return Array.from({ length: totalPaginas }, (_, idx) => idx + 1);
+    }
+
+    let inicio = Math.max(1, paginaActual - 2);
+    let fin = Math.min(totalPaginas, inicio + maxVisibles - 1);
+    inicio = Math.max(1, fin - maxVisibles + 1);
+
+    const paginas = [];
+    if (inicio > 1) paginas.push(1);
+    if (inicio > 2) paginas.push('...');
+
+    for (let pagina = inicio; pagina <= fin; pagina += 1) {
+      paginas.push(pagina);
+    }
+
+    if (fin < totalPaginas - 1) paginas.push('...');
+    if (fin < totalPaginas) paginas.push(totalPaginas);
+
+    return paginas;
+  };
+
+  const paginasVisibles = construirPaginasVisibles(meta.pagina, meta.totalPaginas);
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -408,6 +428,50 @@ const Existencias = () => {
         </div>
       )}
 
+      <div className="jyr-card mb-4">
+        <div className="jyr-card-body">
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <FiAlertTriangle />
+            <h5 className="mb-0">Resumen de alertas de reposicion</h5>
+          </div>
+
+          {errorResumenAlertas && (
+            <div className="alert alert-danger py-2 mb-3" role="alert">
+              {errorResumenAlertas}
+            </div>
+          )}
+
+          <div className="row g-3">
+            <div className="col-12 col-md-4">
+              <div className="border rounded p-3 h-100 bg-danger-subtle border-danger-subtle">
+                <div className="small text-danger fw-semibold">Alertas criticas</div>
+                <div className="h4 mb-0">
+                  {loadingResumenAlertas ? '...' : resumenAlertas.criticas}
+                </div>
+              </div>
+            </div>
+
+            <div className="col-12 col-md-4">
+              <div className="border rounded p-3 h-100 bg-dark text-light">
+                <div className="small text-light-emphasis fw-semibold">Productos sin existencia</div>
+                <div className="h4 mb-0">
+                  {loadingResumenAlertas ? '...' : resumenAlertas.sinExistencia}
+                </div>
+              </div>
+            </div>
+
+            <div className="col-12 col-md-4">
+              <div className="border rounded p-3 h-100 bg-warning-subtle border-warning-subtle">
+                <div className="small text-warning-emphasis fw-semibold">Productos bajo minimo</div>
+                <div className="h4 mb-0">
+                  {loadingResumenAlertas ? '...' : resumenAlertas.bajoMinimo}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <ExistenciasFiltros
         // // Props de filtro controlado
         filtros={filtros}
@@ -424,104 +488,93 @@ const Existencias = () => {
         onEditar={abrirEdicion}
       />
 
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <small className="text-muted">
-          {/* // Conteo total para contexto del usuario */}
-          Total registros: {meta.total}
-        </small>
-        <div className="btn-group">
+      <div
+        style={{
+          marginTop: 10,
+          padding: '12px 14px',
+          border: '1px solid var(--jyr-gray-200)',
+          borderRadius: 12,
+          background: 'linear-gradient(180deg, #ffffff 0%, #fafafa 100%)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 10
+        }}
+      >
+        <span style={{ fontSize: 12, color: 'var(--jyr-gray-500)' }}>
+          Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
+        </span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button
-            // // Boton pagina anterior
             type="button"
-            className="btn btn-outline-secondary btn-sm"
+            className="btn btn-sm"
             onClick={() => cambiarPagina(meta.pagina - 1)}
             disabled={loading || meta.pagina <= 1}
+            aria-label="Pagina anterior"
+            style={{
+              minWidth: 36,
+              height: 36,
+              border: '1px solid var(--jyr-gray-200)',
+              background: '#fff',
+              color: '#0f172a',
+              padding: 0
+            }}
           >
-            Anterior
+            <FiChevronLeft size={15} />
           </button>
+
+          {paginasVisibles.map((pagina, index) => (
+            <button
+              // // Elipsis se renderiza como boton deshabilitado solo visual
+              key={`${pagina}-${index}`}
+              type="button"
+              className="btn btn-sm"
+              onClick={() => (typeof pagina === 'number' ? cambiarPagina(pagina) : undefined)}
+              disabled={loading || pagina === '...'}
+              style={{
+                minWidth: 36,
+                height: 36,
+                border: '1px solid var(--jyr-gray-200)',
+                background: pagina === meta.pagina ? '#0b0f19' : '#fff',
+                color: pagina === meta.pagina ? '#fff' : '#111827',
+                fontWeight: pagina === meta.pagina ? 700 : 500,
+                padding: '0 10px'
+              }}
+            >
+              {pagina}
+            </button>
+          ))}
+
           <button
-            // // Indicador de pagina actual
             type="button"
-            className="btn btn-outline-secondary btn-sm"
-            disabled
-          >
-            Pagina {meta.pagina} de {meta.totalPaginas}
-          </button>
-          <button
-            // // Boton pagina siguiente
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
+            className="btn btn-sm"
             onClick={() => cambiarPagina(meta.pagina + 1)}
             disabled={loading || meta.pagina >= meta.totalPaginas}
+            aria-label="Pagina siguiente"
+            style={{
+              minWidth: 36,
+              height: 36,
+              border: '1px solid var(--jyr-gray-200)',
+              background: '#fff',
+              color: '#0f172a',
+              padding: 0
+            }}
           >
-            Siguiente
+            <FiChevronRight size={15} />
           </button>
-        </div>
-      </div>
 
-      <hr className="my-4" />
-
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div className="d-flex align-items-center gap-2">
-          <FiAlertTriangle />
-          <h5 className="mb-0">Alertas de reposicion</h5>
-        </div>
-      </div>
-
-      {errorAlertas && (
-        // // Feedback de error para bloque de alertas de reposicion
-        <div className="alert alert-danger" role="alert">
-          {errorAlertas}
-        </div>
-      )}
-
-      <AlertasReposicionFiltros
-        // // Props de filtros del bloque de alertas
-        filtros={filtrosAlertas}
-        loading={loadingAlertas}
-        onChange={manejarCambioFiltroAlertas}
-        onAplicar={aplicarFiltrosAlertas}
-        onLimpiar={limpiarFiltrosAlertas}
-      />
-
-      <AlertasReposicionTabla
-        // // Props del listado de alertas de stock bajo
-        filas={alertas}
-        loading={loadingAlertas}
-      />
-
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <small className="text-muted">
-          {/* // Conteo total de alertas para contexto operativo */}
-          Total alertas: {metaAlertas.total}
-        </small>
-        <div className="btn-group">
-          <button
-            // // Navega a la pagina anterior de alertas
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => cambiarPaginaAlertas(metaAlertas.pagina - 1)}
-            disabled={loadingAlertas || metaAlertas.pagina <= 1}
+          <span
+            style={{
+              marginLeft: 6,
+              fontSize: 12,
+              color: 'var(--jyr-gray-500)',
+              whiteSpace: 'nowrap'
+            }}
           >
-            Anterior
-          </button>
-          <button
-            // // Indicador de pagina actual de alertas
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            disabled
-          >
-            Pagina {metaAlertas.pagina} de {metaAlertas.totalPaginas}
-          </button>
-          <button
-            // // Navega a la pagina siguiente de alertas
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => cambiarPaginaAlertas(metaAlertas.pagina + 1)}
-            disabled={loadingAlertas || metaAlertas.pagina >= metaAlertas.totalPaginas}
-          >
-            Siguiente
-          </button>
+            Pagina {meta.pagina} de {meta.totalPaginas}
+          </span>
         </div>
       </div>
 

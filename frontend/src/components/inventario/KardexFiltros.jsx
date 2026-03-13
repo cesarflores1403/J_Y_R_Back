@@ -3,6 +3,7 @@ import { FiFilter, FiRefreshCw } from 'react-icons/fi';
 
 const KardexFiltros = ({
   filtros,
+  productos = [],
   loading,
   onChange,
   onAplicar,
@@ -49,15 +50,25 @@ const KardexFiltros = ({
         <div className="col-12 col-md-2">
           <label className="form-label mb-1">Cod. Producto</label>
           <input
-            // // Filtro exacto por producto
-            type="number"
-            min="1"
+            // // Filtro por codigo enlazado a catalogo real de productos
+            type="text"
             className="form-control"
             name="cod_producto"
             value={filtros.cod_producto}
             onChange={handleInput}
-            placeholder="Ej: 23"
+            list="kardex-productos-list"
+            inputMode="numeric"
+            placeholder="Ej: 23 o PROD-0023"
           />
+          <datalist id="kardex-productos-list">
+            {productos.map((producto) => (
+              <option
+                key={producto.cod_producto}
+                value={String(producto.cod_producto)}
+                label={`${producto.codigo_producto || `PROD-${String(producto.cod_producto).padStart(4, '0')}`} - ${producto.nombre_producto || ''}`}
+              />
+            ))}
+          </datalist>
         </div>
 
         <div className="col-12 col-md-2">
@@ -88,6 +99,8 @@ const KardexFiltros = ({
             <option value="SALIDA">SALIDA</option>
             <option value="BAJA">BAJA</option>
             <option value="AJUSTE">AJUSTE</option>
+            <option value="DEVOLUCION">DEVOLUCION</option>
+            <option value="COMPRA">COMPRA</option>
           </select>
         </div>
       </div>

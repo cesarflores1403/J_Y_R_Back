@@ -627,6 +627,63 @@ a {
 }
 
 /* ============================================================
+   EXISTENCIAS - FILTROS
+   ============================================================ */
+.existencias-filtros-card .jyr-card-body {
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+}
+
+.existencias-filtros-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--jyr-gray-700);
+  letter-spacing: 0.2px;
+}
+
+.existencias-filtros-control {
+  min-height: 40px;
+  border-radius: 10px;
+  border-color: var(--jyr-gray-300);
+}
+
+.existencias-filtros-control:focus {
+  border-color: var(--jyr-red);
+  box-shadow: 0 0 0 3px var(--jyr-red-faint);
+}
+
+.existencias-filtros-switch {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.existencias-filtros-switch .form-check-input {
+  margin: 0;
+  width: 2.2em;
+  height: 1.2em;
+}
+
+.existencias-filtros-switch .form-check-label {
+  color: var(--jyr-gray-700);
+  font-weight: 500;
+}
+
+.existencias-filtros-btn {
+  min-height: 40px;
+  min-width: 112px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+@media (max-width: 767.98px) {
+  .existencias-filtros-btn {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* ============================================================
    TABLES
    ============================================================ */
 .jyr-table-wrapper {

@@ -23,6 +23,9 @@ const obtenerClaseTipo = (tipo) => {
   if (tipoNormalizado === 'ENTRADA') return 'bg-success-subtle text-success border border-success-subtle';
   if (tipoNormalizado === 'SALIDA') return 'bg-danger-subtle text-danger border border-danger-subtle';
   if (tipoNormalizado === 'AJUSTE') return 'bg-warning-subtle text-warning border border-warning-subtle';
+  if (tipoNormalizado === 'BAJA') return 'bg-dark text-white';
+  if (tipoNormalizado === 'DEVOLUCION') return 'bg-info-subtle text-info-emphasis border border-info-subtle';
+  if (tipoNormalizado === 'COMPRA') return 'bg-primary-subtle text-primary border border-primary-subtle';
   return 'bg-secondary text-white';
 };
 

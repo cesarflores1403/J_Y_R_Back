@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FiList } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiList } from 'react-icons/fi';
 import KardexFiltros from './KardexFiltros.jsx';
 import KardexTabla from './KardexTabla.jsx';
 import { inventarioMovimientosApi } from './inventarioMovimientos.api.js';
@@ -61,11 +61,48 @@ const obtenerMensajeError = (error) => {
   return serverMessage || 'Error inesperado al consultar el kardex';
 };
 
+// // Normaliza cod_producto recibido desde UI (ej: "PROD-0023" -> 23)
+const normalizarCodProducto = (valor) => {
+  if (valor === undefined || valor === null) return '';
+  const texto = String(valor).trim();
+  if (!texto) return '';
+  const soloDigitos = texto.replace(/\D+/g, '');
+  if (!soloDigitos) return '';
+  const cod = Number.parseInt(soloDigitos, 10);
+  return Number.isNaN(cod) || cod < 1 ? '' : cod;
+};
+
+// // Construye paginas visibles con elipsis para navegacion compacta
+const construirPaginasVisibles = (paginaActual, totalPaginas, maxVisibles = 5) => {
+  if (totalPaginas <= 1) return [1];
+  if (totalPaginas <= maxVisibles) {
+    return Array.from({ length: totalPaginas }, (_, idx) => idx + 1);
+  }
+
+  let inicio = Math.max(1, paginaActual - 2);
+  let fin = Math.min(totalPaginas, inicio + maxVisibles - 1);
+  inicio = Math.max(1, fin - maxVisibles + 1);
+
+  const paginas = [];
+  if (inicio > 1) paginas.push(1);
+  if (inicio > 2) paginas.push('...');
+
+  for (let pagina = inicio; pagina <= fin; pagina += 1) {
+    paginas.push(pagina);
+  }
+
+  if (fin < totalPaginas - 1) paginas.push('...');
+  if (fin < totalPaginas) paginas.push(totalPaginas);
+
+  return paginas;
+};
+
 const Kardex = ({ refreshKey = 0 }) => {
   // // Filas del kardex y estados de UI
   const [filas, setFilas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [productos, setProductos] = useState([]);
 
   // // Filtros editables y consulta efectiva
   const [filtros, setFiltros] = useState(filtrosIniciales);
@@ -100,6 +137,7 @@ const Kardex = ({ refreshKey = 0 }) => {
       // // Enviamos aliases nuevos y legacy como en el resto del modulo Inventario
       const params = limpiarParamsConsulta({
         ...consulta,
+        cod_producto: normalizarCodProducto(consulta.cod_producto),
         page: Number(consulta.pagina || 1),
         limit: Number(consulta.limite || 10)
       });
@@ -130,6 +168,20 @@ const Kardex = ({ refreshKey = 0 }) => {
     // // Carga inicial y recarga por cambios de filtros/paginacion
     cargarKardex();
   }, [cargarKardex]);
+
+  useEffect(() => {
+    // // Carga catalogo de productos para autocompletado del filtro por codigo
+    const cargarProductos = async () => {
+      try {
+        const { data } = await inventarioMovimientosApi.listarProductos();
+        const lista = Array.isArray(data?.data) ? data.data : [];
+        setProductos(lista);
+      } catch {
+        setProductos([]);
+      }
+    };
+    cargarProductos();
+  }, []);
 
   useEffect(() => {
     // // Recarga del kardex cuando se registra una nueva entrada (HU4)
@@ -181,6 +233,15 @@ const Kardex = ({ refreshKey = 0 }) => {
     }));
   };
 
+  // // Rango mostrado en paginacion tipo "Mostrando X-Y de N"
+  const inicioMostrado = meta.total > 0
+    ? ((meta.pagina - 1) * meta.limite) + 1
+    : 0;
+  const finMostrado = meta.total > 0
+    ? Math.min(meta.pagina * meta.limite, meta.total)
+    : 0;
+  const paginasVisibles = construirPaginasVisibles(meta.pagina, meta.totalPaginas);
+
   return (
     <div className="jyr-card mt-4">
       <div className="jyr-card-body">
@@ -199,6 +260,7 @@ const Kardex = ({ refreshKey = 0 }) => {
         <KardexFiltros
           // // Formulario de filtros del kardex
           filtros={filtros}
+          productos={productos}
           loading={loading}
           onChange={manejarCambioFiltro}
           onAplicar={aplicarFiltros}
@@ -211,38 +273,93 @@ const Kardex = ({ refreshKey = 0 }) => {
           </div>
         </div>
 
-        <div className="d-flex justify-content-between align-items-center mt-3">
-          <small className="text-muted">Total movimientos: {meta.total}</small>
+        <div
+          style={{
+            marginTop: 10,
+            padding: '12px 14px',
+            border: '1px solid var(--jyr-gray-200)',
+            borderRadius: 12,
+            background: 'linear-gradient(180deg, #ffffff 0%, #fafafa 100%)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 10
+          }}
+        >
+          <span style={{ fontSize: 12, color: 'var(--jyr-gray-500)' }}>
+            Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
+          </span>
 
-          <div className="btn-group">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <button
-              // // Navega a la pagina anterior del kardex
               type="button"
-              className="btn btn-outline-secondary btn-sm"
+              className="btn btn-sm"
               onClick={() => cambiarPagina(meta.pagina - 1)}
               disabled={loading || meta.pagina <= 1}
+              aria-label="Pagina anterior"
+              style={{
+                minWidth: 36,
+                height: 36,
+                border: '1px solid var(--jyr-gray-200)',
+                background: '#fff',
+                color: '#0f172a',
+                padding: 0
+              }}
             >
-              Anterior
+              <FiChevronLeft size={15} />
             </button>
 
-            <button
-              // // Indicador de pagina actual del kardex
-              type="button"
-              className="btn btn-outline-secondary btn-sm"
-              disabled
-            >
-              Pagina {meta.pagina} de {meta.totalPaginas}
-            </button>
+            {paginasVisibles.map((pagina, index) => (
+              <button
+                // // Elipsis se renderiza como boton deshabilitado solo visual
+                key={`${pagina}-${index}`}
+                type="button"
+                className="btn btn-sm"
+                onClick={() => (typeof pagina === 'number' ? cambiarPagina(pagina) : undefined)}
+                disabled={loading || pagina === '...'}
+                style={{
+                  minWidth: 36,
+                  height: 36,
+                  border: '1px solid var(--jyr-gray-200)',
+                  background: pagina === meta.pagina ? '#0b0f19' : '#fff',
+                  color: pagina === meta.pagina ? '#fff' : '#111827',
+                  fontWeight: pagina === meta.pagina ? 700 : 500,
+                  padding: '0 10px'
+                }}
+              >
+                {pagina}
+              </button>
+            ))}
 
             <button
-              // // Navega a la pagina siguiente del kardex
               type="button"
-              className="btn btn-outline-secondary btn-sm"
+              className="btn btn-sm"
               onClick={() => cambiarPagina(meta.pagina + 1)}
               disabled={loading || meta.pagina >= meta.totalPaginas}
+              aria-label="Pagina siguiente"
+              style={{
+                minWidth: 36,
+                height: 36,
+                border: '1px solid var(--jyr-gray-200)',
+                background: '#fff',
+                color: '#0f172a',
+                padding: 0
+              }}
             >
-              Siguiente
+              <FiChevronRight size={15} />
             </button>
+
+            <span
+              style={{
+                marginLeft: 6,
+                fontSize: 12,
+                color: 'var(--jyr-gray-500)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              Pagina {meta.pagina} de {meta.totalPaginas}
+            </span>
           </div>
         </div>
       </div>
