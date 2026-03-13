@@ -147,37 +147,36 @@ const mapearFilaAlerta = (fila) => {
   };
 };
 
-// // Construye SELECT base reutilizable con fallback si stock_reservado no existe en BD
-const construirSelectExistenciasBase = ({ usarColumnaStockReservado = true } = {}) => `
+// // FROM base del submodulo de existencias partiendo del catalogo de productos
+const construirFromExistenciasBase = () => `
+  FROM producto p
+  LEFT JOIN inventario i ON i.cod_producto = p.cod_producto
+  LEFT JOIN ubicacion u ON u.cod_ubicacion = COALESCE(i.cod_ubicacion, p.cod_ubicacion)
+`;
+
+// // Construye SELECT base del submodulo de existencias
+const construirSelectExistenciasBase = () => `
   SELECT
     i.cod_inventario,
-    i.cod_producto,
+    p.cod_producto,
     p.nombre_producto,
-    i.cod_ubicacion,
+    COALESCE(i.cod_ubicacion, p.cod_ubicacion) AS cod_ubicacion,
     COALESCE(
       NULLIF(u.codigo_qr, ''),
       NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
-      CAST(u.cod_ubicacion AS TEXT)
+      CASE
+        WHEN COALESCE(i.cod_ubicacion, p.cod_ubicacion) IS NOT NULL
+          THEN CAST(COALESCE(i.cod_ubicacion, p.cod_ubicacion) AS TEXT)
+      END,
+      'Sin ubicacion'
     ) AS ubicacion,
-    i.stock,
-    ${usarColumnaStockReservado ? 'COALESCE(i.stock_reservado, 0)' : '0'} AS stock_reservado,
-    i.stock_minimo,
-    i.stock_maximo,
+    COALESCE(i.stock, 0) AS stock,
+    COALESCE(i.stock_reservado, 0) AS stock_reservado,
+    COALESCE(i.stock_minimo, 0) AS stock_minimo,
+    COALESCE(i.stock_maximo, 0) AS stock_maximo,
     i.fecha_ult_mov
-  FROM inventario i
-  INNER JOIN producto p ON p.cod_producto = i.cod_producto
-  INNER JOIN ubicacion u ON u.cod_ubicacion = i.cod_ubicacion
+  ${construirFromExistenciasBase()}
 `;
-
-// // Detecta el error de PostgreSQL cuando una columna no existe (42703)
-const esErrorColumnaNoExiste = (error, nombreColumna) => {
-  // // En PostgreSQL undefined_column usa codigo 42703
-  if (!error) return false;
-  if (error.code !== '42703') return false;
-  // // Verificamos el nombre en message/original para no ocultar otros errores
-  const mensaje = String(error.message || error.original?.message || '').toLowerCase();
-  return mensaje.includes(String(nombreColumna).toLowerCase());
-};
 
 class InventarioExistenciasService {
   // // Lista existencias por producto y ubicacion con filtros y paginacion
@@ -209,13 +208,13 @@ class InventarioExistenciasService {
 
     // // Filtro exacto por cod_producto si viene en query
     if (codProducto !== null) {
-      whereParts.push('i.cod_producto = :codProducto');
+      whereParts.push('p.cod_producto = :codProducto');
       replacements.codProducto = codProducto;
     }
 
     // // Filtro exacto por cod_ubicacion si viene en query
     if (codUbicacion !== null) {
-      whereParts.push('i.cod_ubicacion = :codUbicacion');
+      whereParts.push('COALESCE(i.cod_ubicacion, p.cod_ubicacion) = :codUbicacion');
       replacements.codUbicacion = codUbicacion;
     }
 
@@ -224,6 +223,7 @@ class InventarioExistenciasService {
       whereParts.push(`
         (
           CAST(p.cod_producto AS TEXT) ILIKE :producto
+          OR CONCAT('PROD-', LPAD(CAST(p.cod_producto AS TEXT), 4, '0')) ILIKE :producto
           OR p.nombre_producto ILIKE :producto
         )
       `);
@@ -234,7 +234,7 @@ class InventarioExistenciasService {
     if (ubicacion) {
       whereParts.push(`
         (
-          CAST(u.cod_ubicacion AS TEXT) ILIKE :ubicacion
+          CAST(COALESCE(i.cod_ubicacion, p.cod_ubicacion) AS TEXT) ILIKE :ubicacion
           OR COALESCE(u.codigo_qr, '') ILIKE :ubicacion
           OR COALESCE(u.pasillo, '') ILIKE :ubicacion
           OR COALESCE(u.estanteria, '') ILIKE :ubicacion
@@ -251,9 +251,7 @@ class InventarioExistenciasService {
     // // Query de conteo total para soportar paginacion en frontend
     const [countRow] = await sequelize.query(`
       SELECT COUNT(*)::int AS total
-      FROM inventario i
-      INNER JOIN producto p ON p.cod_producto = i.cod_producto
-      INNER JOIN ubicacion u ON u.cod_ubicacion = i.cod_ubicacion
+      ${construirFromExistenciasBase()}
       WHERE ${whereSql}
     `, {
       replacements,
@@ -266,44 +264,23 @@ class InventarioExistenciasService {
     const totalPages = Math.max(1, Math.ceil(total / limit));
 
     // // Query principal de listado reutilizando SELECT base de existencias
-    let filasCrudas;
-
-    try {
-      // // Intentamos usar stock_reservado real si la columna ya existe en la BD
-      filasCrudas = await sequelize.query(`
-        ${construirSelectExistenciasBase({ usarColumnaStockReservado: true })}
-        WHERE ${whereSql}
-        ORDER BY p.nombre_producto ASC, i.cod_inventario ASC
-        LIMIT :limite OFFSET :offset
-      `, {
-        // // Reutilizamos filtros y agregamos paginacion
-        replacements: {
-          ...replacements,
-          limite: limit,
-          offset
-        },
-        type: sequelize.QueryTypes.SELECT
-      });
-    } catch (error) {
-      // // Fallback incremental: si la columna no existe, respondemos con stock_reservado=0
-      if (!esErrorColumnaNoExiste(error, 'stock_reservado')) {
-        throw error;
-      }
-
-      filasCrudas = await sequelize.query(`
-        ${construirSelectExistenciasBase({ usarColumnaStockReservado: false })}
-        WHERE ${whereSql}
-        ORDER BY p.nombre_producto ASC, i.cod_inventario ASC
-        LIMIT :limite OFFSET :offset
-      `, {
-        replacements: {
-          ...replacements,
-          limite: limit,
-          offset
-        },
-        type: sequelize.QueryTypes.SELECT
-      });
-    }
+    const filasCrudas = await sequelize.query(`
+      ${construirSelectExistenciasBase()}
+      WHERE ${whereSql}
+      ORDER BY
+        p.nombre_producto ASC,
+        COALESCE(i.cod_ubicacion, p.cod_ubicacion) ASC NULLS LAST,
+        i.cod_inventario ASC NULLS LAST
+      LIMIT :limite OFFSET :offset
+    `, {
+      // // Reutilizamos filtros y agregamos paginacion
+      replacements: {
+        ...replacements,
+        limite: limit,
+        offset
+      },
+      type: sequelize.QueryTypes.SELECT
+    });
 
     // // Agregamos stock_disponible y estado_stock a cada fila para HU2 reestructurada
     const datos = filasCrudas.map(mapearFilaExistencia);
@@ -358,13 +335,13 @@ class InventarioExistenciasService {
 
     // // Filtro exacto por producto cuando aplica
     if (codProducto !== null) {
-      whereBaseParts.push('i.cod_producto = :codProducto');
+      whereBaseParts.push('p.cod_producto = :codProducto');
       replacements.codProducto = codProducto;
     }
 
     // // Filtro exacto por ubicacion cuando aplica
     if (codUbicacion !== null) {
-      whereBaseParts.push('i.cod_ubicacion = :codUbicacion');
+      whereBaseParts.push('COALESCE(i.cod_ubicacion, p.cod_ubicacion) = :codUbicacion');
       replacements.codUbicacion = codUbicacion;
     }
 
@@ -373,6 +350,7 @@ class InventarioExistenciasService {
       whereBaseParts.push(`
         (
           CAST(p.cod_producto AS TEXT) ILIKE :producto
+          OR CONCAT('PROD-', LPAD(CAST(p.cod_producto AS TEXT), 4, '0')) ILIKE :producto
           OR p.nombre_producto ILIKE :producto
         )
       `);
@@ -383,7 +361,7 @@ class InventarioExistenciasService {
     if (ubicacion) {
       whereBaseParts.push(`
         (
-          CAST(u.cod_ubicacion AS TEXT) ILIKE :ubicacion
+          CAST(COALESCE(i.cod_ubicacion, p.cod_ubicacion) AS TEXT) ILIKE :ubicacion
           OR COALESCE(u.codigo_qr, '') ILIKE :ubicacion
           OR COALESCE(u.pasillo, '') ILIKE :ubicacion
           OR COALESCE(u.estanteria, '') ILIKE :ubicacion
@@ -394,12 +372,10 @@ class InventarioExistenciasService {
       replacements.ubicacion = `%${ubicacion}%`;
     }
 
-    // // Helper local para ejecutar query con/sin columna stock_reservado
-    const ejecutarConsultaAlertas = async ({ usarColumnaStockReservado }) => {
-      // // Expresion de stock disponible segun soporte real del schema
-      const exprStockDisponible = usarColumnaStockReservado
-        ? '(i.stock - COALESCE(i.stock_reservado, 0))'
-        : '(i.stock - 0)';
+    // // Helper local para ejecutar query de alertas usando stock reservado real
+    const ejecutarConsultaAlertas = async () => {
+      // // Expresion de stock disponible del modelo actual
+      const exprStockDisponible = '(COALESCE(i.stock, 0) - COALESCE(i.stock_reservado, 0))';
 
       // // Regla principal HU: disponible <= minimo configurado
       const whereAlertaParts = [
@@ -417,9 +393,7 @@ class InventarioExistenciasService {
       // // Conteo total para paginacion de alertas
       const [countRow] = await sequelize.query(`
         SELECT COUNT(*)::int AS total
-        FROM inventario i
-        INNER JOIN producto p ON p.cod_producto = i.cod_producto
-        INNER JOIN ubicacion u ON u.cod_ubicacion = i.cod_ubicacion
+        ${construirFromExistenciasBase()}
         WHERE ${whereSql}
       `, {
         replacements,
@@ -432,13 +406,14 @@ class InventarioExistenciasService {
 
       // // Listado paginado priorizando criticidad y menor disponibilidad
       const filasCrudas = await sequelize.query(`
-        ${construirSelectExistenciasBase({ usarColumnaStockReservado })}
+        ${construirSelectExistenciasBase()}
         WHERE ${whereSql}
         ORDER BY
           CASE WHEN ${exprStockDisponible} <= 0 THEN 0 ELSE 1 END ASC,
           ${exprStockDisponible} ASC,
           p.nombre_producto ASC,
-          i.cod_inventario ASC
+          COALESCE(i.cod_ubicacion, p.cod_ubicacion) ASC NULLS LAST,
+          i.cod_inventario ASC NULLS LAST
         LIMIT :limite OFFSET :offset
       `, {
         replacements: {
@@ -460,18 +435,7 @@ class InventarioExistenciasService {
         totalPages
       };
     };
-
-    // // Intentamos primero con columna stock_reservado real si existe
-    let resultado;
-    try {
-      resultado = await ejecutarConsultaAlertas({ usarColumnaStockReservado: true });
-    } catch (error) {
-      // // Fallback para esquemas legacy donde stock_reservado aun no existe
-      if (!esErrorColumnaNoExiste(error, 'stock_reservado')) {
-        throw error;
-      }
-      resultado = await ejecutarConsultaAlertas({ usarColumnaStockReservado: false });
-    }
+    const resultado = await ejecutarConsultaAlertas();
 
     // // Contrato de salida compatible con el resto de listados de inventario
     return {
@@ -496,33 +460,14 @@ class InventarioExistenciasService {
 
   // // Obtiene una existencia puntual con joins y calculos HU2 para respuesta y auditoria
   async obtenerExistenciaPorId(codInventario) {
-    let fila;
-
-    try {
-      // // Intentamos leer usando la columna stock_reservado si esta disponible en la BD
-      [fila] = await sequelize.query(`
-        ${construirSelectExistenciasBase({ usarColumnaStockReservado: true })}
-        WHERE i.cod_inventario = :codInventario
-        LIMIT 1
-      `, {
-        replacements: { codInventario },
-        type: sequelize.QueryTypes.SELECT
-      });
-    } catch (error) {
-      // // Fallback incremental para ambientes donde aun no se aplico el cambio de BD
-      if (!esErrorColumnaNoExiste(error, 'stock_reservado')) {
-        throw error;
-      }
-
-      [fila] = await sequelize.query(`
-        ${construirSelectExistenciasBase({ usarColumnaStockReservado: false })}
-        WHERE i.cod_inventario = :codInventario
-        LIMIT 1
-      `, {
-        replacements: { codInventario },
-        type: sequelize.QueryTypes.SELECT
-      });
-    }
+    const [fila] = await sequelize.query(`
+      ${construirSelectExistenciasBase()}
+      WHERE i.cod_inventario = :codInventario
+      LIMIT 1
+    `, {
+      replacements: { codInventario },
+      type: sequelize.QueryTypes.SELECT
+    });
 
     // // Aplicamos calculos HU2 antes de devolver la fila
     return mapearFilaExistencia(fila);

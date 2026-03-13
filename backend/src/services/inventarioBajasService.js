@@ -22,15 +22,6 @@ const esErrorColumnaNoExiste = (error, nombreColumna) => {
   return mensaje.includes(String(nombreColumna).toLowerCase());
 };
 
-// // Determina si el check constraint de tipo_movimiento rechazo especificamente BAJA
-const esErrorTipoMovimientoNoSoportaBaja = (error) => {
-  if (!error) return false;
-  if (error.code !== '23514') return false;
-  const constraint = String(error.constraint || '').toLowerCase();
-  const mensaje = String(error.message || error.original?.message || '').toLowerCase();
-  return constraint.includes('tipo') || mensaje.includes('tipo') || mensaje.includes('ck_tipo_mov');
-};
-
 // // Devuelve true si el estado de ubicacion se considera activo en el schema actual
 const ubicacionActiva = (estadoUbi) => {
   if (estadoUbi === null || estadoUbi === undefined) return true;
@@ -202,7 +193,7 @@ class InventarioBajasService {
     return bajaCreada || null;
   }
 
-  // // Inserta movimiento para baja; intenta tipo BAJA y si schema no lo permite, usa AJUSTE como fallback seguro
+  // // Inserta movimiento para baja usando tipo BAJA como contrato oficial
   async insertarMovimientoBaja({
     schemaMovimiento,
     codInventario,
@@ -242,28 +233,13 @@ class InventarioBajasService {
       return movimientoCreado || null;
     };
 
-    // // Primer intento con tipo BAJA segun HU; fallback a AJUSTE solo si constraint del schema lo exige
-    try {
-      const movimientoRow = await ejecutarInsert('BAJA');
-      return {
-        movimientoRow,
-        tipoSolicitado: 'BAJA',
-        tipoAplicado: 'BAJA',
-        fallbackTipo: false
-      };
-    } catch (error) {
-      if (!esErrorTipoMovimientoNoSoportaBaja(error)) {
-        throw error;
-      }
-
-      const movimientoRow = await ejecutarInsert('AJUSTE');
-      return {
-        movimientoRow,
-        tipoSolicitado: 'BAJA',
-        tipoAplicado: 'AJUSTE',
-        fallbackTipo: true
-      };
-    }
+    const movimientoRow = await ejecutarInsert('BAJA');
+    return {
+      movimientoRow,
+      tipoSolicitado: 'BAJA',
+      tipoAplicado: 'BAJA',
+      fallbackTipo: false
+    };
   }
 
   // // Relee movimiento insertado y entrega payload consistente para respuesta y kardex
@@ -380,7 +356,7 @@ class InventarioBajasService {
       });
       const codBaja = schemaBaja.pk ? (bajaRow?.[schemaBaja.pk] ?? null) : null;
 
-      // // Luego registramos movimiento; si tipo BAJA no esta permitido se usa fallback controlado AJUSTE
+      // // Luego registramos movimiento con tipo BAJA segun contrato oficial de kardex
       const insercionMovimiento = await this.insertarMovimientoBaja({
         schemaMovimiento,
         codInventario,

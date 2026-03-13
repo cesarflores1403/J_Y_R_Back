@@ -195,8 +195,8 @@ router.get('/movimientos', [
   query('tipo')
     .optional({ values: 'falsy' })
     .trim()
-    .isIn(['ENTRADA', 'SALIDA', 'AJUSTE', 'BAJA'])
-    .withMessage('tipo debe ser ENTRADA, SALIDA, AJUSTE o BAJA'),
+    .isIn(['ENTRADA', 'SALIDA', 'AJUSTE', 'BAJA', 'DEVOLUCION', 'COMPRA'])
+    .withMessage('tipo debe ser ENTRADA, SALIDA, AJUSTE, BAJA, DEVOLUCION o COMPRA'),
   // // Respuesta 400 si falla cualquier validacion
   validarCampos
 ], listarMovimientos);
