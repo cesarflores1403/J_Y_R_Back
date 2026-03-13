@@ -1,13 +1,12 @@
-import { useState, useRef } from 'react'; // // Estado local
+import { useState } from 'react'; // // Estado local
 import Alert from '../components/common/Alert.jsx'; // // Alert
 import ProductoForm from '../components/producto/ProductoForm.jsx'; // // Form
 import ProductoList from '../components/producto/ProductoList.jsx'; // // Tabla
 import ProductoFicha from '../components/producto/ProductoFicha.jsx'; // // HU-09: Ficha modal
-import ImportarProductos from '../components/producto/ImportarProductos.jsx'; // // HU-12: Importar
 import { useProducto } from '../hooks/useProducto.js'; // // Hook
 import { useAuth } from '../contexts/AuthContext.jsx'; // // HU-09: Permisos
 import { useCategorias } from '../hooks/useCategorias.js'; // // HU-09: Mapa categorías
-import { FiPackage } from 'react-icons/fi';
+import { FiPackage, FiPlusCircle, FiArrowLeft } from 'react-icons/fi';
 
 const ProductoPage = () => {
   const { usuario } = useAuth(); // // HU-09: rol del usuario
@@ -20,7 +19,6 @@ const ProductoPage = () => {
     success,
     setError,
     setSuccess,
-    cargar,
     crear,
     actualizar,
     eliminar,
@@ -31,7 +29,7 @@ const ProductoPage = () => {
 
   const [selected, setSelected] = useState(null);
   const [fichaProducto, setFichaProducto] = useState(null); // // HU-09: producto para ficha
-  const formRef = useRef(null);
+  const [vista, setVista] = useState('listado'); // // listado | formulario
 
   // HU-09: Mapa de categorías para la ficha
   const categoriasMap = {};
@@ -42,61 +40,61 @@ const ProductoPage = () => {
 
   const handleEdit = (p) => {
     setSelected(p);
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    setVista('formulario');
   };
-  const handleCancelEdit = () => setSelected(null);
+  const handleCancelEdit = () => {
+    setSelected(null);
+    setVista('listado');
+  };
 
   const handleSubmit = async (payload) => {
     if (selected) {
       await actualizar(payload);
       setSelected(null);
+      setVista('listado');
     } else {
-      return await crear(payload); // // HU-08: retorna producto creado para subir imagen
+      const productoCreado = await crear(payload); // // HU-08: retorna producto creado para subir imagen
+      setVista('listado');
+      return productoCreado;
     }
   };
 
   return (
     <div>
-      {/* Header */}
-      <div className="d-flex align-items-center gap-3 mb-4">
-        <div style={{
-          width: 48, height: 48, borderRadius: 'var(--radius-md)',
-          background: 'var(--jyr-red)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center',
-          boxShadow: 'var(--shadow-red)'
-        }}>
-          <FiPackage size={24} color="#fff" />
-        </div>
-        <div>
-          <h3 style={{ margin: 0, fontWeight: 700 }}>Productos</h3>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--jyr-gray-500)' }}>
-            Gestión del catálogo de productos e ISV
-          </p>
-        </div>
-      </div>
-
       <Alert type="success" message={success} onClose={() => setSuccess('')} />
       <Alert type="danger" message={error} onClose={() => setError('')} />
 
-      <div className="row g-4">
-        <div className="col-12" ref={formRef}>
-          <ProductoForm
-            saving={saving}
-            onSubmit={handleSubmit}
-            selected={selected}
-            onCancelEdit={handleCancelEdit}
-            onSubirImagen={subirImagen}
-          />
-        </div>
+      {vista === 'listado' ? (
+        <>
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div className="d-flex align-items-center gap-3">
+              <div style={{
+                width: 48, height: 48, borderRadius: 'var(--radius-md)',
+                background: 'var(--jyr-red)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                boxShadow: 'var(--shadow-red)'
+              }}>
+                <FiPackage size={24} color="#fff" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontWeight: 700 }}>Productos</h3>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--jyr-gray-500)' }}>
+                  Gestión del catálogo de productos e ISV
+                </p>
+              </div>
+            </div>
 
-        {/* HU-12: Importar productos (solo Administrador) */}
-        {usuario?.rol === 'Administrador' && (
-          <div className="col-12">
-            <ImportarProductos onImportSuccess={cargar} />
+            {puedeEditar && (
+              <button
+                type="button"
+                className="btn jyr-btn-primary"
+                onClick={() => { setSelected(null); setVista('formulario'); }}
+              >
+                <FiPlusCircle className="me-1" /> Nuevo Producto
+              </button>
+            )}
           </div>
-        )}
 
-        <div className="col-12">
           {loading ? (
             <div className="jyr-card">
               <div className="jyr-card-body text-center py-5">
@@ -115,11 +113,34 @@ const ProductoPage = () => {
               onVerFicha={(p) => setFichaProducto(p)}
             />
           )}
-        </div>
-      </div>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-secondary mb-3"
+            onClick={handleCancelEdit}
+          >
+            <FiArrowLeft className="me-1" /> Volver
+          </button>
+
+          <h3 className="mb-4">
+            <FiPlusCircle className="me-2 text-info" />
+            {selected ? 'Editar Producto' : 'Nuevo Producto'}
+          </h3>
+
+          <ProductoForm
+            saving={saving}
+            onSubmit={handleSubmit}
+            selected={selected}
+            onCancelEdit={handleCancelEdit}
+            onSubirImagen={subirImagen}
+          />
+        </>
+      )}
 
       {/* HU-09: Modal Ficha de Producto */}
-      {fichaProducto && (
+      {vista === 'listado' && fichaProducto && (
         <ProductoFicha
           producto={fichaProducto}
           onClose={() => setFichaProducto(null)}
