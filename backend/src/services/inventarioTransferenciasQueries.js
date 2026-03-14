@@ -83,6 +83,38 @@ export const obtenerUpdateTransferenciaEntradaDestino = () => `
   RETURNING cod_inventario, cod_producto, cod_ubicacion, stock, fecha_ult_mov
 `;
 
+// // SQL para registrar cabecera persistente de la transferencia en su tabla dedicada
+export const obtenerInsertTransferenciaInventario = () => `
+  INSERT INTO transferencia_inventario (
+    cod_producto,
+    cod_inventario_origen,
+    cod_inventario_destino,
+    cod_ubicacion_origen,
+    cod_ubicacion_destino,
+    cod_usuario,
+    cantidad,
+    referencia,
+    motivo,
+    observaciones,
+    estado,
+    fecha
+  ) VALUES (
+    :codProducto,
+    :codInventarioOrigen,
+    :codInventarioDestino,
+    :codUbicacionOrigen,
+    :codUbicacionDestino,
+    :codUsuario,
+    :cantidad,
+    :referencia,
+    :motivo,
+    :observaciones,
+    'COMPLETADA',
+    NOW()
+  )
+  RETURNING *
+`;
+
 // // Construye INSERT dinamico de movimiento_inventario para tramos de transferencia
 export const construirInsertMovimientoTransferenciaSql = ({
   schemaMovimiento,

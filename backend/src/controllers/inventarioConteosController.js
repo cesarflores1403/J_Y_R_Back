@@ -2,6 +2,39 @@ import { sendOk } from '../utils/response.js';
 import logger from '../config/logger.js';
 import inventarioConteosService from '../services/inventarioConteosService.js';
 
+// // GET /api/inventario/conteos
+// // Lista historial de conteos con filtros y paginacion
+export const listarConteos = async (req, res, next) => {
+  try {
+    const data = await inventarioConteosService.listarConteos(req.query);
+
+    return sendOk(res, {
+      status: 200,
+      message: 'Conteos obtenidos correctamente',
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// // GET /api/inventario/conteos/:id/detalles
+// // Lista detalles persistidos de un conteo especifico
+export const listarDetallesConteo = async (req, res, next) => {
+  try {
+    const codConteo = Number(req.params.id);
+    const data = await inventarioConteosService.listarDetallesConteo(codConteo, req.query);
+
+    return sendOk(res, {
+      status: 200,
+      message: 'Detalle de conteo obtenido correctamente',
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // // POST /api/inventario/conteos
 // // Abre un conteo fisico nuevo en estado inicial ABIERTO
 export const abrirConteo = async (req, res, next) => {

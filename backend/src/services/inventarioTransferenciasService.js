@@ -9,9 +9,48 @@ import {
   obtenerInsertInventarioDestinoInicial,
   obtenerUpdateTransferenciaSalidaSeguro,
   obtenerUpdateTransferenciaEntradaDestino,
+  obtenerInsertTransferenciaInventario,
   construirInsertMovimientoTransferenciaSql,
   construirSelectMovimientoTransferenciaFormateadoSql
 } from './inventarioTransferenciasQueries.js';
+
+// // Defaults y limites de paginacion para listados del submodulo
+const PAGINA_DEFAULT = 1;
+const LIMITE_DEFAULT = 15;
+const LIMITE_MAXIMO = 100;
+
+// // Convierte cualquier valor a entero seguro con fallback
+const parsearEntero = (valor, fallback) => {
+  if (valor === undefined || valor === null || valor === '') return fallback;
+  const parsed = Number.parseInt(valor, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+};
+
+// // Resuelve paginacion soportando aliases page/limit y pagina/limite
+const resolverPaginacion = (query = {}) => {
+  const page = Math.max(1, parsearEntero(query.page ?? query.pagina, PAGINA_DEFAULT));
+  const limit = Math.max(1, Math.min(LIMITE_MAXIMO, parsearEntero(query.limit ?? query.limite, LIMITE_DEFAULT)));
+  return {
+    page,
+    limit,
+    offset: (page - 1) * limit
+  };
+};
+
+// // Normaliza texto opcional para filtros en listados
+const normalizarTexto = (valor) => {
+  if (valor === undefined || valor === null) return null;
+  const limpio = String(valor).trim();
+  return limpio.length > 0 ? limpio : null;
+};
+
+// // Normaliza fechas de query a objeto Date o null
+const normalizarFecha = (valor) => {
+  if (!valor) return null;
+  const fecha = valor instanceof Date ? valor : new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return null;
+  return fecha;
+};
 
 // // Detecta error undefined_column (42703) para soportar fallback sin stock_reservado
 const esErrorColumnaNoExiste = (error, nombreColumna) => {
@@ -25,6 +64,14 @@ const esErrorColumnaNoExiste = (error, nombreColumna) => {
 const esErrorUniqueViolation = (error) => {
   if (!error) return false;
   return error.code === '23505';
+};
+
+// // Detecta error de tabla faltante (undefined_table 42P01)
+const esErrorTablaNoExiste = (error, nombreTabla) => {
+  if (!error) return false;
+  if (error.code !== '42P01') return false;
+  const mensaje = String(error.message || error.original?.message || '').toLowerCase();
+  return mensaje.includes(String(nombreTabla).toLowerCase());
 };
 
 // // Determina si una ubicacion puede operar segun estado configurado en BD
@@ -187,6 +234,50 @@ class InventarioTransferenciasService {
     return filasActualizadas[0] || null;
   }
 
+  // // Inserta cabecera persistente de transferencia para trazabilidad del submodulo
+  async insertarTransferenciaInventario({
+    codProducto,
+    codInventarioOrigen,
+    codInventarioDestino,
+    codUbicacionOrigen,
+    codUbicacionDestino,
+    codUsuario,
+    cantidad,
+    referencia,
+    motivo,
+    observaciones,
+    transaction
+  }) {
+    try {
+      const [filas] = await sequelize.query(obtenerInsertTransferenciaInventario(), {
+        replacements: {
+          codProducto,
+          codInventarioOrigen,
+          codInventarioDestino,
+          codUbicacionOrigen,
+          codUbicacionDestino,
+          codUsuario,
+          cantidad,
+          referencia,
+          motivo: motivo || null,
+          observaciones: observaciones || null
+        },
+        transaction
+      });
+
+      const transferencia = Array.isArray(filas) ? filas[0] : null;
+      return transferencia || null;
+    } catch (error) {
+      if (esErrorTablaNoExiste(error, 'transferencia_inventario')) {
+        throw Object.assign(
+          new Error('Tabla transferencia_inventario no encontrada. Ejecute la migracion del modulo Inventario antes de usar transferencias.'),
+          { status: 500 }
+        );
+      }
+      throw error;
+    }
+  }
+
   // // Inserta movimiento de kardex para cada tramo de la transferencia (SALIDA/ENTRADA)
   async insertarMovimientoTransferencia({
     schemaMovimiento,
@@ -199,6 +290,7 @@ class InventarioTransferenciasService {
     referencia,
     motivo,
     observaciones,
+    refId,
     transaction
   }) {
     const { sql, replacements } = construirInsertMovimientoTransferenciaSql({
@@ -213,7 +305,7 @@ class InventarioTransferenciasService {
       motivo,
       observaciones,
       refTipo: 'TRANSFERENCIA',
-      refId: null
+      refId: refId ?? null
     });
 
     const [filas] = await sequelize.query(sql, {
@@ -306,7 +398,11 @@ class InventarioTransferenciasService {
         throw Object.assign(new Error('Ubicacion origen no encontrada'), { status: 404 });
       }
       if (!ubicacionActiva(ubicacionOrigen.estado_ubi)) {
-        throw Object.assign(new Error('La ubicacion origen no esta activa para transferencias'), { status: 400 });
+        const estadoOrigen = String(ubicacionOrigen.estado_ubi ?? 'N/D').trim() || 'N/D';
+        throw Object.assign(
+          new Error(`La ubicacion origen ${codUbicacionOrigen} no esta activa (estado: ${estadoOrigen}) para transferencias`),
+          { status: 400 }
+        );
       }
 
       // // Validamos ubicacion destino existente y operativa
@@ -315,7 +411,11 @@ class InventarioTransferenciasService {
         throw Object.assign(new Error('Ubicacion destino no encontrada'), { status: 404 });
       }
       if (!ubicacionActiva(ubicacionDestino.estado_ubi)) {
-        throw Object.assign(new Error('La ubicacion destino no esta activa para transferencias'), { status: 400 });
+        const estadoDestino = String(ubicacionDestino.estado_ubi ?? 'N/D').trim() || 'N/D';
+        throw Object.assign(
+          new Error(`La ubicacion destino ${codUbicacionDestino} no esta activa (estado: ${estadoDestino}) para transferencias`),
+          { status: 400 }
+        );
       }
 
       // // Bloqueamos inventarios de ambas ubicaciones en orden estable para mitigar condiciones de carrera
@@ -394,6 +494,25 @@ class InventarioTransferenciasService {
         throw Object.assign(new Error('Conflicto de concurrencia al incrementar inventario destino'), { status: 409 });
       }
 
+      // // Persistimos cabecera propia de transferencia para trazabilidad operativa completa
+      const transferenciaRow = await this.insertarTransferenciaInventario({
+        codProducto,
+        codInventarioOrigen,
+        codInventarioDestino,
+        codUbicacionOrigen,
+        codUbicacionDestino,
+        codUsuario,
+        cantidad,
+        referencia,
+        motivo,
+        observaciones,
+        transaction: t
+      });
+      const codTransferencia = Number(transferenciaRow?.cod_transferencia_inventario || 0);
+      if (!codTransferencia) {
+        throw Object.assign(new Error('No fue posible registrar la cabecera de transferencia'), { status: 500 });
+      }
+
       // // Registramos SALIDA en origen con referencia compartida de transferencia
       const movimientoSalidaRow = await this.insertarMovimientoTransferencia({
         schemaMovimiento,
@@ -406,6 +525,7 @@ class InventarioTransferenciasService {
         referencia,
         motivo: motivo || 'TRANSFERENCIA',
         observaciones,
+        refId: codTransferencia,
         transaction: t
       });
 
@@ -421,6 +541,7 @@ class InventarioTransferenciasService {
         referencia,
         motivo: motivo || 'TRANSFERENCIA',
         observaciones,
+        refId: codTransferencia,
         transaction: t
       });
 
@@ -460,6 +581,8 @@ class InventarioTransferenciasService {
             referencia_documento: referencia,
             observaciones: observaciones || null,
             motivo: motivo || 'TRANSFERENCIA',
+            ref_tipo: 'TRANSFERENCIA',
+            ref_id: codTransferencia,
             fecha_movimiento: new Date().toISOString(),
             cod_usuario: codUsuario,
             nombre_usuario: options?.usuario?.nombre_usuario ?? null
@@ -476,14 +599,18 @@ class InventarioTransferenciasService {
             referencia_documento: referencia,
             observaciones: observaciones || null,
             motivo: motivo || 'TRANSFERENCIA',
+            ref_tipo: 'TRANSFERENCIA',
+            ref_id: codTransferencia,
             fecha_movimiento: new Date().toISOString(),
             cod_usuario: codUsuario,
             nombre_usuario: options?.usuario?.nombre_usuario ?? null
           }
         },
+        transferencia: transferenciaRow,
         inventario_origen: inventarioOrigenActualizado,
         inventario_destino: inventarioDestinoActualizado,
         resumen: {
+          cod_transferencia: codTransferencia,
           cod_producto: codProducto,
           cod_inventario_origen: codInventarioOrigen,
           cod_inventario_destino: codInventarioDestino,
@@ -503,6 +630,144 @@ class InventarioTransferenciasService {
       // // Rollback total para evitar stock descuadrado o movimientos huerfanos
       if (!transaccionConfirmada) {
         await t.rollback();
+      }
+      throw error;
+    }
+  }
+
+  // // Lista transferencias persistidas con filtros y paginacion para frontend operativo
+  async listarTransferencias(query = {}) {
+    const { page, limit, offset } = resolverPaginacion(query);
+    const codProducto = query.cod_producto ? Number(query.cod_producto) : null;
+    const codUbicacionOrigen = query.cod_ubicacion_origen ? Number(query.cod_ubicacion_origen) : null;
+    const codUbicacionDestino = query.cod_ubicacion_destino ? Number(query.cod_ubicacion_destino) : null;
+    const estado = normalizarTexto(query.estado)?.toUpperCase() || null;
+    const referencia = normalizarTexto(query.referencia);
+    const fechaDesde = normalizarFecha(query.fecha_desde);
+    const fechaHasta = normalizarFecha(query.fecha_hasta);
+
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
+      throw Object.assign(new Error('fecha_desde no puede ser mayor que fecha_hasta'), { status: 400 });
+    }
+
+    const whereParts = ['1=1'];
+    const replacements = {};
+
+    if (codProducto !== null) {
+      whereParts.push('t.cod_producto = :codProducto');
+      replacements.codProducto = codProducto;
+    }
+    if (codUbicacionOrigen !== null) {
+      whereParts.push('t.cod_ubicacion_origen = :codUbicacionOrigen');
+      replacements.codUbicacionOrigen = codUbicacionOrigen;
+    }
+    if (codUbicacionDestino !== null) {
+      whereParts.push('t.cod_ubicacion_destino = :codUbicacionDestino');
+      replacements.codUbicacionDestino = codUbicacionDestino;
+    }
+    if (estado) {
+      whereParts.push('UPPER(t.estado) = :estado');
+      replacements.estado = estado;
+    }
+    if (referencia) {
+      whereParts.push('t.referencia ILIKE :referencia');
+      replacements.referencia = `%${referencia}%`;
+    }
+    if (fechaDesde) {
+      whereParts.push('CAST(t.fecha AS DATE) >= :fechaDesde');
+      replacements.fechaDesde = fechaDesde;
+    }
+    if (fechaHasta) {
+      whereParts.push('CAST(t.fecha AS DATE) <= :fechaHasta');
+      replacements.fechaHasta = fechaHasta;
+    }
+
+    const whereSql = whereParts.join(' AND ');
+
+    try {
+      const [countRow] = await sequelize.query(`
+        SELECT COUNT(*)::int AS total
+        FROM transferencia_inventario t
+        WHERE ${whereSql}
+      `, {
+        replacements,
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      const total = Number(countRow?.total || 0);
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+
+      const filas = await sequelize.query(`
+        SELECT
+          t.cod_transferencia_inventario AS cod_transferencia,
+          t.fecha,
+          t.estado,
+          t.referencia,
+          t.cantidad,
+          t.motivo,
+          t.observaciones,
+          t.cod_producto,
+          p.nombre_producto,
+          t.cod_inventario_origen,
+          t.cod_inventario_destino,
+          t.cod_ubicacion_origen,
+          COALESCE(
+            NULLIF(uo.codigo_qr, ''),
+            NULLIF(CONCAT_WS('-', uo.pasillo, uo.estanteria, uo.nivel_1, uo.nivel_2), ''),
+            CAST(uo.cod_ubicacion AS TEXT)
+          ) AS ubicacion_origen,
+          t.cod_ubicacion_destino,
+          COALESCE(
+            NULLIF(ud.codigo_qr, ''),
+            NULLIF(CONCAT_WS('-', ud.pasillo, ud.estanteria, ud.nivel_1, ud.nivel_2), ''),
+            CAST(ud.cod_ubicacion AS TEXT)
+          ) AS ubicacion_destino,
+          t.cod_usuario,
+          usu.nombre_usuario,
+          COALESCE(io.stock, 0) AS stock_origen_actual,
+          COALESCE(id.stock, 0) AS stock_destino_actual
+        FROM transferencia_inventario t
+        LEFT JOIN producto p ON p.cod_producto = t.cod_producto
+        LEFT JOIN ubicacion uo ON uo.cod_ubicacion = t.cod_ubicacion_origen
+        LEFT JOIN ubicacion ud ON ud.cod_ubicacion = t.cod_ubicacion_destino
+        LEFT JOIN usuarios usu ON usu.cod_usuario = t.cod_usuario
+        LEFT JOIN inventario io ON io.cod_inventario = t.cod_inventario_origen
+        LEFT JOIN inventario id ON id.cod_inventario = t.cod_inventario_destino
+        WHERE ${whereSql}
+        ORDER BY t.fecha DESC, t.cod_transferencia_inventario DESC
+        LIMIT :limit OFFSET :offset
+      `, {
+        replacements: {
+          ...replacements,
+          limit,
+          offset
+        },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      return {
+        data: filas,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages
+        },
+        datos: filas,
+        total,
+        pagina: page,
+        limite: limit,
+        totalPaginas: totalPages,
+        page,
+        limit,
+        totalPages
+      };
+    } catch (error) {
+      if (esErrorTablaNoExiste(error, 'transferencia_inventario')) {
+        throw Object.assign(
+          new Error('Tabla transferencia_inventario no encontrada. Ejecute la migracion del modulo Inventario para listar transferencias.'),
+          { status: 500 }
+        );
       }
       throw error;
     }

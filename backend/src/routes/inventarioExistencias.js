@@ -1,23 +1,25 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
-import { autenticar } from '../middlewares/auth.js';
+import { autenticar, autorizar } from '../middlewares/auth.js';
 import { validarCampos } from '../middlewares/validar.js';
 import { listarExistencias, listarAlertasStockBajo, actualizarMinMax } from '../controllers/inventarioExistenciasController.js';
 import { listarMovimientos } from '../controllers/inventarioMovimientosController.js';
 import { registrarEntrada } from '../controllers/inventarioEntradasController.js';
 import { registrarSalida } from '../controllers/inventarioSalidasController.js';
 import { registrarBaja } from '../controllers/inventarioBajasController.js';
-import { registrarTransferencia } from '../controllers/inventarioTransferenciasController.js';
-import { abrirConteo, registrarDetalleConteo, cerrarConteo } from '../controllers/inventarioConteosController.js';
-import { crearReserva, liberarReserva, consumirReserva } from '../controllers/inventarioReservasController.js';
+import { listarTransferencias, registrarTransferencia } from '../controllers/inventarioTransferenciasController.js';
+import { listarConteos, listarDetallesConteo, abrirConteo, registrarDetalleConteo, cerrarConteo } from '../controllers/inventarioConteosController.js';
+import { listarReservas, crearReserva, liberarReserva, consumirReserva } from '../controllers/inventarioReservasController.js';
 
 const router = Router();
+const ROLES_INVENTARIO = ['Administrador', 'Bodeguero'];
+const ROLES_RESERVAS = ['Administrador', 'Bodeguero', 'Cajero'];
 
 // // Todas las rutas de existencias requieren autenticacion
 router.use(autenticar);
 
 // // GET /api/inventario/existencias
-router.get('/existencias', [
+router.get('/existencias', autorizar(...ROLES_INVENTARIO), [
   // // Compatibilidad: page (nuevo alias de pagina)
   query('page')
     .optional({ values: 'falsy' })
@@ -77,7 +79,7 @@ router.get('/existencias', [
 
 // // GET /api/inventario/alertas/stock-bajo
 // // Lista alertas de reposicion segun regla stock_disponible <= stock_minimo
-router.get('/alertas/stock-bajo', [
+router.get('/alertas/stock-bajo', autorizar(...ROLES_INVENTARIO), [
   // // Compatibilidad: page (nuevo alias de pagina)
   query('page')
     .optional({ values: 'falsy' })
@@ -147,7 +149,7 @@ router.get('/alertas/stock-bajo', [
 
 // // GET /api/inventario/movimientos
 // // Kardex de movimientos con filtros y paginacion (HU3)
-router.get('/movimientos', [
+router.get('/movimientos', autorizar(...ROLES_INVENTARIO), [
   // // Compatibilidad de paginacion con aliases usados en inventario
   query('page')
     .optional({ values: 'falsy' })
@@ -202,7 +204,7 @@ router.get('/movimientos', [
 ], listarMovimientos);
 
 // // PUT /api/inventario/existencias/:id
-router.put('/existencias/:id', [
+router.put('/existencias/:id', autorizar(...ROLES_INVENTARIO), [
   // // Id de inventario obligatorio y valido
   param('id')
     .isInt({ min: 1 })
@@ -238,7 +240,7 @@ router.put('/existencias/:id', [
 
 // // POST /api/inventario/entradas
 // // Registra una entrada y actualiza inventario de forma transaccional (HU4)
-router.post('/entradas', [
+router.post('/entradas', autorizar(...ROLES_INVENTARIO), [
   // // Relacion producto-ubicacion obligatoria
   body('cod_producto')
     .exists()
@@ -282,7 +284,7 @@ router.post('/entradas', [
 
 // // POST /api/inventario/salidas
 // // Registra una salida de inventario por venta confirmada con validacion de payload
-router.post('/salidas', [
+router.post('/salidas', autorizar(...ROLES_INVENTARIO), [
   // // Relacion producto-ubicacion obligatoria para resolver una existencia exacta
   body('cod_producto')
     .exists()
@@ -326,7 +328,7 @@ router.post('/salidas', [
 
 // // POST /api/inventario/bajas
 // // Registra una baja por dano/perdida con trazabilidad y control transaccional
-router.post('/bajas', [
+router.post('/bajas', autorizar(...ROLES_INVENTARIO), [
   // // Producto y ubicacion obligatorios para ubicar una existencia exacta
   body('cod_producto')
     .exists()
@@ -384,7 +386,7 @@ router.post('/bajas', [
 
 // // POST /api/inventario/transferencias
 // // Registra transferencia entre ubicaciones con doble movimiento y transaccion real
-router.post('/transferencias', [
+router.post('/transferencias', autorizar(...ROLES_INVENTARIO), [
   // // Producto obligatorio para resolver inventario origen/destino de una misma referencia
   body('cod_producto')
     .exists()
@@ -451,9 +453,126 @@ router.post('/transferencias', [
   validarCampos
 ], registrarTransferencia);
 
+// // GET /api/inventario/transferencias
+// // Lista transferencias persistidas con filtros y paginacion
+router.get('/transferencias', autorizar(...ROLES_INVENTARIO), [
+  query('page')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('page debe ser un entero mayor o igual a 1')
+    .toInt(),
+  query('limit')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limit debe ser un entero entre 1 y 100')
+    .toInt(),
+  query('pagina')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('pagina debe ser un entero mayor o igual a 1')
+    .toInt(),
+  query('limite')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limite debe ser un entero entre 1 y 100')
+    .toInt(),
+  query('cod_producto')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_producto debe ser un entero mayor a 0')
+    .toInt(),
+  query('cod_ubicacion_origen')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_ubicacion_origen debe ser un entero mayor a 0')
+    .toInt(),
+  query('cod_ubicacion_destino')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_ubicacion_destino debe ser un entero mayor a 0')
+    .toInt(),
+  query('estado')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('estado debe tener entre 1 y 20 caracteres'),
+  query('referencia')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('referencia debe tener entre 1 y 200 caracteres'),
+  query('fecha_desde')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_desde debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  query('fecha_hasta')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_hasta debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  validarCampos
+], listarTransferencias);
+
+// // GET /api/inventario/conteos
+// // Lista conteos fisicos persistidos para historial y seguimiento
+router.get('/conteos', autorizar(...ROLES_INVENTARIO), [
+  query('page')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('page debe ser un entero mayor o igual a 1')
+    .toInt(),
+  query('limit')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limit debe ser un entero entre 1 y 100')
+    .toInt(),
+  query('pagina')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('pagina debe ser un entero mayor o igual a 1')
+    .toInt(),
+  query('limite')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limite debe ser un entero entre 1 y 100')
+    .toInt(),
+  query('cod_conteo')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_conteo debe ser un entero mayor a 0')
+    .toInt(),
+  query('estado')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('estado debe tener entre 1 y 20 caracteres'),
+  query('cod_usuario_apertura')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_usuario_apertura debe ser un entero mayor a 0')
+    .toInt(),
+  query('cod_usuario_cierre')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_usuario_cierre debe ser un entero mayor a 0')
+    .toInt(),
+  query('fecha_desde')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_desde debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  query('fecha_hasta')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_hasta debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  validarCampos
+], listarConteos);
+
 // // POST /api/inventario/conteos
 // // Abre encabezado de conteo fisico para captura posterior de detalle
-router.post('/conteos', [
+router.post('/conteos', autorizar(...ROLES_INVENTARIO), [
   // // Observaciones de apertura opcionales
   body('observaciones')
     .optional({ values: 'falsy' })
@@ -466,7 +585,7 @@ router.post('/conteos', [
 
 // // POST /api/inventario/conteos/:id/detalle
 // // Captura o actualiza stock fisico de producto+ubicacion en conteo abierto
-router.post('/conteos/:id/detalle', [
+router.post('/conteos/:id/detalle', autorizar(...ROLES_INVENTARIO), [
   // // Id de conteo obligatorio y valido
   param('id')
     .isInt({ min: 1 })
@@ -505,9 +624,39 @@ router.post('/conteos/:id/detalle', [
   validarCampos
 ], registrarDetalleConteo);
 
+// // GET /api/inventario/conteos/:id/detalles
+// // Recupera detalle persistido del conteo para trazabilidad e historial
+router.get('/conteos/:id/detalles', autorizar(...ROLES_INVENTARIO), [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('id de conteo debe ser un entero mayor a 0')
+    .toInt(),
+  query('page')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('page debe ser un entero mayor o igual a 1')
+    .toInt(),
+  query('limit')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limit debe ser un entero entre 1 y 100')
+    .toInt(),
+  query('pagina')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('pagina debe ser un entero mayor o igual a 1')
+    .toInt(),
+  query('limite')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limite debe ser un entero entre 1 y 100')
+    .toInt(),
+  validarCampos
+], listarDetallesConteo);
+
 // // POST /api/inventario/conteos/:id/cerrar
 // // Cierra conteo fisico y aplica ajustes de inventario en transaccion real
-router.post('/conteos/:id/cerrar', [
+router.post('/conteos/:id/cerrar', autorizar(...ROLES_INVENTARIO), [
   // // Id de conteo obligatorio y valido
   param('id')
     .isInt({ min: 1 })
@@ -523,9 +672,70 @@ router.post('/conteos/:id/cerrar', [
   validarCampos
 ], cerrarConteo);
 
+// // GET /api/inventario/reservas
+// // Lista reservas persistidas para seguimiento de estado
+router.get('/reservas', autorizar(...ROLES_RESERVAS), [
+  query('page')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('page debe ser un entero mayor o igual a 1')
+    .toInt(),
+  query('limit')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limit debe ser un entero entre 1 y 100')
+    .toInt(),
+  query('pagina')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('pagina debe ser un entero mayor o igual a 1')
+    .toInt(),
+  query('limite')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1, max: 100 })
+    .withMessage('limite debe ser un entero entre 1 y 100')
+    .toInt(),
+  query('cod_reserva')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_reserva debe ser un entero mayor a 0')
+    .toInt(),
+  query('cod_producto')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_producto debe ser un entero mayor a 0')
+    .toInt(),
+  query('cod_ubicacion')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_ubicacion debe ser un entero mayor a 0')
+    .toInt(),
+  query('estado')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('estado debe tener entre 1 y 20 caracteres'),
+  query('referencia')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('referencia debe tener entre 1 y 200 caracteres'),
+  query('fecha_desde')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_desde debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  query('fecha_hasta')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_hasta debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  validarCampos
+], listarReservas);
+
 // // POST /api/inventario/reservas
 // // Crea una reserva incrementando stock_reservado sin descontar stock total
-router.post('/reservas', [
+router.post('/reservas', autorizar(...ROLES_RESERVAS), [
   // // Producto y ubicacion requeridos para reservar existencia puntual
   body('cod_producto')
     .exists()
@@ -566,7 +776,7 @@ router.post('/reservas', [
 
 // // POST /api/inventario/reservas/:id/liberar
 // // Libera reserva activa restando stock_reservado
-router.post('/reservas/:id/liberar', [
+router.post('/reservas/:id/liberar', autorizar(...ROLES_RESERVAS), [
   // // Id de reserva obligatorio y valido
   param('id')
     .isInt({ min: 1 })
@@ -589,7 +799,7 @@ router.post('/reservas/:id/liberar', [
 
 // // POST /api/inventario/reservas/:id/consumir
 // // Consume reserva activa descontando stock total y reservado
-router.post('/reservas/:id/consumir', [
+router.post('/reservas/:id/consumir', autorizar(...ROLES_RESERVAS), [
   // // Id de reserva obligatorio y valido
   param('id')
     .isInt({ min: 1 })

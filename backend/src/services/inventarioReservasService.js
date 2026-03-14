@@ -16,6 +16,44 @@ import {
   construirInsertMovimientoConsumoReservaSql
 } from './inventarioReservasQueries.js';
 
+// // Defaults de paginacion para listados del submodulo Reservas
+const PAGINA_DEFAULT = 1;
+const LIMITE_DEFAULT = 15;
+const LIMITE_MAXIMO = 100;
+
+// // Convierte query string a entero seguro con fallback
+const parsearEntero = (valor, fallback) => {
+  if (valor === undefined || valor === null || valor === '') return fallback;
+  const parsed = Number.parseInt(valor, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+};
+
+// // Resuelve paginacion con aliases page/limit y pagina/limite
+const resolverPaginacion = (query = {}) => {
+  const page = Math.max(1, parsearEntero(query.page ?? query.pagina, PAGINA_DEFAULT));
+  const limit = Math.max(1, Math.min(LIMITE_MAXIMO, parsearEntero(query.limit ?? query.limite, LIMITE_DEFAULT)));
+  return {
+    page,
+    limit,
+    offset: (page - 1) * limit
+  };
+};
+
+// // Normaliza texto de filtros opcionales
+const normalizarTexto = (valor) => {
+  if (valor === undefined || valor === null) return null;
+  const limpio = String(valor).trim();
+  return limpio.length > 0 ? limpio : null;
+};
+
+// // Normaliza fechas de query a Date o null
+const normalizarFecha = (valor) => {
+  if (!valor) return null;
+  const fecha = valor instanceof Date ? valor : new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return null;
+  return fecha;
+};
+
 // // Detecta error de columna no existente (undefined_column) en PostgreSQL
 const esErrorColumnaNoExiste = (error, nombreColumna) => {
   if (!error) return false;
@@ -111,6 +149,162 @@ class InventarioReservasService {
     });
 
     return fila || null;
+  }
+
+  // // Lista reservas persistidas con filtros de estado/producto/ubicacion y paginacion
+  async listarReservas(query = {}) {
+    const schemaReserva = await this.obtenerSchemaReservasCompatible();
+    const { page, limit, offset } = resolverPaginacion(query);
+
+    const codReserva = query.cod_reserva ? Number(query.cod_reserva) : null;
+    const codProducto = query.cod_producto ? Number(query.cod_producto) : null;
+    const codUbicacion = query.cod_ubicacion ? Number(query.cod_ubicacion) : null;
+    const estado = normalizarTexto(query.estado)?.toUpperCase() || null;
+    const referencia = normalizarTexto(query.referencia);
+    const fechaDesde = normalizarFecha(query.fecha_desde);
+    const fechaHasta = normalizarFecha(query.fecha_hasta);
+
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
+      throw Object.assign(new Error('fecha_desde no puede ser mayor que fecha_hasta'), { status: 400 });
+    }
+
+    const exprCodProducto = schemaReserva.codProducto
+      ? `r.${schemaReserva.codProducto}`
+      : (schemaReserva.codInventario ? 'inv.cod_producto' : 'NULL::int');
+    const exprCodUbicacion = schemaReserva.codUbicacion
+      ? `r.${schemaReserva.codUbicacion}`
+      : (schemaReserva.codInventario ? 'inv.cod_ubicacion' : 'NULL::int');
+    const exprCodInventario = schemaReserva.codInventario
+      ? `r.${schemaReserva.codInventario}`
+      : 'NULL::int';
+    const exprFechaCreacion = schemaReserva.fechaCreacion
+      ? `r.${schemaReserva.fechaCreacion}`
+      : 'NULL::timestamp';
+
+    const whereParts = ['1=1'];
+    const replacements = {};
+
+    if (codReserva !== null) {
+      whereParts.push(`r.${schemaReserva.pk} = :codReserva`);
+      replacements.codReserva = codReserva;
+    }
+    if (codProducto !== null) {
+      whereParts.push(`${exprCodProducto} = :codProducto`);
+      replacements.codProducto = codProducto;
+    }
+    if (codUbicacion !== null) {
+      whereParts.push(`${exprCodUbicacion} = :codUbicacion`);
+      replacements.codUbicacion = codUbicacion;
+    }
+    if (estado && schemaReserva.estado) {
+      whereParts.push(`UPPER(CAST(r.${schemaReserva.estado} AS TEXT)) = :estado`);
+      replacements.estado = estado;
+    }
+    if (referencia && schemaReserva.referencia) {
+      whereParts.push(`CAST(r.${schemaReserva.referencia} AS TEXT) ILIKE :referencia`);
+      replacements.referencia = `%${referencia}%`;
+    }
+    if (fechaDesde && schemaReserva.fechaCreacion) {
+      whereParts.push(`CAST(r.${schemaReserva.fechaCreacion} AS DATE) >= :fechaDesde`);
+      replacements.fechaDesde = fechaDesde;
+    }
+    if (fechaHasta && schemaReserva.fechaCreacion) {
+      whereParts.push(`CAST(r.${schemaReserva.fechaCreacion} AS DATE) <= :fechaHasta`);
+      replacements.fechaHasta = fechaHasta;
+    }
+
+    const whereSql = whereParts.join(' AND ');
+    const joinInventario = schemaReserva.codInventario
+      ? `LEFT JOIN inventario inv ON inv.cod_inventario = r.${schemaReserva.codInventario}`
+      : '';
+
+    const joinUsuarioCreacion = schemaReserva.codUsuarioCreacion
+      ? `LEFT JOIN usuarios uc ON uc.cod_usuario = r.${schemaReserva.codUsuarioCreacion}`
+      : '';
+    const joinUsuarioLiberacion = schemaReserva.codUsuarioLiberacion
+      ? `LEFT JOIN usuarios ul ON ul.cod_usuario = r.${schemaReserva.codUsuarioLiberacion}`
+      : '';
+    const joinUsuarioConsumo = schemaReserva.codUsuarioConsumo
+      ? `LEFT JOIN usuarios us ON us.cod_usuario = r.${schemaReserva.codUsuarioConsumo}`
+      : '';
+
+    const selectBase = `
+      FROM ${schemaReserva.tableName} r
+      ${joinInventario}
+      LEFT JOIN producto p ON p.cod_producto = ${exprCodProducto}
+      LEFT JOIN ubicacion u ON u.cod_ubicacion = ${exprCodUbicacion}
+      ${joinUsuarioCreacion}
+      ${joinUsuarioLiberacion}
+      ${joinUsuarioConsumo}
+      WHERE ${whereSql}
+    `;
+
+    const [countRow] = await sequelize.query(`
+      SELECT COUNT(*)::int AS total
+      ${selectBase}
+    `, {
+      replacements,
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    const total = Number(countRow?.total || 0);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    const filas = await sequelize.query(`
+      SELECT
+        r.${schemaReserva.pk} AS cod_reserva,
+        ${exprCodInventario} AS cod_inventario,
+        ${exprCodProducto} AS cod_producto,
+        p.nombre_producto,
+        ${exprCodUbicacion} AS cod_ubicacion,
+        COALESCE(
+          NULLIF(u.codigo_qr, ''),
+          NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
+          CAST(u.cod_ubicacion AS TEXT)
+        ) AS ubicacion,
+        r.${schemaReserva.cantidad} AS cantidad,
+        ${schemaReserva.estado ? `UPPER(CAST(r.${schemaReserva.estado} AS TEXT))` : "'ACTIVA'::text"} AS estado,
+        CAST(${exprFechaCreacion} AS TIMESTAMP) AS fecha_creacion,
+        ${schemaReserva.fechaLiberacion ? `CAST(r.${schemaReserva.fechaLiberacion} AS TIMESTAMP)` : 'NULL::timestamp'} AS fecha_liberacion,
+        ${schemaReserva.fechaConsumo ? `CAST(r.${schemaReserva.fechaConsumo} AS TIMESTAMP)` : 'NULL::timestamp'} AS fecha_consumo,
+        ${schemaReserva.referencia ? `CAST(r.${schemaReserva.referencia} AS TEXT)` : 'NULL::text'} AS referencia,
+        ${schemaReserva.observaciones ? `CAST(r.${schemaReserva.observaciones} AS TEXT)` : 'NULL::text'} AS observaciones,
+        ${schemaReserva.motivoLiberacion ? `CAST(r.${schemaReserva.motivoLiberacion} AS TEXT)` : 'NULL::text'} AS motivo_liberacion,
+        ${schemaReserva.codUsuarioCreacion ? `r.${schemaReserva.codUsuarioCreacion}` : 'NULL::int'} AS cod_usuario_creacion,
+        ${schemaReserva.codUsuarioCreacion ? 'uc.nombre_usuario' : 'NULL::text'} AS usuario_creacion,
+        ${schemaReserva.codUsuarioLiberacion ? `r.${schemaReserva.codUsuarioLiberacion}` : 'NULL::int'} AS cod_usuario_liberacion,
+        ${schemaReserva.codUsuarioLiberacion ? 'ul.nombre_usuario' : 'NULL::text'} AS usuario_liberacion,
+        ${schemaReserva.codUsuarioConsumo ? `r.${schemaReserva.codUsuarioConsumo}` : 'NULL::int'} AS cod_usuario_consumo,
+        ${schemaReserva.codUsuarioConsumo ? 'us.nombre_usuario' : 'NULL::text'} AS usuario_consumo
+      ${selectBase}
+      ORDER BY ${schemaReserva.fechaCreacion ? `r.${schemaReserva.fechaCreacion}` : `r.${schemaReserva.pk}`} DESC, r.${schemaReserva.pk} DESC
+      LIMIT :limit OFFSET :offset
+    `, {
+      replacements: {
+        ...replacements,
+        limit,
+        offset
+      },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    return {
+      data: filas,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages
+      },
+      datos: filas,
+      total,
+      pagina: page,
+      limite: limit,
+      totalPaginas: totalPages,
+      page,
+      limit,
+      totalPages
+    };
   }
 
   // // Crea reserva valida incrementando stock_reservado sin tocar stock total

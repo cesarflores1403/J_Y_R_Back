@@ -2,6 +2,22 @@ import { sendOk } from '../utils/response.js';
 import logger from '../config/logger.js';
 import inventarioReservasService from '../services/inventarioReservasService.js';
 
+// // GET /api/inventario/reservas
+// // Lista reservas de inventario con filtros de estado/producto/ubicacion
+export const listarReservas = async (req, res, next) => {
+  try {
+    const data = await inventarioReservasService.listarReservas(req.query);
+
+    return sendOk(res, {
+      status: 200,
+      message: 'Reservas obtenidas correctamente',
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // // POST /api/inventario/reservas
 // // Crea una reserva activa incrementando stock_reservado sin afectar stock total
 export const crearReserva = async (req, res, next) => {

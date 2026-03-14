@@ -2,6 +2,22 @@ import { sendOk } from '../utils/response.js';
 import logger from '../config/logger.js';
 import inventarioTransferenciasService from '../services/inventarioTransferenciasService.js';
 
+// // GET /api/inventario/transferencias
+// // Lista transferencias persistidas con filtros para seguimiento operativo
+export const listarTransferencias = async (req, res, next) => {
+  try {
+    const data = await inventarioTransferenciasService.listarTransferencias(req.query);
+
+    return sendOk(res, {
+      status: 200,
+      message: 'Transferencias obtenidas correctamente',
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // // POST /api/inventario/transferencias
 // // Registra transferencia transaccional entre ubicaciones con doble movimiento en kardex
 export const registrarTransferencia = async (req, res, next) => {
@@ -34,6 +50,7 @@ export const registrarTransferencia = async (req, res, next) => {
       },
       cantidad: resultado?.resumen?.cantidad_transferida ?? req.body?.cantidad ?? null,
       inventario_destino_creado: resultado?.resumen?.inventario_destino_creado ?? false,
+      transferencia: resultado?.transferencia ?? null,
       movimientos: {
         salida_id: resultado?.movimientos?.salida?.cod_movimiento ?? null,
         entrada_id: resultado?.movimientos?.entrada?.cod_movimiento ?? null,

@@ -17,6 +17,44 @@ import {
   construirInsertMovimientoAjusteSql
 } from './inventarioConteosQueries.js';
 
+// // Defaults de paginacion para listados de conteos
+const PAGINA_DEFAULT = 1;
+const LIMITE_DEFAULT = 15;
+const LIMITE_MAXIMO = 100;
+
+// // Convierte query string a entero seguro con fallback
+const parsearEntero = (valor, fallback) => {
+  if (valor === undefined || valor === null || valor === '') return fallback;
+  const parsed = Number.parseInt(valor, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+};
+
+// // Resuelve paginacion con aliases page/limit y pagina/limite
+const resolverPaginacion = (query = {}) => {
+  const page = Math.max(1, parsearEntero(query.page ?? query.pagina, PAGINA_DEFAULT));
+  const limit = Math.max(1, Math.min(LIMITE_MAXIMO, parsearEntero(query.limit ?? query.limite, LIMITE_DEFAULT)));
+  return {
+    page,
+    limit,
+    offset: (page - 1) * limit
+  };
+};
+
+// // Normaliza strings opcionales para filtros
+const normalizarTexto = (valor) => {
+  if (valor === undefined || valor === null) return null;
+  const limpio = String(valor).trim();
+  return limpio.length > 0 ? limpio : null;
+};
+
+// // Normaliza fechas de query a Date o null
+const normalizarFecha = (valor) => {
+  if (!valor) return null;
+  const fecha = valor instanceof Date ? valor : new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return null;
+  return fecha;
+};
+
 // // Detecta error de columna faltante en PostgreSQL (undefined_column)
 const esErrorColumnaNoExiste = (error, nombreColumna) => {
   if (!error) return false;
@@ -72,6 +110,228 @@ class InventarioConteosService {
     });
 
     return fila || null;
+  }
+
+  // // Lista conteos con filtros y resumen de diferencias para historial recuperable
+  async listarConteos(query = {}) {
+    const schemaConteos = await this.obtenerSchemaConteosCompatible();
+    const { header: schemaHeader, detail: schemaDetail } = schemaConteos;
+    const { page, limit, offset } = resolverPaginacion(query);
+
+    const codConteo = query.cod_conteo ? Number(query.cod_conteo) : null;
+    const estado = normalizarTexto(query.estado)?.toUpperCase() || null;
+    const codUsuarioApertura = query.cod_usuario_apertura ? Number(query.cod_usuario_apertura) : null;
+    const codUsuarioCierre = query.cod_usuario_cierre ? Number(query.cod_usuario_cierre) : null;
+    const fechaDesde = normalizarFecha(query.fecha_desde);
+    const fechaHasta = normalizarFecha(query.fecha_hasta);
+
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
+      throw Object.assign(new Error('fecha_desde no puede ser mayor que fecha_hasta'), { status: 400 });
+    }
+
+    const whereParts = ['1=1'];
+    const replacements = {};
+
+    if (codConteo !== null) {
+      whereParts.push(`h.${schemaHeader.pk} = :codConteo`);
+      replacements.codConteo = codConteo;
+    }
+    if (estado && schemaHeader.estado) {
+      whereParts.push(`UPPER(CAST(h.${schemaHeader.estado} AS TEXT)) = :estado`);
+      replacements.estado = estado;
+    }
+    if (codUsuarioApertura !== null && schemaHeader.codUsuarioApertura) {
+      whereParts.push(`h.${schemaHeader.codUsuarioApertura} = :codUsuarioApertura`);
+      replacements.codUsuarioApertura = codUsuarioApertura;
+    }
+    if (codUsuarioCierre !== null && schemaHeader.codUsuarioCierre) {
+      whereParts.push(`h.${schemaHeader.codUsuarioCierre} = :codUsuarioCierre`);
+      replacements.codUsuarioCierre = codUsuarioCierre;
+    }
+    if (fechaDesde && schemaHeader.fechaApertura) {
+      whereParts.push(`CAST(h.${schemaHeader.fechaApertura} AS DATE) >= :fechaDesde`);
+      replacements.fechaDesde = fechaDesde;
+    }
+    if (fechaHasta && schemaHeader.fechaApertura) {
+      whereParts.push(`CAST(h.${schemaHeader.fechaApertura} AS DATE) <= :fechaHasta`);
+      replacements.fechaHasta = fechaHasta;
+    }
+
+    const whereSql = whereParts.join(' AND ');
+    const exprDiferenciaDetalle = schemaDetail.diferencia
+      ? `COALESCE(d.${schemaDetail.diferencia}, 0)`
+      : (schemaDetail.stockSistema
+          ? `(COALESCE(d.${schemaDetail.stockFisico}, 0) - COALESCE(d.${schemaDetail.stockSistema}, 0))`
+          : '0');
+
+    const [countRow] = await sequelize.query(`
+      SELECT COUNT(*)::int AS total
+      FROM ${schemaHeader.tableName} h
+      WHERE ${whereSql}
+    `, {
+      replacements,
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    const total = Number(countRow?.total || 0);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    const filas = await sequelize.query(`
+      SELECT
+        h.${schemaHeader.pk} AS cod_conteo,
+        ${schemaHeader.estado ? `UPPER(CAST(h.${schemaHeader.estado} AS TEXT))` : "'ABIERTO'::text"} AS estado,
+        ${schemaHeader.fechaApertura ? `CAST(h.${schemaHeader.fechaApertura} AS TIMESTAMP)` : 'NULL::timestamp'} AS fecha_apertura,
+        ${schemaHeader.fechaCierre ? `CAST(h.${schemaHeader.fechaCierre} AS TIMESTAMP)` : 'NULL::timestamp'} AS fecha_cierre,
+        ${schemaHeader.observaciones ? `CAST(h.${schemaHeader.observaciones} AS TEXT)` : 'NULL::text'} AS observaciones,
+        ${schemaHeader.observacionesCierre ? `CAST(h.${schemaHeader.observacionesCierre} AS TEXT)` : 'NULL::text'} AS observaciones_cierre,
+        ${schemaHeader.codUsuarioApertura ? `h.${schemaHeader.codUsuarioApertura}` : 'NULL::int'} AS cod_usuario_apertura,
+        ${schemaHeader.codUsuarioApertura ? 'ua.nombre_usuario' : 'NULL::text'} AS usuario_apertura,
+        ${schemaHeader.codUsuarioCierre ? `h.${schemaHeader.codUsuarioCierre}` : 'NULL::int'} AS cod_usuario_cierre,
+        ${schemaHeader.codUsuarioCierre ? 'uc.nombre_usuario' : 'NULL::text'} AS usuario_cierre,
+        (
+          SELECT COUNT(*)::int
+          FROM ${schemaDetail.tableName} d
+          WHERE d.${schemaDetail.codConteo} = h.${schemaHeader.pk}
+        ) AS total_detalles,
+        (
+          SELECT COUNT(*)::int
+          FROM ${schemaDetail.tableName} d
+          WHERE d.${schemaDetail.codConteo} = h.${schemaHeader.pk}
+            AND ${exprDiferenciaDetalle} > 0
+        ) AS total_diferencias_positivas,
+        (
+          SELECT COUNT(*)::int
+          FROM ${schemaDetail.tableName} d
+          WHERE d.${schemaDetail.codConteo} = h.${schemaHeader.pk}
+            AND ${exprDiferenciaDetalle} < 0
+        ) AS total_diferencias_negativas
+      FROM ${schemaHeader.tableName} h
+      ${schemaHeader.codUsuarioApertura ? `LEFT JOIN usuarios ua ON ua.cod_usuario = h.${schemaHeader.codUsuarioApertura}` : ''}
+      ${schemaHeader.codUsuarioCierre ? `LEFT JOIN usuarios uc ON uc.cod_usuario = h.${schemaHeader.codUsuarioCierre}` : ''}
+      WHERE ${whereSql}
+      ORDER BY ${schemaHeader.fechaApertura ? `h.${schemaHeader.fechaApertura}` : `h.${schemaHeader.pk}`} DESC, h.${schemaHeader.pk} DESC
+      LIMIT :limit OFFSET :offset
+    `, {
+      replacements: {
+        ...replacements,
+        limit,
+        offset
+      },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    return {
+      data: filas,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages
+      },
+      datos: filas,
+      total,
+      pagina: page,
+      limite: limit,
+      totalPaginas: totalPages,
+      page,
+      limit,
+      totalPages
+    };
+  }
+
+  // // Lista detalle persistido de un conteo para recuperar historial completo
+  async listarDetallesConteo(codConteo, query = {}) {
+    const schemaConteos = await this.obtenerSchemaConteosCompatible();
+    const { header: schemaHeader, detail: schemaDetail } = schemaConteos;
+    const { page, limit, offset } = resolverPaginacion(query);
+
+    const conteo = await this.obtenerConteoPorId({
+      schemaHeader,
+      codConteo,
+      transaction: undefined,
+      forUpdate: false
+    });
+    if (!conteo) {
+      throw Object.assign(new Error('Conteo no encontrado'), { status: 404 });
+    }
+
+    const [countRow] = await sequelize.query(`
+      SELECT COUNT(*)::int AS total
+      FROM ${schemaDetail.tableName} d
+      WHERE d.${schemaDetail.codConteo} = :codConteo
+    `, {
+      replacements: { codConteo },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    const total = Number(countRow?.total || 0);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const exprDiferencia = schemaDetail.diferencia
+      ? `COALESCE(d.${schemaDetail.diferencia}, 0)`
+      : (schemaDetail.stockSistema
+          ? `(COALESCE(d.${schemaDetail.stockFisico}, 0) - COALESCE(d.${schemaDetail.stockSistema}, 0))`
+          : '0');
+
+    const filas = await sequelize.query(`
+      SELECT
+        ${schemaDetail.pk ? `d.${schemaDetail.pk}` : 'NULL::int'} AS cod_conteo_detalle,
+        d.${schemaDetail.codConteo} AS cod_conteo,
+        ${schemaDetail.codInventario ? `d.${schemaDetail.codInventario}` : 'NULL::int'} AS cod_inventario,
+        d.${schemaDetail.codProducto} AS cod_producto,
+        p.nombre_producto,
+        d.${schemaDetail.codUbicacion} AS cod_ubicacion,
+        COALESCE(
+          NULLIF(u.codigo_qr, ''),
+          NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
+          CAST(u.cod_ubicacion AS TEXT)
+        ) AS ubicacion,
+        ${schemaDetail.stockSistema ? `COALESCE(d.${schemaDetail.stockSistema}, 0)` : '0'} AS stock_sistema,
+        COALESCE(d.${schemaDetail.stockFisico}, 0) AS stock_fisico,
+        ${exprDiferencia} AS diferencia,
+        ${schemaDetail.observaciones ? `CAST(d.${schemaDetail.observaciones} AS TEXT)` : 'NULL::text'} AS observaciones,
+        ${schemaDetail.fechaRegistro ? `CAST(d.${schemaDetail.fechaRegistro} AS TIMESTAMP)` : 'NULL::timestamp'} AS fecha_registro,
+        COALESCE(i.stock, 0) AS stock_actual
+      FROM ${schemaDetail.tableName} d
+      LEFT JOIN producto p ON p.cod_producto = d.${schemaDetail.codProducto}
+      LEFT JOIN ubicacion u ON u.cod_ubicacion = d.${schemaDetail.codUbicacion}
+      LEFT JOIN inventario i ON i.cod_inventario = ${schemaDetail.codInventario ? `d.${schemaDetail.codInventario}` : 'NULL'}
+      WHERE d.${schemaDetail.codConteo} = :codConteo
+      ORDER BY ${schemaDetail.pk ? `d.${schemaDetail.pk}` : `d.${schemaDetail.codConteo}`} ASC
+      LIMIT :limit OFFSET :offset
+    `, {
+      replacements: {
+        codConteo,
+        limit,
+        offset
+      },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    return {
+      conteo: {
+        cod_conteo: conteo[schemaHeader.pk],
+        estado: schemaHeader.estado ? conteo[schemaHeader.estado] : 'ABIERTO',
+        fecha_apertura: schemaHeader.fechaApertura ? conteo[schemaHeader.fechaApertura] : null,
+        fecha_cierre: schemaHeader.fechaCierre ? conteo[schemaHeader.fechaCierre] : null,
+        observaciones: schemaHeader.observaciones ? conteo[schemaHeader.observaciones] : null,
+        observaciones_cierre: schemaHeader.observacionesCierre ? conteo[schemaHeader.observacionesCierre] : null
+      },
+      data: filas,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages
+      },
+      datos: filas,
+      total,
+      pagina: page,
+      limite: limit,
+      totalPaginas: totalPages,
+      page,
+      limit,
+      totalPages
+    };
   }
 
   // // Obtiene inventario por producto+ubicacion con fallback cuando stock_reservado no existe
@@ -524,7 +784,7 @@ class InventarioConteosService {
             tipo_ajuste: tipoAjuste,
             cantidad: cantidadMovimiento,
             stock_sistema_antes: stockSistemaActual,
-            stock_fisico,
+            stock_fisico: stockFisico,
             stock_resultante: stockResultado
           });
 
