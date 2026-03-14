@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FiClipboard } from 'react-icons/fi';
 import { inventarioConteosApi } from './inventarioConteos.api.js';
 
@@ -20,6 +20,20 @@ const estadoCierreInicial = {
   observaciones_cierre: ''
 };
 
+const normalizarListado = (payload) => {
+  if (Array.isArray(payload?.data) && payload?.meta) {
+    return {
+      filas: payload.data,
+      total: Number(payload.meta.total || 0)
+    };
+  }
+
+  return {
+    filas: Array.isArray(payload?.datos) ? payload.datos : [],
+    total: Number(payload?.total || 0)
+  };
+};
+
 // // Traduce errores HTTP a mensajes funcionales para el flujo de conteos
 const obtenerMensajeError = (error) => {
   const status = error?.response?.status;
@@ -31,23 +45,31 @@ const obtenerMensajeError = (error) => {
   return serverMessage || 'Error inesperado en conteo fisico';
 };
 
+const formatearFecha = (valor) => {
+  if (!valor) return '-';
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return '-';
+  return fecha.toLocaleString();
+};
+
 const InventarioConteosPage = () => {
-  // // Estado de carga inicial para feedback visual uniforme
-  const [loading, setLoading] = useState(true);
-  // // Estado del conteo activo (abierto/cerrado) en la vista
-  const [conteoActivo, setConteoActivo] = useState(null);
-  // // Lista local de detalles capturados para mostrar diferencias en tabla
+  // // Estado de pantalla
+  const [conteos, setConteos] = useState([]);
+  const [totalConteos, setTotalConteos] = useState(0);
   const [detalles, setDetalles] = useState([]);
+  const [totalDetalles, setTotalDetalles] = useState(0);
+  const [conteoActivo, setConteoActivo] = useState(null);
+  const [conteoManual, setConteoManual] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
 
   // // Formularios por etapa
   const [formApertura, setFormApertura] = useState(estadoAperturaInicial);
   const [formDetalle, setFormDetalle] = useState(estadoDetalleInicial);
   const [formCierre, setFormCierre] = useState(estadoCierreInicial);
 
-  // // Input manual para retomar un conteo por id sin abrir uno nuevo
-  const [conteoManual, setConteoManual] = useState('');
-
-  // // Estados de proceso por etapa
+  // // Estados de proceso
+  const [loadingConteos, setLoadingConteos] = useState(true);
+  const [loadingDetalles, setLoadingDetalles] = useState(false);
   const [savingApertura, setSavingApertura] = useState(false);
   const [savingDetalle, setSavingDetalle] = useState(false);
   const [savingCierre, setSavingCierre] = useState(false);
@@ -57,41 +79,86 @@ const InventarioConteosPage = () => {
   const [success, setSuccess] = useState('');
   const [resultadoCierre, setResultadoCierre] = useState(null);
 
-  // // Finaliza loading inicial del submodulo
-  useEffect(() => {
-    setLoading(false);
+  // // Carga historial de conteos persistidos
+  const cargarConteos = useCallback(async (estado = filtroEstado) => {
+    try {
+      setLoadingConteos(true);
+      setError('');
+
+      const params = {
+        page: 1,
+        limit: 30
+      };
+      if (estado) params.estado = estado;
+
+      const { data } = await inventarioConteosApi.listar(params);
+      if (!data?.ok) {
+        setConteos([]);
+        setTotalConteos(0);
+        setError('Respuesta invalida al listar conteos');
+        return;
+      }
+
+      const normalizado = normalizarListado(data.data);
+      setConteos(normalizado.filas);
+      setTotalConteos(normalizado.total);
+    } catch (err) {
+      setConteos([]);
+      setTotalConteos(0);
+      setError(obtenerMensajeError(err));
+    } finally {
+      setLoadingConteos(false);
+    }
+  }, [filtroEstado]);
+
+  // // Carga detalle persistido de un conteo
+  const cargarDetallesConteo = useCallback(async (codConteo) => {
+    if (!Number.isInteger(codConteo) || codConteo <= 0) return;
+
+    try {
+      setLoadingDetalles(true);
+      setError('');
+
+      const { data } = await inventarioConteosApi.listarDetalles(codConteo, {
+        page: 1,
+        limit: 500
+      });
+      if (!data?.ok) {
+        setDetalles([]);
+        setTotalDetalles(0);
+        setError('Respuesta invalida al listar detalle del conteo');
+        return;
+      }
+
+      const normalizado = normalizarListado(data.data);
+      setDetalles(normalizado.filas);
+      setTotalDetalles(normalizado.total);
+      setConteoActivo(data.data?.conteo || null);
+    } catch (err) {
+      setDetalles([]);
+      setTotalDetalles(0);
+      setError(obtenerMensajeError(err));
+    } finally {
+      setLoadingDetalles(false);
+    }
   }, []);
 
-  // // Calcula resumen local de diferencias capturadas en la tabla
+  // // Carga inicial de historial
+  React.useEffect(() => {
+    cargarConteos('');
+  }, [cargarConteos]);
+
+  // // Calcula resumen local de diferencias capturadas
   const resumenDiferencias = useMemo(() => {
     const positivos = detalles.filter((d) => Number(d.diferencia) > 0).length;
     const negativos = detalles.filter((d) => Number(d.diferencia) < 0).length;
     const sinCambio = detalles.filter((d) => Number(d.diferencia) === 0).length;
     return {
-      total: detalles.length,
       positivos,
       negativos,
       sinCambio
     };
   }, [detalles]);
-
-  // // Reemplaza o agrega detalle en el estado local por clave producto+ubicacion
-  const upsertDetalleLocal = (resumen) => {
-    if (!resumen) return;
-    const clave = `${resumen.cod_producto}-${resumen.cod_ubicacion}`;
-    setDetalles((prev) => {
-      const mapa = new Map(prev.map((item) => [`${item.cod_producto}-${item.cod_ubicacion}`, item]));
-      mapa.set(clave, {
-        cod_producto: resumen.cod_producto,
-        cod_ubicacion: resumen.cod_ubicacion,
-        stock_sistema: resumen.stock_sistema,
-        stock_fisico: resumen.stock_fisico,
-        diferencia: resumen.diferencia,
-        accion: resumen.accion
-      });
-      return Array.from(mapa.values());
-    });
-  };
 
   // // Etapa 1: apertura de conteo fisico
   const abrirConteo = async (event) => {
@@ -113,17 +180,14 @@ const InventarioConteosPage = () => {
         return;
       }
 
-      const codConteo = data?.data?.cod_conteo;
-      setConteoActivo({
-        cod_conteo: codConteo,
-        estado: data?.data?.estado || 'ABIERTO'
-      });
-      setDetalles([]);
+      const codConteo = Number(data?.data?.cod_conteo || 0);
+      setConteoManual(codConteo ? String(codConteo) : '');
+      setFormApertura(estadoAperturaInicial);
       setFormDetalle(estadoDetalleInicial);
       setFormCierre(estadoCierreInicial);
-      setFormApertura(estadoAperturaInicial);
-      setConteoManual(codConteo ? String(codConteo) : '');
       setSuccess(`Conteo ${codConteo} abierto correctamente`);
+      await cargarConteos();
+      await cargarDetallesConteo(codConteo);
     } catch (err) {
       setError(obtenerMensajeError(err));
     } finally {
@@ -131,7 +195,7 @@ const InventarioConteosPage = () => {
     }
   };
 
-  // // Etapa 2: captura de detalle fisico (insert/update por producto+ubicacion)
+  // // Etapa 2: captura de detalle fisico persistente
   const registrarDetalle = async (event) => {
     event.preventDefault();
 
@@ -165,14 +229,10 @@ const InventarioConteosPage = () => {
         return;
       }
 
-      const resumen = data?.data?.resumen || null;
-      upsertDetalleLocal(resumen);
-      setConteoActivo((prev) => ({
-        cod_conteo: codConteo,
-        estado: prev?.estado || 'ABIERTO'
-      }));
       setFormDetalle(estadoDetalleInicial);
-      setSuccess(`Detalle ${resumen?.accion || 'registrado'} en conteo ${codConteo}`);
+      setSuccess(`Detalle ${data?.data?.accion || 'registrado'} en conteo ${codConteo}`);
+      await cargarConteos();
+      await cargarDetallesConteo(codConteo);
     } catch (err) {
       setError(obtenerMensajeError(err));
     } finally {
@@ -205,13 +265,10 @@ const InventarioConteosPage = () => {
         return;
       }
 
-      setConteoActivo((prev) => ({
-        cod_conteo: codConteo,
-        estado: 'CERRADO',
-        ...prev
-      }));
       setResultadoCierre(data?.data || null);
       setSuccess(`Conteo ${codConteo} cerrado correctamente`);
+      await cargarConteos();
+      await cargarDetallesConteo(codConteo);
     } catch (err) {
       setError(obtenerMensajeError(err));
     } finally {
@@ -219,16 +276,15 @@ const InventarioConteosPage = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="jyr-card mt-4">
-        <div className="jyr-card-body d-flex align-items-center gap-2">
-          <span className="spinner-border spinner-border-sm" />
-          <span>Cargando submodulo de conteo fisico...</span>
-        </div>
-      </div>
-    );
-  }
+  // // Carga manual de detalle de conteo existente
+  const cargarConteoManual = async () => {
+    const codConteo = Number(conteoManual);
+    if (!Number.isInteger(codConteo) || codConteo <= 0) {
+      setError('Debes indicar un conteo valido para consultar detalle');
+      return;
+    }
+    await cargarDetallesConteo(codConteo);
+  };
 
   return (
     <div>
@@ -240,14 +296,12 @@ const InventarioConteosPage = () => {
       </div>
 
       {success && (
-        // // Feedback positivo del flujo de conteo
         <div className="alert alert-success" role="alert">
           {success}
         </div>
       )}
 
       {error && (
-        // // Feedback de error funcional (validaciones y conflictos)
         <div className="alert alert-danger" role="alert">
           {error}
         </div>
@@ -261,18 +315,16 @@ const InventarioConteosPage = () => {
               <div className="col-12 col-md-9">
                 <label className="form-label">Observaciones (opcional)</label>
                 <input
-                  // // Observaciones iniciales del encabezado de conteo
                   type="text"
                   className="form-control"
                   maxLength={500}
                   value={formApertura.observaciones}
                   onChange={(event) => setFormApertura({ observaciones: event.target.value })}
-                  placeholder="Conteo general de bodega principal"
+                  placeholder="Conteo general de bodega"
                 />
               </div>
               <div className="col-12 col-md-3 d-flex align-items-end">
                 <button
-                  // // Accion de apertura del conteo
                   type="submit"
                   className="btn btn-primary w-100"
                   disabled={savingApertura}
@@ -293,7 +345,6 @@ const InventarioConteosPage = () => {
             <div className="col-12 col-md-4">
               <label className="form-label">Conteo activo</label>
               <input
-                // // Permite retomar un conteo por id cuando se requiere captura manual posterior
                 type="number"
                 min="1"
                 className="form-control"
@@ -302,12 +353,22 @@ const InventarioConteosPage = () => {
                 placeholder="ID conteo"
               />
             </div>
-            <div className="col-12 col-md-8 d-flex align-items-end">
+            <div className="col-12 col-md-3 d-flex align-items-end">
+              <button
+                type="button"
+                className="btn btn-outline-primary w-100"
+                onClick={cargarConteoManual}
+                disabled={loadingDetalles}
+              >
+                Cargar detalle
+              </button>
+            </div>
+            <div className="col-12 col-md-5 d-flex align-items-end">
               <div className="w-100 alert alert-light border mb-0">
                 <strong>Estado actual:</strong>{' '}
                 {conteoActivo?.cod_conteo
                   ? `Conteo #${conteoActivo.cod_conteo} (${conteoActivo.estado || 'ABIERTO'})`
-                  : 'Sin conteo en memoria'}
+                  : 'Sin conteo seleccionado'}
               </div>
             </div>
           </div>
@@ -317,7 +378,6 @@ const InventarioConteosPage = () => {
               <div className="col-12 col-md-3">
                 <label className="form-label">Cod. Producto</label>
                 <input
-                  // // Producto contado fisicamente
                   type="number"
                   min="1"
                   className="form-control"
@@ -329,7 +389,6 @@ const InventarioConteosPage = () => {
               <div className="col-12 col-md-3">
                 <label className="form-label">Cod. Ubicacion</label>
                 <input
-                  // // Ubicacion fisica del conteo
                   type="number"
                   min="1"
                   className="form-control"
@@ -341,7 +400,6 @@ const InventarioConteosPage = () => {
               <div className="col-12 col-md-3">
                 <label className="form-label">Stock fisico</label>
                 <input
-                  // // Conteo fisico capturado (>=0)
                   type="number"
                   min="0"
                   step="1"
@@ -353,7 +411,6 @@ const InventarioConteosPage = () => {
               </div>
               <div className="col-12 col-md-3 d-flex align-items-end">
                 <button
-                  // // Guarda linea de detalle del conteo
                   type="submit"
                   className="btn btn-secondary w-100"
                   disabled={savingDetalle}
@@ -364,7 +421,6 @@ const InventarioConteosPage = () => {
               <div className="col-12">
                 <label className="form-label">Observaciones detalle (opcional)</label>
                 <input
-                  // // Comentario adicional de la linea de conteo
                   type="text"
                   maxLength={500}
                   className="form-control"
@@ -380,7 +436,10 @@ const InventarioConteosPage = () => {
 
       <div className="jyr-card mt-4">
         <div className="jyr-card-body">
-          <h5 className="mb-3">Diferencias capturadas</h5>
+          <h5 className="mb-3">Diferencias persistidas del conteo</h5>
+          <div className="alert alert-light border mb-3">
+            <strong>Total detalle:</strong> {totalDetalles} | <strong>Positivos:</strong> {resumenDiferencias.positivos} | <strong>Negativos:</strong> {resumenDiferencias.negativos} | <strong>Sin cambio:</strong> {resumenDiferencias.sinCambio}
+          </div>
           <div className="table-responsive">
             <table className="table table-sm table-striped align-middle">
               <thead>
@@ -390,38 +449,31 @@ const InventarioConteosPage = () => {
                   <th>Sistema</th>
                   <th>Fisico</th>
                   <th>Diferencia</th>
-                  <th>Accion</th>
+                  <th>Fecha</th>
                 </tr>
               </thead>
               <tbody>
-                {detalles.length === 0 && (
+                {!loadingDetalles && detalles.length === 0 && (
                   <tr>
                     <td colSpan="6" className="text-center text-muted">
-                      Sin detalles capturados.
+                      Sin detalle persistido para el conteo seleccionado.
                     </td>
                   </tr>
                 )}
                 {detalles.map((item) => (
-                  <tr key={`${item.cod_producto}-${item.cod_ubicacion}`}>
-                    <td>{item.cod_producto}</td>
-                    <td>{item.cod_ubicacion}</td>
+                  <tr key={item.cod_conteo_detalle || `${item.cod_producto}-${item.cod_ubicacion}-${item.fecha_registro}`}>
+                    <td>{item.nombre_producto || item.cod_producto}</td>
+                    <td>{item.ubicacion || item.cod_ubicacion}</td>
                     <td>{item.stock_sistema}</td>
                     <td>{item.stock_fisico}</td>
                     <td className={Number(item.diferencia) === 0 ? '' : Number(item.diferencia) > 0 ? 'text-success' : 'text-danger'}>
                       {item.diferencia}
                     </td>
-                    <td>{item.accion}</td>
+                    <td>{formatearFecha(item.fecha_registro)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-
-          <div className="alert alert-light border mt-3 mb-0">
-            <strong>Total detalles:</strong> {resumenDiferencias.total} |{' '}
-            <strong>Positivos:</strong> {resumenDiferencias.positivos} |{' '}
-            <strong>Negativos:</strong> {resumenDiferencias.negativos} |{' '}
-            <strong>Sin cambio:</strong> {resumenDiferencias.sinCambio}
           </div>
         </div>
       </div>
@@ -434,7 +486,6 @@ const InventarioConteosPage = () => {
               <div className="col-12 col-md-9">
                 <label className="form-label">Observaciones cierre (opcional)</label>
                 <input
-                  // // Observaciones finales del cierre de conteo
                   type="text"
                   maxLength={500}
                   className="form-control"
@@ -445,7 +496,6 @@ const InventarioConteosPage = () => {
               </div>
               <div className="col-12 col-md-3 d-flex align-items-end">
                 <button
-                  // // Accion de cierre transaccional del conteo
                   type="submit"
                   className="btn btn-danger w-100"
                   disabled={savingCierre}
@@ -457,7 +507,6 @@ const InventarioConteosPage = () => {
           </form>
 
           {resultadoCierre?.resumen && (
-            // // Resumen final de cierre con conteo de ajustes aplicados
             <div className="alert alert-light border mt-3 mb-0">
               <div><strong>Total detalles:</strong> {resultadoCierre.resumen.total_detalles}</div>
               <div><strong>Ajustes +:</strong> {resultadoCierre.resumen.ajustes_positivos}</div>
@@ -468,8 +517,90 @@ const InventarioConteosPage = () => {
           )}
         </div>
       </div>
+
+      <div className="jyr-card mt-4">
+        <div className="jyr-card-body">
+          <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h5 className="mb-0">Historial persistente de conteos</h5>
+            <div className="d-flex gap-2">
+              <select
+                className="form-select"
+                value={filtroEstado}
+                onChange={(event) => setFiltroEstado(event.target.value)}
+              >
+                <option value="">Todos</option>
+                <option value="ABIERTO">ABIERTO</option>
+                <option value="CERRADO">CERRADO</option>
+                <option value="ANULADO">ANULADO</option>
+              </select>
+              <button
+                type="button"
+                className="btn btn-outline-primary"
+                onClick={() => cargarConteos()}
+                disabled={loadingConteos}
+              >
+                Buscar
+              </button>
+            </div>
+          </div>
+
+          <div className="alert alert-light border mb-3">
+            <strong>Total conteos:</strong> {totalConteos}
+          </div>
+
+          <div className="table-responsive">
+            <table className="table table-sm table-striped align-middle">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Estado</th>
+                  <th>Apertura</th>
+                  <th>Cierre</th>
+                  <th>Detalle</th>
+                  <th>Diferencias +</th>
+                  <th>Diferencias -</th>
+                  <th>Accion</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!loadingConteos && conteos.length === 0 && (
+                  <tr>
+                    <td colSpan="8" className="text-center text-muted">
+                      No hay conteos registrados.
+                    </td>
+                  </tr>
+                )}
+                {conteos.map((item) => (
+                  <tr key={item.cod_conteo}>
+                    <td>{item.cod_conteo}</td>
+                    <td>{item.estado || '-'}</td>
+                    <td>{formatearFecha(item.fecha_apertura)}</td>
+                    <td>{formatearFecha(item.fecha_cierre)}</td>
+                    <td>{item.total_detalles || 0}</td>
+                    <td>{item.total_diferencias_positivas || 0}</td>
+                    <td>{item.total_diferencias_negativas || 0}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        onClick={async () => {
+                          setConteoManual(String(item.cod_conteo));
+                          await cargarDetallesConteo(Number(item.cod_conteo));
+                        }}
+                      >
+                        Ver detalle
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
 export default InventarioConteosPage;
+

@@ -2,6 +2,8 @@ import api from '../../services/axiosApi.js';
 
 // // API del submodulo de reservas de inventario
 export const inventarioReservasApi = {
+  // // Lista reservas persistidas con filtros/paginacion
+  listar: (params) => api.get('/inventario/reservas', { params }),
   // // Crea reserva activa sobre inventario disponible
   crear: (data) => api.post('/inventario/reservas', data),
   // // Libera reserva activa

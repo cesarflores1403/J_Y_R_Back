@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FiRepeat } from 'react-icons/fi';
 import { inventarioTransferenciasApi } from './inventarioTransferencias.api.js';
+import { useUbicaciones } from '../../hooks/useUbicaciones.js';
 
 // // Estado inicial del formulario de transferencias entre ubicaciones
 const estadoInicial = {
@@ -24,6 +25,31 @@ const obtenerMensajeError = (error) => {
   return serverMessage || 'Error inesperado al registrar la transferencia';
 };
 
+// // Determina si una ubicacion puede usarse en operaciones de transferencia
+const esUbicacionActiva = (estado) => {
+  if (estado === null || estado === undefined) return true;
+  const normalizado = String(estado).trim().toUpperCase();
+  return ['ACTIVA', 'ACTIVO', '1', 'TRUE'].includes(normalizado);
+};
+
+// // Construye etiqueta legible de ubicacion para selects operativos
+const formatearEtiquetaUbicacion = (u) => {
+  if (!u) return '';
+  const qr = String(u.codigo_qr || '').trim();
+  const desc = String(u.descripcion || '').trim();
+  const partes = [u.pasillo, u.estanteria, u.nivel_1, u.nivel_2]
+    .map((p) => String(p || '').trim())
+    .filter(Boolean);
+  const detalle = partes.length > 0 ? partes.join('-') : null;
+
+  if (qr && desc) return `${u.cod_ubicacion} - ${qr} (${desc})`;
+  if (qr && detalle) return `${u.cod_ubicacion} - ${qr} (${detalle})`;
+  if (qr) return `${u.cod_ubicacion} - ${qr}`;
+  if (desc) return `${u.cod_ubicacion} - ${desc}`;
+  if (detalle) return `${u.cod_ubicacion} - ${detalle}`;
+  return String(u.cod_ubicacion);
+};
+
 const TransferenciaForm = ({ onTransferenciaRegistrada }) => {
   // // Estado local para loading inicial, guardado, mensajes y resultado de la ultima transferencia
   const [loading, setLoading] = useState(true);
@@ -32,6 +58,13 @@ const TransferenciaForm = ({ onTransferenciaRegistrada }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [ultimoResultado, setUltimoResultado] = useState(null);
+  // // Catalogo de ubicaciones para evitar ingreso manual de codigos inactivos
+  const { ubicaciones, loadingUbicaciones } = useUbicaciones();
+
+  // // Solo ubicaciones activas pueden operar transferencias
+  const ubicacionesActivas = Array.isArray(ubicaciones)
+    ? ubicaciones.filter((u) => esUbicacionActiva(u.estado_ubi))
+    : [];
 
   // // Loading inicial del submodulo (patron visual uniforme con otros formularios operativos)
   useEffect(() => {
@@ -62,11 +95,25 @@ const TransferenciaForm = ({ onTransferenciaRegistrada }) => {
         return;
       }
 
+      // // Validacion cliente de seleccion obligatoria de ubicaciones activas
+      if (!form.cod_ubicacion_origen || !form.cod_ubicacion_destino) {
+        setError('Debe seleccionar ubicacion origen y ubicacion destino');
+        return;
+      }
+
       // // Validacion cliente de ubicaciones distintas para evitar transferencias nulas
       const codUbicacionOrigen = Number(form.cod_ubicacion_origen);
       const codUbicacionDestino = Number(form.cod_ubicacion_destino);
       if (codUbicacionOrigen === codUbicacionDestino) {
         setError('La ubicacion origen y destino no pueden ser iguales');
+        return;
+      }
+
+      // // Defensa de UX: bloquea envio si alguna ubicacion ya no esta activa
+      const origenActiva = ubicacionesActivas.some((u) => Number(u.cod_ubicacion) === codUbicacionOrigen);
+      const destinoActiva = ubicacionesActivas.some((u) => Number(u.cod_ubicacion) === codUbicacionDestino);
+      if (!origenActiva || !destinoActiva) {
+        setError('Solo se permiten transferencias entre ubicaciones activas');
         return;
       }
 
@@ -156,30 +203,52 @@ const TransferenciaForm = ({ onTransferenciaRegistrada }) => {
 
             <div className="col-12 col-md-4">
               <label className="form-label">Ubicacion origen</label>
-              <input
-                // // Ubicacion de donde se descuenta stock
-                type="number"
-                min="1"
+              <select
+                // // Ubicacion activa de donde se descuenta stock
                 className="form-control"
                 value={form.cod_ubicacion_origen}
                 onChange={(event) => actualizarCampo('cod_ubicacion_origen', event.target.value)}
-                placeholder="Ej: 1"
+                disabled={loadingUbicaciones || saving}
                 required
-              />
+              >
+                <option value="">
+                  {loadingUbicaciones ? 'Cargando ubicaciones...' : '-- Seleccionar origen --'}
+                </option>
+                {ubicacionesActivas.map((u) => (
+                  <option
+                    key={`origen-${u.cod_ubicacion}`}
+                    value={u.cod_ubicacion}
+                    disabled={String(form.cod_ubicacion_destino) === String(u.cod_ubicacion)}
+                  >
+                    {formatearEtiquetaUbicacion(u)}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="col-12 col-md-4">
               <label className="form-label">Ubicacion destino</label>
-              <input
-                // // Ubicacion a la que se incrementa stock
-                type="number"
-                min="1"
+              <select
+                // // Ubicacion activa a la que se incrementa stock
                 className="form-control"
                 value={form.cod_ubicacion_destino}
                 onChange={(event) => actualizarCampo('cod_ubicacion_destino', event.target.value)}
-                placeholder="Ej: 5"
+                disabled={loadingUbicaciones || saving}
                 required
-              />
+              >
+                <option value="">
+                  {loadingUbicaciones ? 'Cargando ubicaciones...' : '-- Seleccionar destino --'}
+                </option>
+                {ubicacionesActivas.map((u) => (
+                  <option
+                    key={`destino-${u.cod_ubicacion}`}
+                    value={u.cod_ubicacion}
+                    disabled={String(form.cod_ubicacion_origen) === String(u.cod_ubicacion)}
+                  >
+                    {formatearEtiquetaUbicacion(u)}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="col-12 col-md-3">
@@ -238,12 +307,18 @@ const TransferenciaForm = ({ onTransferenciaRegistrada }) => {
             </div>
           </div>
 
+          {!loadingUbicaciones && ubicacionesActivas.length < 2 && (
+            <div className="alert alert-warning mt-3 mb-0" role="alert">
+              Se requieren al menos 2 ubicaciones activas para registrar transferencias.
+            </div>
+          )}
+
           <div className="d-flex justify-content-end mt-3">
             <button
               // // Submit con estado de guardado para prevenir doble envio concurrente
               type="submit"
               className="btn btn-primary"
-              disabled={saving}
+              disabled={saving || loadingUbicaciones || ubicacionesActivas.length < 2}
             >
               {saving ? (
                 <>

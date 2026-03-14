@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FiLock } from 'react-icons/fi';
 import { inventarioReservasApi } from './inventarioReservas.api.js';
 
@@ -11,18 +11,40 @@ const estadoCrearInicial = {
   observaciones: ''
 };
 
-// // Estado inicial para liberar reserva manualmente por id
+// // Estado inicial para liberar reserva por id
 const estadoLiberarInicial = {
   cod_reserva: '',
   motivo: '',
   observaciones: ''
 };
 
-// // Estado inicial para consumir reserva manualmente por id
+// // Estado inicial para consumir reserva por id
 const estadoConsumirInicial = {
   cod_reserva: '',
   referencia: '',
   observaciones: ''
+};
+
+// // Estado inicial de filtros del listado persistente
+const filtrosIniciales = {
+  cod_producto: '',
+  cod_ubicacion: '',
+  estado: '',
+  referencia: ''
+};
+
+const normalizarListado = (payload) => {
+  if (Array.isArray(payload?.data) && payload?.meta) {
+    return {
+      filas: payload.data,
+      total: Number(payload.meta.total || 0)
+    };
+  }
+
+  return {
+    filas: Array.isArray(payload?.datos) ? payload.datos : [],
+    total: Number(payload?.total || 0)
+  };
 };
 
 // // Mapea errores HTTP a mensajes funcionales de la UI de reservas
@@ -36,71 +58,84 @@ const obtenerMensajeError = (error) => {
   return serverMessage || 'Error inesperado en reservas de inventario';
 };
 
+const formatearFecha = (valor) => {
+  if (!valor) return '-';
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return '-';
+  return fecha.toLocaleString();
+};
+
 const InventarioReservasPage = () => {
   // // Estado local de formularios y feedback
   const [formCrear, setFormCrear] = useState(estadoCrearInicial);
   const [formLiberar, setFormLiberar] = useState(estadoLiberarInicial);
   const [formConsumir, setFormConsumir] = useState(estadoConsumirInicial);
+  const [filtros, setFiltros] = useState(filtrosIniciales);
 
   // // Estado de proceso por accion
   const [savingCrear, setSavingCrear] = useState(false);
   const [savingLiberar, setSavingLiberar] = useState(false);
   const [savingConsumir, setSavingConsumir] = useState(false);
+  const [loadingListado, setLoadingListado] = useState(true);
 
   // // Estado de mensajes globales de la pantalla
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [reservas, setReservas] = useState([]);
+  const [totalReservas, setTotalReservas] = useState(0);
 
-  // // Lista local para visualizar reservas creadas durante la sesion UI
-  const [reservasLocales, setReservasLocales] = useState([]);
+  // // Carga reservas persistidas con filtros
+  const cargarReservas = useCallback(async (filtrosActivos = filtros) => {
+    try {
+      setLoadingListado(true);
 
-  // // Resumen local rapido para ver distribucion de estados en la lista de reservas
+      const params = {
+        page: 1,
+        limit: 50
+      };
+      if (filtrosActivos.cod_producto) params.cod_producto = Number(filtrosActivos.cod_producto);
+      if (filtrosActivos.cod_ubicacion) params.cod_ubicacion = Number(filtrosActivos.cod_ubicacion);
+      if (filtrosActivos.estado) params.estado = filtrosActivos.estado;
+      if (filtrosActivos.referencia) params.referencia = filtrosActivos.referencia;
+
+      const { data } = await inventarioReservasApi.listar(params);
+      if (!data?.ok) {
+        setReservas([]);
+        setTotalReservas(0);
+        setError('Respuesta invalida al listar reservas');
+        return;
+      }
+
+      const normalizado = normalizarListado(data.data);
+      setReservas(normalizado.filas);
+      setTotalReservas(normalizado.total);
+    } catch (err) {
+      setReservas([]);
+      setTotalReservas(0);
+      setError(obtenerMensajeError(err));
+    } finally {
+      setLoadingListado(false);
+    }
+  }, [filtros]);
+
+  // // Ejecuta carga inicial del historial persistente
+  React.useEffect(() => {
+    cargarReservas(filtrosIniciales);
+  }, [cargarReservas]);
+
+  // // Resumen rapido de estados en el listado actual
   const resumenReservas = useMemo(() => {
-    const activas = reservasLocales.filter((r) => String(r.estado || '').toUpperCase() === 'ACTIVA').length;
-    const liberadas = reservasLocales.filter((r) => String(r.estado || '').toUpperCase() === 'LIBERADA').length;
-    const consumidas = reservasLocales.filter((r) => String(r.estado || '').toUpperCase() === 'CONSUMIDA').length;
+    const activas = reservas.filter((r) => String(r.estado || '').toUpperCase() === 'ACTIVA').length;
+    const liberadas = reservas.filter((r) => String(r.estado || '').toUpperCase() === 'LIBERADA').length;
+    const consumidas = reservas.filter((r) => String(r.estado || '').toUpperCase() === 'CONSUMIDA').length;
     return {
-      total: reservasLocales.length,
       activas,
       liberadas,
       consumidas
     };
-  }, [reservasLocales]);
+  }, [reservas]);
 
-  // // Inserta o actualiza una reserva en la lista local por id
-  const upsertReservaLocal = (reserva, resumen) => {
-    if (!reserva && !resumen?.cod_reserva) return;
-
-    const codReserva = Number(
-      resumen?.cod_reserva
-      || reserva?.cod_reserva_inventario
-      || reserva?.cod_reserva
-      || reserva?.id_reserva
-    );
-
-    const estado = String(
-      reserva?.estado
-      || reserva?.estado_reserva
-      || 'ACTIVA'
-    ).toUpperCase();
-
-    const item = {
-      cod_reserva: codReserva,
-      estado,
-      cantidad: Number(reserva?.cantidad ?? resumen?.cantidad ?? 0),
-      cod_producto: Number(reserva?.cod_producto ?? resumen?.cod_producto ?? 0),
-      cod_ubicacion: Number(reserva?.cod_ubicacion ?? resumen?.cod_ubicacion ?? 0),
-      referencia: reserva?.referencia ?? resumen?.referencia ?? null
-    };
-
-    setReservasLocales((prev) => {
-      const mapa = new Map(prev.map((r) => [r.cod_reserva, r]));
-      mapa.set(codReserva, { ...(mapa.get(codReserva) || {}), ...item });
-      return Array.from(mapa.values()).sort((a, b) => b.cod_reserva - a.cod_reserva);
-    });
-  };
-
-  // // Crea reserva y actualiza listado local
+  // // Crea reserva y recarga listado persistente
   const crearReserva = async (event) => {
     event.preventDefault();
 
@@ -129,9 +164,9 @@ const InventarioReservasPage = () => {
         return;
       }
 
-      upsertReservaLocal(data?.data?.reserva, data?.data?.resumen);
       setFormCrear(estadoCrearInicial);
       setSuccess('Reserva creada correctamente');
+      await cargarReservas();
     } catch (err) {
       setError(obtenerMensajeError(err));
     } finally {
@@ -139,7 +174,7 @@ const InventarioReservasPage = () => {
     }
   };
 
-  // // Ejecuta liberacion de reserva por id con motivo/observaciones opcionales
+  // // Libera reserva por id y recarga historial
   const liberarReserva = async (codReservaManual = null) => {
     try {
       setSavingLiberar(true);
@@ -163,9 +198,9 @@ const InventarioReservasPage = () => {
         return;
       }
 
-      upsertReservaLocal(data?.data?.reserva, data?.data?.resumen);
       setFormLiberar(estadoLiberarInicial);
       setSuccess(`Reserva ${codReserva} liberada correctamente`);
+      await cargarReservas();
     } catch (err) {
       setError(obtenerMensajeError(err));
     } finally {
@@ -173,7 +208,7 @@ const InventarioReservasPage = () => {
     }
   };
 
-  // // Ejecuta consumo de reserva por id con referencia/observaciones opcionales
+  // // Consume reserva por id y recarga historial
   const consumirReserva = async (codReservaManual = null) => {
     try {
       setSavingConsumir(true);
@@ -197,14 +232,27 @@ const InventarioReservasPage = () => {
         return;
       }
 
-      upsertReservaLocal(data?.data?.reserva, data?.data?.resumen);
       setFormConsumir(estadoConsumirInicial);
       setSuccess(`Reserva ${codReserva} consumida correctamente`);
+      await cargarReservas();
     } catch (err) {
       setError(obtenerMensajeError(err));
     } finally {
       setSavingConsumir(false);
     }
+  };
+
+  // // Aplica filtros del historial
+  const aplicarFiltros = async () => {
+    setError('');
+    await cargarReservas(filtros);
+  };
+
+  // // Limpia filtros del historial
+  const limpiarFiltros = async () => {
+    setFiltros(filtrosIniciales);
+    setError('');
+    await cargarReservas(filtrosIniciales);
   };
 
   return (
@@ -217,14 +265,12 @@ const InventarioReservasPage = () => {
       </div>
 
       {success && (
-        // // Mensaje de exito de operaciones de reserva
         <div className="alert alert-success" role="alert">
           {success}
         </div>
       )}
 
       {error && (
-        // // Mensaje de error funcional de reservas
         <div className="alert alert-danger" role="alert">
           {error}
         </div>
@@ -238,7 +284,6 @@ const InventarioReservasPage = () => {
               <div className="col-12 col-md-3">
                 <label className="form-label">Cod. Producto</label>
                 <input
-                  // // Producto a reservar
                   type="number"
                   min="1"
                   className="form-control"
@@ -250,7 +295,6 @@ const InventarioReservasPage = () => {
               <div className="col-12 col-md-3">
                 <label className="form-label">Cod. Ubicacion</label>
                 <input
-                  // // Ubicacion donde se reservara inventario
                   type="number"
                   min="1"
                   className="form-control"
@@ -262,7 +306,6 @@ const InventarioReservasPage = () => {
               <div className="col-12 col-md-2">
                 <label className="form-label">Cantidad</label>
                 <input
-                  // // Cantidad a reservar (>0)
                   type="number"
                   min="1"
                   step="1"
@@ -275,7 +318,6 @@ const InventarioReservasPage = () => {
               <div className="col-12 col-md-4">
                 <label className="form-label">Referencia (opcional)</label>
                 <input
-                  // // Referencia externa de cotizacion/documento
                   type="text"
                   maxLength={200}
                   className="form-control"
@@ -286,7 +328,6 @@ const InventarioReservasPage = () => {
               <div className="col-12">
                 <label className="form-label">Observaciones (opcional)</label>
                 <textarea
-                  // // Observaciones de la reserva
                   rows="3"
                   maxLength={500}
                   className="form-control"
@@ -296,7 +337,6 @@ const InventarioReservasPage = () => {
               </div>
               <div className="col-12 d-flex justify-content-end">
                 <button
-                  // // Submit de creacion de reserva
                   type="submit"
                   className="btn btn-primary"
                   disabled={savingCrear}
@@ -319,7 +359,6 @@ const InventarioReservasPage = () => {
                 <div className="mb-2">
                   <label className="form-label">ID reserva</label>
                   <input
-                    // // Id de reserva a liberar
                     type="number"
                     min="1"
                     className="form-control"
@@ -330,7 +369,6 @@ const InventarioReservasPage = () => {
                 <div className="mb-2">
                   <label className="form-label">Motivo (opcional)</label>
                   <input
-                    // // Motivo de liberacion
                     type="text"
                     maxLength={200}
                     className="form-control"
@@ -341,7 +379,6 @@ const InventarioReservasPage = () => {
                 <div className="mb-3">
                   <label className="form-label">Observaciones (opcional)</label>
                   <input
-                    // // Observaciones de liberacion
                     type="text"
                     maxLength={500}
                     className="form-control"
@@ -350,7 +387,6 @@ const InventarioReservasPage = () => {
                   />
                 </div>
                 <button
-                  // // Boton de liberacion manual
                   type="button"
                   className="btn btn-warning"
                   disabled={savingLiberar}
@@ -367,7 +403,6 @@ const InventarioReservasPage = () => {
                 <div className="mb-2">
                   <label className="form-label">ID reserva</label>
                   <input
-                    // // Id de reserva a consumir
                     type="number"
                     min="1"
                     className="form-control"
@@ -378,7 +413,6 @@ const InventarioReservasPage = () => {
                 <div className="mb-2">
                   <label className="form-label">Referencia (opcional)</label>
                   <input
-                    // // Referencia del consumo de reserva
                     type="text"
                     maxLength={200}
                     className="form-control"
@@ -389,7 +423,6 @@ const InventarioReservasPage = () => {
                 <div className="mb-3">
                   <label className="form-label">Observaciones (opcional)</label>
                   <input
-                    // // Observaciones del consumo
                     type="text"
                     maxLength={500}
                     className="form-control"
@@ -398,7 +431,6 @@ const InventarioReservasPage = () => {
                   />
                 </div>
                 <button
-                  // // Boton de consumo manual
                   type="button"
                   className="btn btn-danger"
                   disabled={savingConsumir}
@@ -414,9 +446,63 @@ const InventarioReservasPage = () => {
 
       <div className="jyr-card mt-4">
         <div className="jyr-card-body">
-          <h5 className="mb-3">Reservas locales de la sesión</h5>
+          <h5 className="mb-3">Historial persistente de reservas</h5>
+
+          <div className="row g-2 mb-3">
+            <div className="col-12 col-md-2">
+              <input
+                type="number"
+                min="1"
+                className="form-control"
+                placeholder="Producto"
+                value={filtros.cod_producto}
+                onChange={(event) => setFiltros((prev) => ({ ...prev, cod_producto: event.target.value }))}
+              />
+            </div>
+            <div className="col-12 col-md-2">
+              <input
+                type="number"
+                min="1"
+                className="form-control"
+                placeholder="Ubicacion"
+                value={filtros.cod_ubicacion}
+                onChange={(event) => setFiltros((prev) => ({ ...prev, cod_ubicacion: event.target.value }))}
+              />
+            </div>
+            <div className="col-12 col-md-2">
+              <select
+                className="form-select"
+                value={filtros.estado}
+                onChange={(event) => setFiltros((prev) => ({ ...prev, estado: event.target.value }))}
+              >
+                <option value="">Estado</option>
+                <option value="ACTIVA">ACTIVA</option>
+                <option value="LIBERADA">LIBERADA</option>
+                <option value="CONSUMIDA">CONSUMIDA</option>
+                <option value="ANULADA">ANULADA</option>
+              </select>
+            </div>
+            <div className="col-12 col-md-3">
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Referencia"
+                value={filtros.referencia}
+                onChange={(event) => setFiltros((prev) => ({ ...prev, referencia: event.target.value }))}
+              />
+            </div>
+            <div className="col-12 col-md-3 d-flex gap-2">
+              <button type="button" className="btn btn-outline-primary w-100" onClick={aplicarFiltros} disabled={loadingListado}>
+                Buscar
+              </button>
+              <button type="button" className="btn btn-outline-secondary w-100" onClick={limpiarFiltros} disabled={loadingListado}>
+                Limpiar
+              </button>
+            </div>
+          </div>
+
           <div className="alert alert-light border mb-3">
-            <strong>Total:</strong> {resumenReservas.total} | <strong>Activas:</strong> {resumenReservas.activas} | <strong>Liberadas:</strong> {resumenReservas.liberadas} | <strong>Consumidas:</strong> {resumenReservas.consumidas}
+            <strong>Total:</strong> {totalReservas} | <strong>Activas:</strong> {resumenReservas.activas} | <strong>Liberadas:</strong> {resumenReservas.liberadas} | <strong>Consumidas:</strong> {resumenReservas.consumidas}
           </div>
 
           <div className="table-responsive">
@@ -424,36 +510,39 @@ const InventarioReservasPage = () => {
               <thead>
                 <tr>
                   <th>ID</th>
+                  <th>Fecha</th>
                   <th>Producto</th>
-                  <th>Ubicación</th>
+                  <th>Ubicacion</th>
                   <th>Cantidad</th>
                   <th>Estado</th>
                   <th>Referencia</th>
+                  <th>Usuario</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {reservasLocales.length === 0 && (
+                {!loadingListado && reservas.length === 0 && (
                   <tr>
-                    <td colSpan="7" className="text-center text-muted">
-                      Aún no hay reservas registradas en esta sesión.
+                    <td colSpan="9" className="text-center text-muted">
+                      No hay reservas registradas.
                     </td>
                   </tr>
                 )}
-                {reservasLocales.map((r) => {
+                {reservas.map((r) => {
                   const estado = String(r.estado || '').toUpperCase();
                   const activa = estado === 'ACTIVA';
                   return (
                     <tr key={r.cod_reserva}>
                       <td>{r.cod_reserva}</td>
-                      <td>{r.cod_producto || '-'}</td>
-                      <td>{r.cod_ubicacion || '-'}</td>
+                      <td>{formatearFecha(r.fecha_creacion)}</td>
+                      <td>{r.nombre_producto || r.cod_producto}</td>
+                      <td>{r.ubicacion || r.cod_ubicacion}</td>
                       <td>{r.cantidad}</td>
                       <td>{estado}</td>
                       <td>{r.referencia || '-'}</td>
+                      <td>{r.usuario_creacion || '-'}</td>
                       <td className="d-flex gap-2">
                         <button
-                          // // Liberacion rapida desde listado local
                           type="button"
                           className="btn btn-sm btn-outline-warning"
                           disabled={!activa || savingLiberar}
@@ -462,7 +551,6 @@ const InventarioReservasPage = () => {
                           Liberar
                         </button>
                         <button
-                          // // Consumo rapido desde listado local
                           type="button"
                           className="btn btn-sm btn-outline-danger"
                           disabled={!activa || savingConsumir}
@@ -484,3 +572,4 @@ const InventarioReservasPage = () => {
 };
 
 export default InventarioReservasPage;
+
