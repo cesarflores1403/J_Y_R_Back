@@ -76,6 +76,24 @@ const estadoReservaNormalizado = (reserva, schemaReserva) => {
 };
 
 class InventarioReservasService {
+  // // Si el usuario autenticado no existe en tabla usuarios, retorna null para evitar FK invalida
+  async normalizarCodUsuario(codUsuario, transaction) {
+    if (!Number.isInteger(codUsuario) || codUsuario <= 0) return null;
+
+    const [fila] = await sequelize.query(`
+      SELECT cod_usuario
+      FROM usuarios
+      WHERE cod_usuario = :codUsuario
+      LIMIT 1
+    `, {
+      replacements: { codUsuario },
+      type: sequelize.QueryTypes.SELECT,
+      transaction
+    });
+
+    return fila?.cod_usuario ? Number(fila.cod_usuario) : null;
+  }
+
   // // Valida si hay estructura compatible de reservas para operar endpoints de esta HU
   async obtenerSchemaReservasCompatible() {
     const schemaReserva = await inventarioReservasSchemaService.obtenerSchemaReservas();
@@ -159,7 +177,10 @@ class InventarioReservasService {
     const codReserva = query.cod_reserva ? Number(query.cod_reserva) : null;
     const codProducto = query.cod_producto ? Number(query.cod_producto) : null;
     const codUbicacion = query.cod_ubicacion ? Number(query.cod_ubicacion) : null;
-    const estado = normalizarTexto(query.estado)?.toUpperCase() || null;
+    const estadoSolicitado = normalizarTexto(query.estado)?.toUpperCase() || null;
+    const estado = (estadoSolicitado && !['TODAS', 'TODOS'].includes(estadoSolicitado))
+      ? estadoSolicitado
+      : null;
     const referencia = normalizarTexto(query.referencia);
     const fechaDesde = normalizarFecha(query.fecha_desde);
     const fechaHasta = normalizarFecha(query.fecha_hasta);
@@ -258,8 +279,8 @@ class InventarioReservasService {
         p.nombre_producto,
         ${exprCodUbicacion} AS cod_ubicacion,
         COALESCE(
-          NULLIF(u.codigo_producto, ''),
           NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
+          NULLIF(u.codigo_producto, ''),
           CAST(u.cod_ubicacion AS TEXT)
         ) AS ubicacion,
         r.${schemaReserva.cantidad} AS cantidad,
@@ -315,7 +336,7 @@ class InventarioReservasService {
     const cantidad = Number(payload.cantidad);
     const referencia = payload?.referencia ? String(payload.referencia).trim() : '';
     const observaciones = payload?.observaciones ? String(payload.observaciones).trim() : '';
-    const codUsuario = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
+    const codUsuarioAuth = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
 
     // // Defensa en profundidad del service por seguridad
     if (!Number.isInteger(cantidad) || cantidad <= 0) {
@@ -326,6 +347,8 @@ class InventarioReservasService {
     let transaccionConfirmada = false;
 
     try {
+      const codUsuario = await this.normalizarCodUsuario(codUsuarioAuth, t);
+
       // // Validamos existencia y estado de producto/ubicacion
       const producto = await ProductoSeq.findByPk(codProducto, { transaction: t });
       if (!producto) {
@@ -431,7 +454,7 @@ class InventarioReservasService {
   // // Libera reserva activa disminuyendo solo stock_reservado y actualizando estado final
   async liberarReserva(codReserva, payload, options = {}) {
     const schemaReserva = await this.obtenerSchemaReservasCompatible();
-    const codUsuario = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
+    const codUsuarioAuth = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
     const motivo = payload?.motivo ? String(payload.motivo).trim() : '';
     const observaciones = payload?.observaciones ? String(payload.observaciones).trim() : '';
 
@@ -439,6 +462,8 @@ class InventarioReservasService {
     let transaccionConfirmada = false;
 
     try {
+      const codUsuario = await this.normalizarCodUsuario(codUsuarioAuth, t);
+
       // // Bloqueamos reserva para validar estado y evitar doble liberacion/consumo concurrente
       const reserva = await this.obtenerReservaPorId({
         schemaReserva,
@@ -542,7 +567,7 @@ class InventarioReservasService {
   async consumirReserva(codReserva, payload, options = {}) {
     const schemaReserva = await this.obtenerSchemaReservasCompatible();
     const schemaMovimiento = await inventarioMovimientosSchemaService.obtenerSchemaMovimiento();
-    const codUsuario = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
+    const codUsuarioAuth = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
     const referencia = payload?.referencia ? String(payload.referencia).trim() : '';
     const observaciones = payload?.observaciones ? String(payload.observaciones).trim() : '';
 
@@ -550,6 +575,8 @@ class InventarioReservasService {
     let transaccionConfirmada = false;
 
     try {
+      const codUsuario = await this.normalizarCodUsuario(codUsuarioAuth, t);
+
       // // Bloqueo de reserva para garantizar operacion idempotente y sin doble consumo
       const reserva = await this.obtenerReservaPorId({
         schemaReserva,

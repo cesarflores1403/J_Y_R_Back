@@ -86,6 +86,24 @@ const esConteoCerrado = ({ conteo, schemaHeader }) => {
 };
 
 class InventarioConteosService {
+  // // Valida que el usuario autenticado exista en tabla usuarios; si no existe devuelve null
+  async normalizarCodUsuario(codUsuario, transaction) {
+    if (!Number.isInteger(Number(codUsuario)) || Number(codUsuario) < 1) return null;
+
+    const [fila] = await sequelize.query(`
+      SELECT cod_usuario
+      FROM usuarios
+      WHERE cod_usuario = :codUsuario
+      LIMIT 1
+    `, {
+      replacements: { codUsuario: Number(codUsuario) },
+      type: sequelize.QueryTypes.SELECT,
+      transaction
+    });
+
+    return fila?.cod_usuario ? Number(fila.cod_usuario) : null;
+  }
+
   // // Garantiza que el schema de conteos exista y sea compatible antes de operar
   async obtenerSchemaConteosCompatible() {
     const schemaConteos = await inventarioConteosSchemaService.obtenerSchemaConteos();
@@ -281,7 +299,6 @@ class InventarioConteosService {
         p.nombre_producto,
         d.${schemaDetail.codUbicacion} AS cod_ubicacion,
         COALESCE(
-          NULLIF(u.codigo_producto, ''),
           NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
           CAST(u.cod_ubicacion AS TEXT)
         ) AS ubicacion,
@@ -428,12 +445,14 @@ class InventarioConteosService {
     const schemaConteos = await this.obtenerSchemaConteosCompatible();
     const { header: schemaHeader } = schemaConteos;
     const observaciones = payload?.observaciones ? String(payload.observaciones).trim() : '';
-    const codUsuario = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
+    const codUsuarioAuth = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
 
     const t = await sequelize.transaction();
     let transaccionConfirmada = false;
 
     try {
+      const codUsuario = await this.normalizarCodUsuario(codUsuarioAuth, t);
+
       // // Construimos INSERT dinamico de encabezado segun columnas reales detectadas
       const { sql, replacements } = construirInsertConteoSql({
         schemaHeader,
@@ -628,13 +647,15 @@ class InventarioConteosService {
     const schemaConteos = await this.obtenerSchemaConteosCompatible();
     const { header: schemaHeader, detail: schemaDetail } = schemaConteos;
     const schemaMovimiento = await inventarioMovimientosSchemaService.obtenerSchemaMovimiento();
-    const codUsuario = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
+    const codUsuarioAuth = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
     const observacionesCierre = payload?.observaciones_cierre ? String(payload.observaciones_cierre).trim() : '';
 
     const t = await sequelize.transaction();
     let transaccionConfirmada = false;
 
     try {
+      const codUsuario = await this.normalizarCodUsuario(codUsuarioAuth, t);
+
       // // Bloqueamos conteo objetivo para evitar doble cierre concurrente
       const conteo = await this.obtenerConteoPorId({
         schemaHeader,
