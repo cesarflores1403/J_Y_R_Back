@@ -1,4 +1,4 @@
-import { sequelize } from '../config/sequelize.js';
+﻿import { sequelize } from '../config/sequelize.js';
 import Cliente from '../models/Cliente.js';
 import Proveedor from '../models/ProveedorModel.js';
 import ProductoSeq from '../models/ProductoSeq.js';
@@ -6,24 +6,38 @@ import Factura from '../models/Factura.js';
 
 class ReporteService {
   async dashboard() {
-    // Conteos — estado_producto es varchar ('Activo'/'Inactivo'), no booleano
+    // Conteos principales del dashboard
     const totalClientes = await Cliente.count();
     const totalProveedores = await Proveedor.count({ where: { estado_proveedor: true } });
     const totalProductos = await ProductoSeq.count({ where: { estado_producto: 'Activo' } });
     const totalFacturas = await Factura.count({ where: { estado: true } });
 
+    // Resumen economico de ventas
     const [ventasResult] = await sequelize.query(`
       SELECT COALESCE(SUM(subtotal),0) as subtotal,
              COALESCE(SUM(isv),0) as isv,
              COALESCE(SUM(total),0) as total
-      FROM factura WHERE estado = true
+      FROM factura
+      WHERE estado = true
     `);
 
-    // stock_reservado no existe en la tabla inventario — usar solo stock vs stock_minimo
-    const [stockBajo] = await sequelize.query(`
-      SELECT COUNT(*) as total FROM inventario
-      WHERE stock < stock_minimo AND stock_minimo > 0
+    // Alertas de inventario separadas: sin existencia y stock bajo
+    const [alertasInventarioResult] = await sequelize.query(`
+      SELECT
+        COUNT(*) FILTER (
+          WHERE (COALESCE(i.stock, 0) - COALESCE(i.stock_reservado, 0)) <= 0
+        )::int AS sin_existencia,
+        COUNT(*) FILTER (
+          WHERE (COALESCE(i.stock, 0) - COALESCE(i.stock_reservado, 0)) > 0
+            AND (COALESCE(i.stock, 0) - COALESCE(i.stock_reservado, 0)) <= COALESCE(i.stock_minimo, 0)
+        )::int AS stock_bajo
+      FROM inventario i
+      LEFT JOIN producto p ON p.cod_producto = i.cod_producto
+      WHERE p.cod_producto IS NULL OR p.estado_producto = 'Activo'
     `);
+
+    const stockBajo = Number(alertasInventarioResult?.[0]?.stock_bajo || 0);
+    const stockEnCero = Number(alertasInventarioResult?.[0]?.sin_existencia || 0);
 
     const [ultimasFacturas] = await sequelize.query(`
       SELECT f.cod_factura, c.nombre, c.apellido, f.total, f.estado,
@@ -31,7 +45,8 @@ class ReporteService {
       FROM factura f
       JOIN clientes c ON c.cod_cliente = f.cod_cliente
       JOIN usuarios u ON u.cod_usuario = f.cod_usuario
-      ORDER BY f.cod_factura DESC LIMIT 5
+      ORDER BY f.cod_factura DESC
+      LIMIT 5
     `);
 
     return {
@@ -40,7 +55,15 @@ class ReporteService {
       totalProductos,
       totalFacturas,
       ventasTotales: ventasResult[0] || { subtotal: 0, isv: 0, total: 0 },
-      stockBajo: parseInt(stockBajo[0]?.total || 0),
+      // Compatibilidad con consumidores existentes
+      stockBajo,
+      // Campos nuevos para desglose explicito en UI
+      stockEnCero,
+      alertasInventario: {
+        stockBajo,
+        stockEnCero,
+        total: stockBajo + stockEnCero
+      },
       ultimasFacturas
     };
   }
