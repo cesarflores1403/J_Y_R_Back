@@ -1,4 +1,5 @@
 import React from 'react';
+import { FiInbox } from 'react-icons/fi';
 
 // // Formatea fecha de kardex en formato local legible
 const formatearFecha = (fecha) => {
@@ -14,7 +15,7 @@ const formatearFecha = (fecha) => {
 const formatearCantidad = (cantidad) => {
   if (cantidad === null || cantidad === undefined || cantidad === '') return 0;
   if (Number.isNaN(Number(cantidad))) return cantidad;
-  return Number(cantidad);
+  return Number(cantidad).toLocaleString();
 };
 
 // // Resalta el tipo de movimiento con badge Bootstrap
@@ -29,16 +30,28 @@ const obtenerClaseTipo = (tipo) => {
   return 'bg-secondary text-white';
 };
 
+// // Estilo de cantidad segun el tipo de movimiento del kardex
+const obtenerClaseCantidad = (tipo) => {
+  const tipoNormalizado = String(tipo || '').toUpperCase();
+  if (tipoNormalizado === 'ENTRADA' || tipoNormalizado === 'DEVOLUCION' || tipoNormalizado === 'COMPRA') {
+    return 'kdx-qty kdx-qty-in';
+  }
+  if (tipoNormalizado === 'SALIDA' || tipoNormalizado === 'BAJA') {
+    return 'kdx-qty kdx-qty-out';
+  }
+  return 'kdx-qty kdx-qty-neutral';
+};
+
 const KardexTabla = ({ filas, loading }) => {
   return (
-    <div className="table-responsive">
-      <table className="table table-hover mb-0">
+    <div className="table-responsive kdx-table-wrapper">
+      <table className="table table-hover mb-0 kdx-table">
         <thead>
           <tr>
             <th>Fecha</th>
             <th>Tipo</th>
             <th>Producto</th>
-            <th>Ubicacion</th>
+            <th>Ubicación</th>
             <th>Cantidad</th>
             <th>Referencia</th>
             <th>Usuario</th>
@@ -57,7 +70,10 @@ const KardexTabla = ({ filas, loading }) => {
           ) : filas.length === 0 ? (
             <tr>
               <td colSpan="7" className="text-center text-muted py-4">
-                No hay movimientos para los filtros seleccionados
+                <div className="kdx-empty-state">
+                  <FiInbox size={18} />
+                  <span>No hay movimientos para los filtros seleccionados</span>
+                </div>
               </td>
             </tr>
           ) : (
@@ -70,16 +86,20 @@ const KardexTabla = ({ filas, loading }) => {
                   </span>
                 </td>
                 <td>
-                  <div>{fila.nombre_producto || '-'}</div>
-                  <div className="text-muted small">ID: {fila.cod_producto ?? '-'}</div>
+                  <div className="kdx-cell-main">{fila.nombre_producto || '-'}</div>
+                  <div className="kdx-cell-sub">ID: {fila.cod_producto ?? '-'}</div>
                 </td>
                 <td>
-                  <div>{fila.ubicacion || '-'}</div>
-                  <div className="text-muted small">ID: {fila.cod_ubicacion ?? '-'}</div>
+                  <div className="kdx-cell-main">{fila.ubicacion || '-'}</div>
+                  <div className="kdx-cell-sub">ID: {fila.cod_ubicacion ?? '-'}</div>
                 </td>
-                <td>{formatearCantidad(fila.cantidad)}</td>
-                <td>{fila.referencia_documento || '-'}</td>
-                <td>{fila.nombre_usuario || '-'}</td>
+                <td>
+                  <span className={obtenerClaseCantidad(fila.tipo)}>
+                    {formatearCantidad(fila.cantidad)}
+                  </span>
+                </td>
+                <td className="kdx-reference">{fila.referencia_documento || '-'}</td>
+                <td className="kdx-user">{fila.nombre_usuario || '-'}</td>
               </tr>
             ))
           )}

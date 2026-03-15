@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FiChevronLeft, FiChevronRight, FiList } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiDatabase, FiList } from 'react-icons/fi';
 import KardexFiltros from './KardexFiltros.jsx';
 import KardexTabla from './KardexTabla.jsx';
 import { inventarioMovimientosApi } from './inventarioMovimientos.api.js';
@@ -241,18 +241,31 @@ const Kardex = ({ refreshKey = 0 }) => {
     ? Math.min(meta.pagina * meta.limite, meta.total)
     : 0;
   const paginasVisibles = construirPaginasVisibles(meta.pagina, meta.totalPaginas);
-
   return (
-    <div className="jyr-card mt-4">
-      <div className="jyr-card-body">
-        <div className="d-flex align-items-center gap-2 mb-3">
-          <FiList />
-          <h5 className="mb-0">Kardex (Movimientos)</h5>
+    <section className="kdx-shell mt-4">
+      <div className="kdx-hero">
+        <div className="kdx-hero-head">
+          <div className="kdx-title-wrap">
+            <div className="kdx-title-icon">
+              <FiList />
+            </div>
+            <div>
+              <h5 className="mb-0">Kardex (Movimientos)</h5>
+              <p className="kdx-subtitle mb-0">Historial trazable de entradas, salidas, bajas y ajustes de inventario.</p>
+            </div>
+          </div>
+          <div className="kdx-mini-kpi">
+            <span className="kdx-mini-kpi-label">Total</span>
+            <strong>{meta.total}</strong>
+          </div>
         </div>
+      </div>
 
+      <div className="jyr-card kdx-filtros-card">
+        <div className="jyr-card-body">
         {error && (
           // // Error de consulta/validacion del kardex
-          <div className="alert alert-danger" role="alert">
+          <div className="alert alert-danger kdx-error-alert" role="alert">
             {error}
           </div>
         )}
@@ -266,104 +279,69 @@ const Kardex = ({ refreshKey = 0 }) => {
           onAplicar={aplicarFiltros}
           onLimpiar={limpiarFiltros}
         />
-
-        <div className="jyr-card mt-3">
-          <div className="jyr-card-body p-0">
-            <KardexTabla filas={filas} loading={loading} />
-          </div>
-        </div>
-
-        <div
-          style={{
-            marginTop: 10,
-            padding: '12px 14px',
-            border: '1px solid var(--jyr-gray-200)',
-            borderRadius: 12,
-            background: 'linear-gradient(180deg, #ffffff 0%, #fafafa 100%)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 10
-          }}
-        >
-          <span style={{ fontSize: 12, color: 'var(--jyr-gray-500)' }}>
-            Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
-          </span>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => cambiarPagina(meta.pagina - 1)}
-              disabled={loading || meta.pagina <= 1}
-              aria-label="Pagina anterior"
-              style={{
-                minWidth: 36,
-                height: 36,
-                border: '1px solid var(--jyr-gray-200)',
-                background: '#fff',
-                color: '#0f172a',
-                padding: 0
-              }}
-            >
-              <FiChevronLeft size={15} />
-            </button>
-
-            {paginasVisibles.map((pagina, index) => (
-              <button
-                // // Elipsis se renderiza como boton deshabilitado solo visual
-                key={`${pagina}-${index}`}
-                type="button"
-                className="btn btn-sm"
-                onClick={() => (typeof pagina === 'number' ? cambiarPagina(pagina) : undefined)}
-                disabled={loading || pagina === '...'}
-                style={{
-                  minWidth: 36,
-                  height: 36,
-                  border: '1px solid var(--jyr-gray-200)',
-                  background: pagina === meta.pagina ? '#0b0f19' : '#fff',
-                  color: pagina === meta.pagina ? '#fff' : '#111827',
-                  fontWeight: pagina === meta.pagina ? 700 : 500,
-                  padding: '0 10px'
-                }}
-              >
-                {pagina}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => cambiarPagina(meta.pagina + 1)}
-              disabled={loading || meta.pagina >= meta.totalPaginas}
-              aria-label="Pagina siguiente"
-              style={{
-                minWidth: 36,
-                height: 36,
-                border: '1px solid var(--jyr-gray-200)',
-                background: '#fff',
-                color: '#0f172a',
-                padding: 0
-              }}
-            >
-              <FiChevronRight size={15} />
-            </button>
-
-            <span
-              style={{
-                marginLeft: 6,
-                fontSize: 12,
-                color: 'var(--jyr-gray-500)',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              Pagina {meta.pagina} de {meta.totalPaginas}
-            </span>
-          </div>
         </div>
       </div>
-    </div>
+
+      <div className="jyr-card mt-3 kdx-table-card">
+        <div className="kdx-table-topbar">
+          <div className="kdx-table-topbar-left">
+            <FiDatabase />
+            <span>Movimientos registrados</span>
+          </div>
+          <div className="kdx-table-topbar-right">
+            Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
+          </div>
+        </div>
+        <div className="jyr-card-body p-0">
+          <KardexTabla filas={filas} loading={loading} />
+        </div>
+      </div>
+
+      <div className="kdx-pagination-bar">
+        <span className="kdx-pagination-summary">
+          Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
+        </span>
+
+        <div className="kdx-pagination-controls">
+          <button
+            type="button"
+            className="kdx-page-btn kdx-page-btn-nav"
+            onClick={() => cambiarPagina(meta.pagina - 1)}
+            disabled={loading || meta.pagina <= 1}
+            aria-label="Pagina anterior"
+          >
+            <FiChevronLeft size={15} />
+          </button>
+
+          {paginasVisibles.map((pagina, index) => (
+            <button
+              // // Elipsis se renderiza como boton deshabilitado solo visual
+              key={`${pagina}-${index}`}
+              type="button"
+              className={`kdx-page-btn ${pagina === meta.pagina ? 'is-active' : ''} ${pagina === '...' ? 'is-ellipsis' : ''}`}
+              onClick={() => (typeof pagina === 'number' ? cambiarPagina(pagina) : undefined)}
+              disabled={loading || pagina === '...'}
+            >
+              {pagina}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            className="kdx-page-btn kdx-page-btn-nav"
+            onClick={() => cambiarPagina(meta.pagina + 1)}
+            disabled={loading || meta.pagina >= meta.totalPaginas}
+            aria-label="Pagina siguiente"
+          >
+            <FiChevronRight size={15} />
+          </button>
+
+          <span className="kdx-page-state">
+            Página {meta.pagina} de {meta.totalPaginas}
+          </span>
+        </div>
+      </div>
+    </section>
   );
 };
 

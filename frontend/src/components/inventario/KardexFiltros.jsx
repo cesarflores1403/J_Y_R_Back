@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiFilter, FiRefreshCw } from 'react-icons/fi';
+import { FiCalendar, FiFilter, FiLayers, FiMapPin, FiPackage, FiRefreshCw } from 'react-icons/fi';
 
 const KardexFiltros = ({
   filtros,
@@ -16,19 +16,51 @@ const KardexFiltros = ({
 
   return (
     <form
+      className="kdx-filters-form"
       // // Aplicamos filtros solo al enviar el formulario para evitar requests en cada cambio
       onSubmit={(event) => {
         event.preventDefault();
         onAplicar();
       }}
     >
+      <div className="kdx-filters-topbar mb-3">
+        <div className="kdx-filters-topbar-left">
+          <span className="kdx-filters-chip">Filtros de búsqueda</span>
+        </div>
+        <div className="kdx-filters-topbar-actions">
+          <button
+            // // Restablece filtros del kardex
+            type="button"
+            className="btn kdx-btn kdx-btn-ghost"
+            onClick={onLimpiar}
+            disabled={loading}
+          >
+            <FiRefreshCw className="me-1" />
+            Limpiar
+          </button>
+
+          <button
+            // // Ejecuta consulta de kardex con los filtros actuales
+            type="submit"
+            className="btn kdx-btn kdx-btn-accent"
+            disabled={loading}
+          >
+            <FiFilter className="me-1" />
+            Filtrar
+          </button>
+        </div>
+      </div>
+
       <div className="row g-2">
         <div className="col-12 col-md-3">
-          <label className="form-label mb-1">Fecha desde</label>
+          <label className="form-label mb-1 kdx-label">
+            <FiCalendar size={14} />
+            Fecha desde
+          </label>
           <input
             // // Inicio de rango de fechas para kardex
             type="date"
-            className="form-control"
+            className="form-control kdx-control"
             name="fecha_desde"
             value={filtros.fecha_desde}
             onChange={handleInput}
@@ -36,11 +68,14 @@ const KardexFiltros = ({
         </div>
 
         <div className="col-12 col-md-3">
-          <label className="form-label mb-1">Fecha hasta</label>
+          <label className="form-label mb-1 kdx-label">
+            <FiCalendar size={14} />
+            Fecha hasta
+          </label>
           <input
             // // Fin de rango de fechas para kardex
             type="date"
-            className="form-control"
+            className="form-control kdx-control"
             name="fecha_hasta"
             value={filtros.fecha_hasta}
             onChange={handleInput}
@@ -48,11 +83,14 @@ const KardexFiltros = ({
         </div>
 
         <div className="col-12 col-md-2">
-          <label className="form-label mb-1">Cod. Producto</label>
+          <label className="form-label mb-1 kdx-label">
+            <FiPackage size={14} />
+            Cod. Producto
+          </label>
           <input
             // // Filtro por codigo enlazado a catalogo real de productos
             type="text"
-            className="form-control"
+            className="form-control kdx-control"
             name="cod_producto"
             value={filtros.cod_producto}
             onChange={handleInput}
@@ -72,12 +110,15 @@ const KardexFiltros = ({
         </div>
 
         <div className="col-12 col-md-2">
-          <label className="form-label mb-1">Cod. Ubicacion</label>
+          <label className="form-label mb-1 kdx-label">
+            <FiMapPin size={14} />
+            Cod. Ubicación
+          </label>
           <input
             // // Filtro exacto por ubicacion
             type="number"
             min="1"
-            className="form-control"
+            className="form-control kdx-control"
             name="cod_ubicacion"
             value={filtros.cod_ubicacion}
             onChange={handleInput}
@@ -86,10 +127,13 @@ const KardexFiltros = ({
         </div>
 
         <div className="col-12 col-md-2">
-          <label className="form-label mb-1">Tipo</label>
+          <label className="form-label mb-1 kdx-label">
+            <FiLayers size={14} />
+            Tipo
+          </label>
           <select
             // // Tipo de movimiento para kardex (HU3)
-            className="form-select"
+            className="form-select kdx-control"
             name="tipo"
             value={filtros.tipo}
             onChange={handleInput}
@@ -102,58 +146,6 @@ const KardexFiltros = ({
             <option value="DEVOLUCION">DEVOLUCION</option>
             <option value="COMPRA">COMPRA</option>
           </select>
-        </div>
-      </div>
-
-      <div className="row g-2 mt-2">
-        <div className="col-12 col-md-2">
-          <label className="form-label mb-1">Pagina</label>
-          <input
-            // // Pagina solicitada para el kardex
-            type="number"
-            min="1"
-            className="form-control"
-            name="pagina"
-            value={filtros.pagina}
-            onChange={handleInput}
-          />
-        </div>
-
-        <div className="col-12 col-md-2">
-          <label className="form-label mb-1">Limite</label>
-          <input
-            // // Tamano de pagina para el kardex
-            type="number"
-            min="1"
-            max="100"
-            className="form-control"
-            name="limite"
-            value={filtros.limite}
-            onChange={handleInput}
-          />
-        </div>
-
-        <div className="col-12 col-md-8 d-flex justify-content-md-end align-items-end gap-2">
-          <button
-            // // Restablece filtros del kardex
-            type="button"
-            className="btn btn-outline-secondary"
-            onClick={onLimpiar}
-            disabled={loading}
-          >
-            <FiRefreshCw className="me-1" />
-            Limpiar
-          </button>
-
-          <button
-            // // Ejecuta consulta de kardex con los filtros actuales
-            type="submit"
-            className="btn jyr-btn-primary"
-            disabled={loading}
-          >
-            <FiFilter className="me-1" />
-            Filtrar
-          </button>
         </div>
       </div>
     </form>
