@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { reporteService } from '../../services/serviceIndex.js';
 import { formatMoney } from '../../utils/helpers.js';
-import { FiUsers, FiTruck, FiPackage, FiFileText, FiAlertTriangle } from 'react-icons/fi';
+import { FiUsers, FiTruck, FiPackage, FiFileText, FiAlertTriangle, FiArrowRight } from 'react-icons/fi';
 import logoClean from '../../assets/img/logo2.jpeg';
 
 const Dashboard = () => {
   const { usuario } = useAuth();
+  const navigate = useNavigate();
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const stockBajo = Number(datos?.alertasInventario?.stockBajo ?? datos?.stockBajo ?? 0);
+  const stockEnCero = Number(datos?.alertasInventario?.stockEnCero ?? datos?.stockEnCero ?? 0);
+  const totalAlertasInventario = Number(
+    datos?.alertasInventario?.total ?? (stockBajo + stockEnCero)
+  );
+  const hayAlertasStock = totalAlertasInventario > 0;
 
   useEffect(() => {
     const cargar = async () => {
@@ -71,35 +79,67 @@ const Dashboard = () => {
       </div>
 
       {/* Ventas totales + Stock bajo */}
-      <div className="row g-3 mb-4">
-        <div className="col-md-8">
-          <div className="jyr-card animate-in">
+      <div className="row g-3 mb-4 align-items-stretch">
+        <div className="col-12 col-lg-6">
+          <div className="jyr-card animate-in h-100 dash-ventas-card">
             <div className="jyr-card-header"><h5 className="mb-0">Resumen de Ventas</h5></div>
             <div className="jyr-card-body">
-              <div className="row text-center">
-                <div className="col-4">
-                  <div className="stat-label">Subtotal</div>
-                  <div className="stat-value" style={{ fontSize: 18 }}>{formatMoney(datos?.ventasTotales?.subtotal)}</div>
+              <div className="row text-center dash-ventas-grid">
+                <div className="col-4 dash-ventas-item">
+                  <div className="stat-label dash-ventas-label">Subtotal</div>
+                  <div className="stat-value dash-ventas-value">{formatMoney(datos?.ventasTotales?.subtotal)}</div>
                 </div>
-                <div className="col-4">
-                  <div className="stat-label">ISV</div>
-                  <div className="stat-value" style={{ fontSize: 18 }}>{formatMoney(datos?.ventasTotales?.isv)}</div>
+                <div className="col-4 dash-ventas-item">
+                  <div className="stat-label dash-ventas-label">ISV</div>
+                  <div className="stat-value dash-ventas-value">{formatMoney(datos?.ventasTotales?.isv)}</div>
                 </div>
-                <div className="col-4">
-                  <div className="stat-label">Total</div>
-                  <div className="stat-value" style={{ fontSize: 18, color: '#16a34a' }}>{formatMoney(datos?.ventasTotales?.total)}</div>
+                <div className="col-4 dash-ventas-item">
+                  <div className="stat-label dash-ventas-label">Total</div>
+                  <div className="stat-value dash-ventas-value dash-ventas-total">{formatMoney(datos?.ventasTotales?.total)}</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div className="col-md-4">
-          <div className="jyr-card animate-in">
+        <div className="col-12 col-lg-6">
+          <div className="jyr-card animate-in h-100 dash-alertas-card">
             <div className="jyr-card-header"><h5 className="mb-0">Alertas</h5></div>
-            <div className="jyr-card-body text-center">
-              <FiAlertTriangle size={32} style={{ color: datos?.stockBajo > 0 ? '#ef4444' : '#10b981' }} />
-              <div className="stat-value mt-2">{datos?.stockBajo || 0}</div>
-              <div className="stat-label">Productos con stock bajo</div>
+            <div className="jyr-card-body dash-alertas-body">
+              <div className="dash-alertas-main">
+                <div className={`dash-alertas-icon ${hayAlertasStock ? 'is-danger' : 'is-ok'}`}>
+                  <FiAlertTriangle size={24} />
+                </div>
+                <div>
+                  <div className="dash-alertas-number">{totalAlertasInventario}</div>
+                  <div className="dash-alertas-label">Total de alertas de inventario</div>
+                </div>
+              </div>
+
+              <div className="dash-alertas-breakdown">
+                <div className="dash-alerta-chip is-warning">
+                  <span className="dash-alerta-chip-label">Stock bajo</span>
+                  <strong>{stockBajo}</strong>
+                </div>
+                <div className="dash-alerta-chip is-danger">
+                  <span className="dash-alerta-chip-label">Sin existencia (0)</span>
+                  <strong>{stockEnCero}</strong>
+                </div>
+              </div>
+
+              <div className={`dash-alertas-status ${hayAlertasStock ? 'is-danger' : 'is-ok'}`}>
+                {hayAlertasStock ? 'Requiere atencion inmediata' : 'Inventario en estado controlado'}
+              </div>
+
+              <div className="dash-alertas-actions">
+                <button
+                  type="button"
+                  className={`btn dash-alertas-btn ${hayAlertasStock ? 'is-danger' : 'is-ok'}`}
+                  onClick={() => navigate('/inventario/existencias')}
+                >
+                  Ver existencias
+                  <FiArrowRight />
+                </button>
+              </div>
             </div>
           </div>
         </div>

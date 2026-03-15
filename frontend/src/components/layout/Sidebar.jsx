@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { getInitials } from '../../utils/helpers.js';
@@ -15,40 +15,38 @@ const menuItems = [
   ]},
   { section: 'Comercial', items: [
     { path: '/clientes', label: 'Clientes', icon: <FiUsers />, roles: ['Administrador', 'Cajero'] },
-    { path: '/facturas', label: 'Facturación', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
+    { path: '/facturas', label: 'Facturacion', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
     { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiClipboard />, roles: ['Administrador', 'Cajero'] },
-    { path: '/notas-credito', label: 'Notas de Crédito', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
+    { path: '/notas-credito', label: 'Notas de Credito', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
+  ]},
+  { section: 'Catalogo', items: [
+    { path: '/productos', label: 'Productos', icon: <FiPackage />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
+    { path: '/categorias', label: 'Categorias', icon: <FiTag />, roles: ['Administrador'] },
   ]},
   { section: 'Inventario', items: [
-    { path: '/productos', label: 'Productos', icon: <FiPackage />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
-    { path: '/categorias', label: 'Categorías', icon: <FiTag />, roles: ['Administrador'] },
     { path: '/ubicaciones', label: 'Ubicaciones', icon: <FiMapPin />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/existencias', label: 'Existencias', icon: <FiDatabase />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/kardex', label: 'Kardex', icon: <FiList />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/entradas', label: 'Entradas', icon: <FiPlusCircle />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/salidas', label: 'Salidas', icon: <FiMinusCircle />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/bajas', label: 'Bajas', icon: <FiAlertTriangle />, roles: ['Administrador', 'Bodeguero'] },
-    // // Submodulo HU transferencias entre ubicaciones dentro de Inventario
     { path: '/inventario/transferencias', label: 'Transferencias', icon: <FiRepeat />, roles: ['Administrador', 'Bodeguero'] },
-    // // Submodulo HU conteo fisico completo dentro de Inventario
     { path: '/inventario/conteos', label: 'Conteos', icon: <FiClipboard />, roles: ['Administrador', 'Bodeguero'] },
-    // // Submodulo HU reservas de inventario
     { path: '/inventario/reservas', label: 'Reservas', icon: <FiLock />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
   ]},
   { section: 'Compras', items: [
     { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, roles: ['Administrador', 'Bodeguero'] },
-    { path: '/compras/ordenes', label: 'Órdenes de Compra', icon: <FiShoppingCart />, roles: ['Administrador', 'Bodeguero'] },
+    { path: '/compras/ordenes', label: 'Ordenes de Compra', icon: <FiShoppingCart />, roles: ['Administrador', 'Bodeguero'] },
   ]},
-  
-  { section: 'Gestión', items: [
+  { section: 'Gestion', items: [
     { path: '/reportes', label: 'Reportes', icon: <FiBarChart2 />, roles: ['Administrador'] },
     { path: '/usuarios', label: 'Usuarios', icon: <FiUsers />, roles: ['Administrador'] },
-    { path: '/auditoria-facturacion', label: 'Auditoría Fact.', icon: <FiClock />, roles: ['Administrador'] },
+    { path: '/auditoria-facturacion', label: 'Auditoria Fact.', icon: <FiClock />, roles: ['Administrador'] },
   ]},
   { section: 'Fotos Carrusel', items: [
     { path: '/carrusel', label: 'Carrusel', icon: <FiImage />, roles: ['Administrador'] },
   ]},
-  { section: 'Configuración', items: [
+  { section: 'Configuracion', items: [
     { path: '/config-empresa', label: 'Datos Factura', icon: <FiFileText />, roles: ['Super Administrador'] },
   ]},
 ];
@@ -112,7 +110,7 @@ const Sidebar = () => {
           <div className="jyr-sidebar-user-name">{usuario?.nombre_usuario}</div>
           <div className="jyr-sidebar-user-role">{usuario?.rol}</div>
         </div>
-        <button className="jyr-sidebar-logout" onClick={handleLogout} title="Cerrar sesión">
+        <button className="jyr-sidebar-logout" onClick={handleLogout} title="Cerrar sesion">
           <FiLogOut />
         </button>
       </div>
