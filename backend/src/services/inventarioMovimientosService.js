@@ -33,12 +33,23 @@ const normalizarTexto = (valor) => {
   return limpio.length > 0 ? limpio : null;
 };
 
-// // Convierte fecha de query a objeto Date valido o null
+// // Convierte fecha de query a texto YYYY-MM-DD (sin desfase por zona horaria)
 const normalizarFecha = (valor) => {
   if (!valor) return null;
-  const fecha = valor instanceof Date ? valor : new Date(valor);
+  if (valor instanceof Date) {
+    if (Number.isNaN(valor.getTime())) return null;
+    return valor.toISOString().slice(0, 10);
+  }
+
+  const texto = String(valor).trim();
+  if (!texto) return null;
+
+  const matchIso = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (matchIso) return `${matchIso[1]}-${matchIso[2]}-${matchIso[3]}`;
+
+  const fecha = new Date(texto);
   if (Number.isNaN(fecha.getTime())) return null;
-  return fecha;
+  return fecha.toISOString().slice(0, 10);
 };
 
 // // Devuelve expresion SQL segura (con nombres resueltos por schema) para cod_producto/cod_ubicacion
@@ -77,6 +88,8 @@ class InventarioMovimientosService {
     const codProducto = query.cod_producto ? Number(query.cod_producto) : null;
     const codUbicacion = query.cod_ubicacion ? Number(query.cod_ubicacion) : null;
     const tipo = normalizarTexto(query.tipo)?.toUpperCase() || null;
+    const estado = normalizarTexto(query.estado)?.toUpperCase() || null;
+    const excluirRefTipo = normalizarTexto(query.excluir_ref_tipo ?? query.excluirRefTipo)?.toUpperCase() || null;
     const fechaDesde = normalizarFecha(query.fecha_desde);
     const fechaHasta = normalizarFecha(query.fecha_hasta);
 
@@ -92,13 +105,13 @@ class InventarioMovimientosService {
 
     // // Filtro por fecha desde (inclusive)
     if (fechaDesde) {
-      whereParts.push(`CAST(m.${schemaMovimiento.fecha} AS DATE) >= :fechaDesde`);
+      whereParts.push(`CAST(m.${schemaMovimiento.fecha} AS DATE) >= CAST(:fechaDesde AS DATE)`);
       replacements.fechaDesde = fechaDesde;
     }
 
     // // Filtro por fecha hasta (inclusive)
     if (fechaHasta) {
-      whereParts.push(`CAST(m.${schemaMovimiento.fecha} AS DATE) <= :fechaHasta`);
+      whereParts.push(`CAST(m.${schemaMovimiento.fecha} AS DATE) <= CAST(:fechaHasta AS DATE)`);
       replacements.fechaHasta = fechaHasta;
     }
 
@@ -118,6 +131,59 @@ class InventarioMovimientosService {
     if (tipo) {
       whereParts.push(`UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = :tipo`);
       replacements.tipo = tipo;
+    }
+
+    // // Permite excluir subtipos tecnicos (ej. ANULACION_ENTRADA) cuando el schema soporta ref_tipo
+    if (excluirRefTipo && schemaMovimiento.refTipo) {
+      whereParts.push(`(
+        m.${schemaMovimiento.refTipo} IS NULL
+        OR UPPER(CAST(m.${schemaMovimiento.refTipo} AS TEXT)) <> :excluirRefTipo
+      )`);
+      replacements.excluirRefTipo = excluirRefTipo;
+    }
+
+    const soportaTrazabilidadAnulacion = Boolean(
+      schemaMovimiento.pk
+      && schemaMovimiento.refTipo
+      && schemaMovimiento.refId
+    );
+    const exprEntradaAnulada = soportaTrazabilidadAnulacion
+      ? `EXISTS (
+          SELECT 1
+          FROM ${schemaMovimiento.tableName} ma
+          WHERE UPPER(CAST(ma.${schemaMovimiento.tipo} AS TEXT)) = 'SALIDA'
+            AND CAST(ma.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_ENTRADA'
+            AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
+        )`
+      : 'false';
+    const exprSalidaAnulada = soportaTrazabilidadAnulacion
+      ? `EXISTS (
+          SELECT 1
+          FROM ${schemaMovimiento.tableName} ma
+          WHERE UPPER(CAST(ma.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA'
+            AND CAST(ma.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_SALIDA'
+            AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
+        )`
+      : 'false';
+    const exprAnuladoSegunTipo = soportaTrazabilidadAnulacion
+      ? `CASE
+          WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA' THEN (${exprEntradaAnulada})
+          WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'SALIDA' THEN (${exprSalidaAnulada})
+          ELSE false
+        END`
+      : 'false';
+
+    // // Filtro de anulacion para entradas/salidas cuando el schema soporta ref_tipo/ref_id
+    if (estado && estado !== 'TODAS' && soportaTrazabilidadAnulacion) {
+      const exprAnuladoEstado = tipo === 'ENTRADA'
+        ? exprEntradaAnulada
+        : (tipo === 'SALIDA' ? exprSalidaAnulada : exprAnuladoSegunTipo);
+
+      if (estado === 'ANULADAS') {
+        whereParts.push(exprAnuladoEstado);
+      } else if (estado === 'ACTIVAS') {
+        whereParts.push(`NOT (${exprAnuladoEstado})`);
+      }
     }
 
     // // WHERE final de la consulta de kardex
@@ -152,6 +218,56 @@ class InventarioMovimientosService {
       : `ORDER BY m.${schemaMovimiento.fecha} DESC`;
 
     // // Select de filas del kardex con aliases estables para frontend
+    const exprAnulado = exprAnuladoSegunTipo;
+
+    const exprCodMovimientoAnulacion = soportaTrazabilidadAnulacion
+      ? `CASE
+          WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA' THEN (
+            SELECT ma.${schemaMovimiento.pk}
+            FROM ${schemaMovimiento.tableName} ma
+            WHERE UPPER(CAST(ma.${schemaMovimiento.tipo} AS TEXT)) = 'SALIDA'
+              AND CAST(ma.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_ENTRADA'
+              AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
+            ORDER BY ma.${schemaMovimiento.fecha} DESC
+            LIMIT 1
+          )
+          WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'SALIDA' THEN (
+            SELECT ma.${schemaMovimiento.pk}
+            FROM ${schemaMovimiento.tableName} ma
+            WHERE UPPER(CAST(ma.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA'
+              AND CAST(ma.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_SALIDA'
+              AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
+            ORDER BY ma.${schemaMovimiento.fecha} DESC
+            LIMIT 1
+          )
+          ELSE NULL
+        END`
+      : 'NULL::int';
+
+    const exprFechaAnulacion = soportaTrazabilidadAnulacion
+      ? `CASE
+          WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA' THEN (
+            SELECT CAST(ma.${schemaMovimiento.fecha} AS TIMESTAMP)
+            FROM ${schemaMovimiento.tableName} ma
+            WHERE UPPER(CAST(ma.${schemaMovimiento.tipo} AS TEXT)) = 'SALIDA'
+              AND CAST(ma.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_ENTRADA'
+              AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
+            ORDER BY ma.${schemaMovimiento.fecha} DESC
+            LIMIT 1
+          )
+          WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'SALIDA' THEN (
+            SELECT CAST(ma.${schemaMovimiento.fecha} AS TIMESTAMP)
+            FROM ${schemaMovimiento.tableName} ma
+            WHERE UPPER(CAST(ma.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA'
+              AND CAST(ma.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_SALIDA'
+              AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
+            ORDER BY ma.${schemaMovimiento.fecha} DESC
+            LIMIT 1
+          )
+          ELSE NULL
+        END`
+      : 'NULL::timestamp';
+
     const filas = await sequelize.query(`
       SELECT
         ${schemaMovimiento.pk ? `m.${schemaMovimiento.pk} AS cod_movimiento,` : 'NULL::int AS cod_movimiento,'}
@@ -160,9 +276,9 @@ class InventarioMovimientosService {
         p.nombre_producto,
         ${exprCodUbicacion} AS cod_ubicacion,
         COALESCE(
-          NULLIF(u.codigo_producto, ''),
           NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
-          CAST(u.cod_ubicacion AS TEXT)
+          CAST(u.cod_ubicacion AS TEXT),
+          '-'
         ) AS ubicacion,
         CAST(m.${schemaMovimiento.fecha} AS TIMESTAMP) AS fecha_movimiento,
         UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) AS tipo,
@@ -172,6 +288,9 @@ class InventarioMovimientosService {
         ${schemaMovimiento.motivo ? `CAST(m.${schemaMovimiento.motivo} AS TEXT)` : 'NULL::text'} AS motivo,
         ${schemaMovimiento.refTipo ? `CAST(m.${schemaMovimiento.refTipo} AS TEXT)` : 'NULL::text'} AS ref_tipo,
         ${schemaMovimiento.refId ? `m.${schemaMovimiento.refId}` : 'NULL::int'} AS ref_id,
+        ${exprAnulado} AS anulado,
+        ${exprCodMovimientoAnulacion} AS cod_movimiento_anulacion,
+        ${exprFechaAnulacion} AS fecha_anulacion,
         ${schemaMovimiento.codUsuario ? `m.${schemaMovimiento.codUsuario}` : 'NULL::int'} AS cod_usuario,
         ${schemaMovimiento.codUsuario ? 'usu.nombre_usuario' : 'NULL::text'} AS nombre_usuario
       ${selectBase}

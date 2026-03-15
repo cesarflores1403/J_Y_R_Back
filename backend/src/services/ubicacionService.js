@@ -44,6 +44,13 @@ const parsearEntero = (valor, defecto, { min = 1, max = Number.MAX_SAFE_INTEGER 
   return Math.min(max, Math.max(min, numero));
 };
 
+const esErrorColumnaNoExiste = (error, nombreColumna) => {
+  if (!error) return false;
+  if (error.code !== '42703') return false;
+  const mensaje = String(error.message || error.original?.message || '').toLowerCase();
+  return mensaje.includes(String(nombreColumna).toLowerCase());
+};
+
 const construirPayload = (datos) => {
   const codProducto = extraerCodProducto(datos.codigo_producto);
   return {
@@ -181,6 +188,52 @@ class UbicacionService {
 
   async desactivar(id) {
     const ubicacion = await this.obtenerPorId(id);
+
+    let totalConInventarioOperativo = 0;
+    try {
+      const [usoInventario] = await sequelize.query(
+        `
+          SELECT COUNT(*)::int AS total
+          FROM inventario
+          WHERE cod_ubicacion = :id
+            AND (
+              COALESCE(stock, 0) > 0
+              OR COALESCE(stock_reservado, 0) > 0
+            )
+        `,
+        {
+          replacements: { id },
+          type: sequelize.QueryTypes.SELECT
+        }
+      );
+      totalConInventarioOperativo = Number(usoInventario?.total || 0);
+    } catch (error) {
+      if (!esErrorColumnaNoExiste(error, 'stock_reservado')) {
+        throw error;
+      }
+
+      const [usoInventarioFallback] = await sequelize.query(
+        `
+          SELECT COUNT(*)::int AS total
+          FROM inventario
+          WHERE cod_ubicacion = :id
+            AND COALESCE(stock, 0) > 0
+        `,
+        {
+          replacements: { id },
+          type: sequelize.QueryTypes.SELECT
+        }
+      );
+      totalConInventarioOperativo = Number(usoInventarioFallback?.total || 0);
+    }
+
+    if (totalConInventarioOperativo > 0) {
+      throw Object.assign(
+        new Error('No se puede desactivar la ubicacion porque tiene inventario con stock o reserva'),
+        { status: 409 }
+      );
+    }
+
     if (ubicacion.estado_ubi !== ESTADO_INACTIVA) {
       await ubicacion.update({ estado_ubi: ESTADO_INACTIVA });
     }

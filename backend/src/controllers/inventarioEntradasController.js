@@ -38,3 +38,37 @@ export const registrarEntrada = async (req, res, next) => {
     next(error);
   }
 };
+
+// // PATCH /api/inventario/entradas/:id/anular
+// // Revierte una entrada con salida compensatoria y trazabilidad de auditoria
+export const anularEntrada = async (req, res, next) => {
+  try {
+    const data = await inventarioEntradasService.anularEntrada(req.params.id, req.body, {
+      usuario: req.usuario
+    });
+
+    logger.info('inventario.entradas.anulada', {
+      modulo: 'inventario',
+      accion: 'anular_entrada',
+      usuario: req.usuario ? {
+        cod_usuario: req.usuario.cod_usuario ?? null,
+        nombre_usuario: req.usuario.nombre_usuario ?? null,
+        rol: req.usuario.rol ?? null
+      } : null,
+      cod_movimiento_entrada: Number(req.params?.id || 0),
+      motivo: req.body?.motivo ?? 'ANULACION_ENTRADA',
+      referencia: req.body?.referencia ?? null,
+      cod_inventario: data?.resumen?.cod_inventario ?? null,
+      stock_antes: data?.resumen?.stock_antes ?? null,
+      stock_despues: data?.resumen?.stock_despues ?? null
+    });
+
+    return sendOk(res, {
+      status: 200,
+      message: 'Entrada anulada correctamente',
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};

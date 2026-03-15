@@ -4,8 +4,8 @@ import { autenticar, autorizar } from '../middlewares/auth.js';
 import { validarCampos } from '../middlewares/validar.js';
 import { listarExistencias, listarAlertasStockBajo, actualizarMinMax } from '../controllers/inventarioExistenciasController.js';
 import { listarMovimientos } from '../controllers/inventarioMovimientosController.js';
-import { registrarEntrada } from '../controllers/inventarioEntradasController.js';
-import { registrarSalida } from '../controllers/inventarioSalidasController.js';
+import { registrarEntrada, anularEntrada } from '../controllers/inventarioEntradasController.js';
+import { registrarSalida, anularSalida } from '../controllers/inventarioSalidasController.js';
 import { registrarBaja } from '../controllers/inventarioBajasController.js';
 import { listarTransferencias, registrarTransferencia } from '../controllers/inventarioTransferenciasController.js';
 import { listarConteos, listarDetallesConteo, abrirConteo, registrarDetalleConteo, cerrarConteo } from '../controllers/inventarioConteosController.js';
@@ -199,6 +199,23 @@ router.get('/movimientos', autorizar(...ROLES_INVENTARIO), [
     .trim()
     .isIn(['ENTRADA', 'SALIDA', 'AJUSTE', 'BAJA', 'DEVOLUCION', 'COMPRA'])
     .withMessage('tipo debe ser ENTRADA, SALIDA, AJUSTE, BAJA, DEVOLUCION o COMPRA'),
+  // // Estado de anulacion para entradas (opcional): TODAS | ACTIVAS | ANULADAS
+  query('estado')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isIn(['TODAS', 'ACTIVAS', 'ANULADAS'])
+    .withMessage('estado debe ser TODAS, ACTIVAS o ANULADAS'),
+  // // Exclusion opcional por subtipo tecnico (ej. ANULACION_ENTRADA en vista de Salidas)
+  query('excluir_ref_tipo')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 60 })
+    .withMessage('excluir_ref_tipo debe tener entre 1 y 60 caracteres'),
+  query('excluirRefTipo')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 60 })
+    .withMessage('excluirRefTipo debe tener entre 1 y 60 caracteres'),
   // // Respuesta 400 si falla cualquier validacion
   validarCampos
 ], listarMovimientos);
@@ -282,6 +299,35 @@ router.post('/entradas', autorizar(...ROLES_INVENTARIO), [
   validarCampos
 ], registrarEntrada);
 
+// // PATCH /api/inventario/entradas/:id/anular
+// // Revierte una entrada con movimiento compensatorio y control de trazabilidad
+router.patch('/entradas/:id/anular', autorizar(...ROLES_INVENTARIO), [
+  // // Id del movimiento ENTRADA en kardex
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('id de movimiento debe ser un entero mayor a 0')
+    .toInt(),
+  // // Motivo opcional de anulacion (si no llega se usa motivo por defecto)
+  body('motivo')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('motivo debe tener entre 1 y 200 caracteres'),
+  // // Referencia opcional del reverso para auditoria cruzada
+  body('referencia')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('referencia debe tener entre 1 y 200 caracteres'),
+  // // Observaciones opcionales
+  body('observaciones')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('observaciones no puede exceder 500 caracteres'),
+  validarCampos
+], anularEntrada);
+
 // // POST /api/inventario/salidas
 // // Registra una salida de inventario por venta confirmada con validacion de payload
 router.post('/salidas', autorizar(...ROLES_INVENTARIO), [
@@ -325,6 +371,35 @@ router.post('/salidas', autorizar(...ROLES_INVENTARIO), [
   // // Respuesta 400 estandar si falla cualquier validacion de entrada
   validarCampos
 ], registrarSalida);
+
+// // PATCH /api/inventario/salidas/:id/anular
+// // Revierte una salida con entrada compensatoria y trazabilidad
+router.patch('/salidas/:id/anular', autorizar(...ROLES_INVENTARIO), [
+  // // Id del movimiento SALIDA en kardex
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('id de movimiento debe ser un entero mayor a 0')
+    .toInt(),
+  // // Motivo opcional de anulacion (si no llega se usa motivo por defecto)
+  body('motivo')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('motivo debe tener entre 1 y 200 caracteres'),
+  // // Referencia opcional del reverso para auditoria cruzada
+  body('referencia')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('referencia debe tener entre 1 y 200 caracteres'),
+  // // Observaciones opcionales
+  body('observaciones')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('observaciones no puede exceder 500 caracteres'),
+  validarCampos
+], anularSalida);
 
 // // POST /api/inventario/bajas
 // // Registra una baja por dano/perdida con trazabilidad y control transaccional
