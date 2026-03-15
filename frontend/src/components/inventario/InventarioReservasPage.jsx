@@ -1,575 +1,589 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { FiLock } from 'react-icons/fi';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FiChevronLeft, FiChevronRight, FiDatabase, FiLock, FiPlus } from 'react-icons/fi';
 import { inventarioReservasApi } from './inventarioReservas.api.js';
+import { inventarioMovimientosApi } from './inventarioMovimientos.api.js';
+import { useUbicaciones } from '../../hooks/useUbicaciones.js';
+import ReservaForm from './ReservaForm.jsx';
+import ReservasFiltros from './ReservasFiltros.jsx';
+import ReservasTabla from './ReservasTabla.jsx';
 
-// // Estado inicial para crear reserva
-const estadoCrearInicial = {
-  cod_producto: '',
-  cod_ubicacion: '',
-  cantidad: '',
-  referencia: '',
-  observaciones: ''
-};
+const LIMITE_PAGINA = 10;
 
-// // Estado inicial para liberar reserva por id
-const estadoLiberarInicial = {
-  cod_reserva: '',
-  motivo: '',
-  observaciones: ''
-};
-
-// // Estado inicial para consumir reserva por id
-const estadoConsumirInicial = {
-  cod_reserva: '',
-  referencia: '',
-  observaciones: ''
-};
-
-// // Estado inicial de filtros del listado persistente
 const filtrosIniciales = {
+  fecha_desde: '',
+  fecha_hasta: '',
   cod_producto: '',
   cod_ubicacion: '',
-  estado: '',
-  referencia: ''
+  estado: 'TODAS',
+  referencia: '',
+  pagina: 1,
+  limite: LIMITE_PAGINA
 };
 
-const normalizarListado = (payload) => {
+const limpiarParamsConsulta = (params = {}) => {
+  const limpio = {};
+  Object.entries(params).forEach(([clave, valor]) => {
+    if (valor === undefined || valor === null) return;
+    if (typeof valor === 'string' && valor.trim() === '') return;
+    limpio[clave] = valor;
+  });
+  return limpio;
+};
+
+const normalizarCodProducto = (valor) => {
+  if (valor === undefined || valor === null) return '';
+  const texto = String(valor).trim();
+  if (!texto) return '';
+
+  if (/^\d+$/.test(texto)) {
+    const cod = Number.parseInt(texto, 10);
+    return Number.isNaN(cod) || cod < 1 ? '' : cod;
+  }
+
+  const matchCodigo = texto.match(/PROD-(\d{1,10})/i);
+  if (matchCodigo?.[1]) {
+    const cod = Number.parseInt(matchCodigo[1], 10);
+    return Number.isNaN(cod) || cod < 1 ? '' : cod;
+  }
+
+  const matchNumero = texto.match(/\b(\d{1,10})\b/);
+  if (matchNumero?.[1]) {
+    const cod = Number.parseInt(matchNumero[1], 10);
+    return Number.isNaN(cod) || cod < 1 ? '' : cod;
+  }
+
+  return '';
+};
+
+const normalizarCodUbicacion = (valor) => {
+  if (valor === undefined || valor === null) return '';
+  const texto = String(valor).trim();
+  if (!texto) return '';
+  const cod = Number.parseInt(texto, 10);
+  return Number.isNaN(cod) || cod < 1 ? '' : cod;
+};
+
+const normalizarRespuesta = (payload, fallbackLimite = LIMITE_PAGINA) => {
   if (Array.isArray(payload?.data) && payload?.meta) {
     return {
       filas: payload.data,
-      total: Number(payload.meta.total || 0)
+      meta: {
+        total: Number(payload.meta.total || 0),
+        pagina: Number(payload.meta.page || 1),
+        limite: Number(payload.meta.limit || fallbackLimite),
+        totalPaginas: Number(payload.meta.totalPages || 1)
+      }
     };
   }
 
   return {
     filas: Array.isArray(payload?.datos) ? payload.datos : [],
-    total: Number(payload?.total || 0)
+    meta: {
+      total: Number(payload?.total || 0),
+      pagina: Number(payload?.pagina || payload?.page || 1),
+      limite: Number(payload?.limite || payload?.limit || fallbackLimite),
+      totalPaginas: Number(payload?.totalPaginas || payload?.totalPages || 1)
+    }
   };
 };
 
-// // Mapea errores HTTP a mensajes funcionales de la UI de reservas
 const obtenerMensajeError = (error) => {
   const status = error?.response?.status;
   const serverMessage = error?.response?.data?.message || error?.response?.data?.mensaje;
 
-  if (status === 400) return serverMessage || 'Datos invalidos para operar la reserva';
+  if (!error?.response) return 'No se pudo conectar con la API. Verifica backend y frontend corriendo.';
+  if (status === 400) return serverMessage || 'Datos invalidos para reservas';
   if (status === 404) return serverMessage || 'Reserva o inventario no encontrado';
-  if (status === 409) return serverMessage || 'Conflicto logico de estado o stock insuficiente';
+  if (status === 409) return serverMessage || 'Conflicto de estado o stock insuficiente';
+  if (status === 401) return serverMessage || 'Sesion expirada. Inicia sesion nuevamente';
+  if (status === 403) return serverMessage || 'No tienes permisos para operar reservas';
   return serverMessage || 'Error inesperado en reservas de inventario';
 };
 
-const formatearFecha = (valor) => {
-  if (!valor) return '-';
-  const fecha = new Date(valor);
-  if (Number.isNaN(fecha.getTime())) return '-';
-  return fecha.toLocaleString();
+const construirPaginasVisibles = (paginaActual, totalPaginas, maxVisibles = 5) => {
+  if (totalPaginas <= 1) return [1];
+  if (totalPaginas <= maxVisibles) {
+    return Array.from({ length: totalPaginas }, (_, idx) => idx + 1);
+  }
+
+  let inicio = Math.max(1, paginaActual - 2);
+  let fin = Math.min(totalPaginas, inicio + maxVisibles - 1);
+  inicio = Math.max(1, fin - maxVisibles + 1);
+
+  const paginas = [];
+  if (inicio > 1) paginas.push(1);
+  if (inicio > 2) paginas.push('...');
+  for (let pagina = inicio; pagina <= fin; pagina += 1) paginas.push(pagina);
+  if (fin < totalPaginas - 1) paginas.push('...');
+  if (fin < totalPaginas) paginas.push(totalPaginas);
+
+  return paginas;
 };
 
-const InventarioReservasPage = () => {
-  // // Estado local de formularios y feedback
-  const [formCrear, setFormCrear] = useState(estadoCrearInicial);
-  const [formLiberar, setFormLiberar] = useState(estadoLiberarInicial);
-  const [formConsumir, setFormConsumir] = useState(estadoConsumirInicial);
-  const [filtros, setFiltros] = useState(filtrosIniciales);
+const ReservaAccionModal = ({
+  abierto = false,
+  tipo = '',
+  reserva = null,
+  loading = false,
+  onClose,
+  onConfirm
+}) => {
+  const [form, setForm] = useState({
+    motivo: '',
+    referencia: '',
+    observaciones: ''
+  });
 
-  // // Estado de proceso por accion
-  const [savingCrear, setSavingCrear] = useState(false);
-  const [savingLiberar, setSavingLiberar] = useState(false);
-  const [savingConsumir, setSavingConsumir] = useState(false);
-  const [loadingListado, setLoadingListado] = useState(true);
-
-  // // Estado de mensajes globales de la pantalla
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [reservas, setReservas] = useState([]);
-  const [totalReservas, setTotalReservas] = useState(0);
-
-  // // Carga reservas persistidas con filtros
-  const cargarReservas = useCallback(async (filtrosActivos = filtros) => {
-    try {
-      setLoadingListado(true);
-
-      const params = {
-        page: 1,
-        limit: 50
-      };
-      if (filtrosActivos.cod_producto) params.cod_producto = Number(filtrosActivos.cod_producto);
-      if (filtrosActivos.cod_ubicacion) params.cod_ubicacion = Number(filtrosActivos.cod_ubicacion);
-      if (filtrosActivos.estado) params.estado = filtrosActivos.estado;
-      if (filtrosActivos.referencia) params.referencia = filtrosActivos.referencia;
-
-      const { data } = await inventarioReservasApi.listar(params);
-      if (!data?.ok) {
-        setReservas([]);
-        setTotalReservas(0);
-        setError('Respuesta invalida al listar reservas');
-        return;
-      }
-
-      const normalizado = normalizarListado(data.data);
-      setReservas(normalizado.filas);
-      setTotalReservas(normalizado.total);
-    } catch (err) {
-      setReservas([]);
-      setTotalReservas(0);
-      setError(obtenerMensajeError(err));
-    } finally {
-      setLoadingListado(false);
+  useEffect(() => {
+    if (!abierto) {
+      setForm({
+        motivo: '',
+        referencia: '',
+        observaciones: ''
+      });
     }
-  }, [filtros]);
+  }, [abierto, tipo, reserva?.cod_reserva]);
 
-  // // Ejecuta carga inicial del historial persistente
-  React.useEffect(() => {
-    cargarReservas(filtrosIniciales);
-  }, [cargarReservas]);
+  if (!abierto || !reserva) return null;
 
-  // // Resumen rapido de estados en el listado actual
-  const resumenReservas = useMemo(() => {
-    const activas = reservas.filter((r) => String(r.estado || '').toUpperCase() === 'ACTIVA').length;
-    const liberadas = reservas.filter((r) => String(r.estado || '').toUpperCase() === 'LIBERADA').length;
-    const consumidas = reservas.filter((r) => String(r.estado || '').toUpperCase() === 'CONSUMIDA').length;
-    return {
-      activas,
-      liberadas,
-      consumidas
-    };
-  }, [reservas]);
-
-  // // Crea reserva y recarga listado persistente
-  const crearReserva = async (event) => {
-    event.preventDefault();
-
-    try {
-      setSavingCrear(true);
-      setError('');
-      setSuccess('');
-
-      const cantidad = Number(formCrear.cantidad);
-      if (!Number.isInteger(cantidad) || cantidad <= 0) {
-        setError('cantidad debe ser un entero mayor a 0');
-        return;
-      }
-
-      const payload = {
-        cod_producto: Number(formCrear.cod_producto),
-        cod_ubicacion: Number(formCrear.cod_ubicacion),
-        cantidad,
-        referencia: String(formCrear.referencia || '').trim(),
-        observaciones: String(formCrear.observaciones || '').trim()
-      };
-
-      const { data } = await inventarioReservasApi.crear(payload);
-      if (!data?.ok) {
-        setError('Respuesta invalida al crear reserva');
-        return;
-      }
-
-      setFormCrear(estadoCrearInicial);
-      setSuccess('Reserva creada correctamente');
-      await cargarReservas();
-    } catch (err) {
-      setError(obtenerMensajeError(err));
-    } finally {
-      setSavingCrear(false);
-    }
+  const cerrarModal = () => {
+    if (loading) return;
+    if (typeof onClose === 'function') onClose();
   };
 
-  // // Libera reserva por id y recarga historial
-  const liberarReserva = async (codReservaManual = null) => {
-    try {
-      setSavingLiberar(true);
-      setError('');
-      setSuccess('');
-
-      const codReserva = Number(codReservaManual || formLiberar.cod_reserva);
-      if (!Number.isInteger(codReserva) || codReserva <= 0) {
-        setError('Debes indicar un id de reserva valido para liberar');
-        return;
-      }
-
-      const payload = {
-        motivo: String(formLiberar.motivo || '').trim(),
-        observaciones: String(formLiberar.observaciones || '').trim()
-      };
-
-      const { data } = await inventarioReservasApi.liberar(codReserva, payload);
-      if (!data?.ok) {
-        setError('Respuesta invalida al liberar reserva');
-        return;
-      }
-
-      setFormLiberar(estadoLiberarInicial);
-      setSuccess(`Reserva ${codReserva} liberada correctamente`);
-      await cargarReservas();
-    } catch (err) {
-      setError(obtenerMensajeError(err));
-    } finally {
-      setSavingLiberar(false);
-    }
-  };
-
-  // // Consume reserva por id y recarga historial
-  const consumirReserva = async (codReservaManual = null) => {
-    try {
-      setSavingConsumir(true);
-      setError('');
-      setSuccess('');
-
-      const codReserva = Number(codReservaManual || formConsumir.cod_reserva);
-      if (!Number.isInteger(codReserva) || codReserva <= 0) {
-        setError('Debes indicar un id de reserva valido para consumir');
-        return;
-      }
-
-      const payload = {
-        referencia: String(formConsumir.referencia || '').trim(),
-        observaciones: String(formConsumir.observaciones || '').trim()
-      };
-
-      const { data } = await inventarioReservasApi.consumir(codReserva, payload);
-      if (!data?.ok) {
-        setError('Respuesta invalida al consumir reserva');
-        return;
-      }
-
-      setFormConsumir(estadoConsumirInicial);
-      setSuccess(`Reserva ${codReserva} consumida correctamente`);
-      await cargarReservas();
-    } catch (err) {
-      setError(obtenerMensajeError(err));
-    } finally {
-      setSavingConsumir(false);
-    }
-  };
-
-  // // Aplica filtros del historial
-  const aplicarFiltros = async () => {
-    setError('');
-    await cargarReservas(filtros);
-  };
-
-  // // Limpia filtros del historial
-  const limpiarFiltros = async () => {
-    setFiltros(filtrosIniciales);
-    setError('');
-    await cargarReservas(filtrosIniciales);
-  };
+  const esLiberar = tipo === 'liberar';
+  const titulo = esLiberar ? 'Liberar reserva' : 'Consumir reserva';
+  const boton = esLiberar ? 'Liberar reserva' : 'Consumir reserva';
+  const botonClase = esLiberar ? 'btn btn-warning' : 'btn jyr-btn-primary';
 
   return (
-    <div>
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div className="d-flex align-items-center gap-2">
-          <FiLock />
-          <h3 className="mb-0">Reservas</h3>
-        </div>
-      </div>
+    <div
+      className="modal show d-block"
+      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) cerrarModal();
+      }}
+    >
+      <div className="modal-dialog">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">{titulo}</h5>
+            <button type="button" className="btn-close" onClick={cerrarModal} disabled={loading} />
+          </div>
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (typeof onConfirm === 'function') {
+                await onConfirm({
+                  motivo: String(form.motivo || '').trim(),
+                  referencia: String(form.referencia || '').trim(),
+                  observaciones: String(form.observaciones || '').trim()
+                });
+              }
+            }}
+          >
+            <div className="modal-body">
+              <div className="alert alert-light border mb-3">
+                <strong>Reserva:</strong> #{reserva.cod_reserva} <br />
+                <strong>Producto:</strong> {reserva.nombre_producto || reserva.cod_producto} <br />
+                <strong>Cantidad:</strong> {reserva.cantidad}
+              </div>
 
-      {success && (
-        <div className="alert alert-success" role="alert">
-          {success}
-        </div>
-      )}
-
-      {error && (
-        <div className="alert alert-danger" role="alert">
-          {error}
-        </div>
-      )}
-
-      <div className="jyr-card">
-        <div className="jyr-card-body">
-          <h5 className="mb-3">Crear reserva</h5>
-          <form onSubmit={crearReserva}>
-            <div className="row g-3">
-              <div className="col-12 col-md-3">
-                <label className="form-label">Cod. Producto</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="form-control"
-                  value={formCrear.cod_producto}
-                  onChange={(event) => setFormCrear((prev) => ({ ...prev, cod_producto: event.target.value }))}
-                  required
-                />
-              </div>
-              <div className="col-12 col-md-3">
-                <label className="form-label">Cod. Ubicacion</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="form-control"
-                  value={formCrear.cod_ubicacion}
-                  onChange={(event) => setFormCrear((prev) => ({ ...prev, cod_ubicacion: event.target.value }))}
-                  required
-                />
-              </div>
-              <div className="col-12 col-md-2">
-                <label className="form-label">Cantidad</label>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  className="form-control"
-                  value={formCrear.cantidad}
-                  onChange={(event) => setFormCrear((prev) => ({ ...prev, cantidad: event.target.value }))}
-                  required
-                />
-              </div>
-              <div className="col-12 col-md-4">
-                <label className="form-label">Referencia (opcional)</label>
-                <input
-                  type="text"
-                  maxLength={200}
-                  className="form-control"
-                  value={formCrear.referencia}
-                  onChange={(event) => setFormCrear((prev) => ({ ...prev, referencia: event.target.value }))}
-                />
-              </div>
-              <div className="col-12">
-                <label className="form-label">Observaciones (opcional)</label>
-                <textarea
-                  rows="3"
-                  maxLength={500}
-                  className="form-control"
-                  value={formCrear.observaciones}
-                  onChange={(event) => setFormCrear((prev) => ({ ...prev, observaciones: event.target.value }))}
-                />
-              </div>
-              <div className="col-12 d-flex justify-content-end">
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={savingCrear}
-                >
-                  {savingCrear ? 'Guardando...' : 'Crear reserva'}
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div className="jyr-card mt-4">
-        <div className="jyr-card-body">
-          <h5 className="mb-3">Acciones manuales</h5>
-          <div className="row g-3">
-            <div className="col-12 col-lg-6">
-              <div className="border rounded p-3 h-100">
-                <h6>Liberar reserva</h6>
-                <div className="mb-2">
-                  <label className="form-label">ID reserva</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-control"
-                    value={formLiberar.cod_reserva}
-                    onChange={(event) => setFormLiberar((prev) => ({ ...prev, cod_reserva: event.target.value }))}
-                  />
-                </div>
-                <div className="mb-2">
+              {esLiberar ? (
+                <div className="mb-3">
                   <label className="form-label">Motivo (opcional)</label>
                   <input
                     type="text"
+                    className="form-control"
+                    value={form.motivo}
+                    onChange={(event) => setForm((prev) => ({ ...prev, motivo: event.target.value }))}
                     maxLength={200}
-                    className="form-control"
-                    value={formLiberar.motivo}
-                    onChange={(event) => setFormLiberar((prev) => ({ ...prev, motivo: event.target.value }))}
+                    placeholder="Motivo de liberacion"
                   />
                 </div>
+              ) : (
                 <div className="mb-3">
-                  <label className="form-label">Observaciones (opcional)</label>
-                  <input
-                    type="text"
-                    maxLength={500}
-                    className="form-control"
-                    value={formLiberar.observaciones}
-                    onChange={(event) => setFormLiberar((prev) => ({ ...prev, observaciones: event.target.value }))}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-warning"
-                  disabled={savingLiberar}
-                  onClick={() => liberarReserva()}
-                >
-                  {savingLiberar ? 'Liberando...' : 'Liberar'}
-                </button>
-              </div>
-            </div>
-
-            <div className="col-12 col-lg-6">
-              <div className="border rounded p-3 h-100">
-                <h6>Consumir reserva</h6>
-                <div className="mb-2">
-                  <label className="form-label">ID reserva</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-control"
-                    value={formConsumir.cod_reserva}
-                    onChange={(event) => setFormConsumir((prev) => ({ ...prev, cod_reserva: event.target.value }))}
-                  />
-                </div>
-                <div className="mb-2">
                   <label className="form-label">Referencia (opcional)</label>
                   <input
                     type="text"
+                    className="form-control"
+                    value={form.referencia}
+                    onChange={(event) => setForm((prev) => ({ ...prev, referencia: event.target.value }))}
                     maxLength={200}
-                    className="form-control"
-                    value={formConsumir.referencia}
-                    onChange={(event) => setFormConsumir((prev) => ({ ...prev, referencia: event.target.value }))}
+                    placeholder="Referencia de consumo"
                   />
                 </div>
-                <div className="mb-3">
-                  <label className="form-label">Observaciones (opcional)</label>
-                  <input
-                    type="text"
-                    maxLength={500}
-                    className="form-control"
-                    value={formConsumir.observaciones}
-                    onChange={(event) => setFormConsumir((prev) => ({ ...prev, observaciones: event.target.value }))}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  disabled={savingConsumir}
-                  onClick={() => consumirReserva()}
-                >
-                  {savingConsumir ? 'Consumiendo...' : 'Consumir'}
-                </button>
+              )}
+
+              <div className="mb-2">
+                <label className="form-label">Observaciones (opcional)</label>
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  value={form.observaciones}
+                  onChange={(event) => setForm((prev) => ({ ...prev, observaciones: event.target.value }))}
+                  maxLength={500}
+                  placeholder="Notas de la operacion"
+                />
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="jyr-card mt-4">
-        <div className="jyr-card-body">
-          <h5 className="mb-3">Historial persistente de reservas</h5>
-
-          <div className="row g-2 mb-3">
-            <div className="col-12 col-md-2">
-              <input
-                type="number"
-                min="1"
-                className="form-control"
-                placeholder="Producto"
-                value={filtros.cod_producto}
-                onChange={(event) => setFiltros((prev) => ({ ...prev, cod_producto: event.target.value }))}
-              />
-            </div>
-            <div className="col-12 col-md-2">
-              <input
-                type="number"
-                min="1"
-                className="form-control"
-                placeholder="Ubicacion"
-                value={filtros.cod_ubicacion}
-                onChange={(event) => setFiltros((prev) => ({ ...prev, cod_ubicacion: event.target.value }))}
-              />
-            </div>
-            <div className="col-12 col-md-2">
-              <select
-                className="form-select"
-                value={filtros.estado}
-                onChange={(event) => setFiltros((prev) => ({ ...prev, estado: event.target.value }))}
-              >
-                <option value="">Estado</option>
-                <option value="ACTIVA">ACTIVA</option>
-                <option value="LIBERADA">LIBERADA</option>
-                <option value="CONSUMIDA">CONSUMIDA</option>
-                <option value="ANULADA">ANULADA</option>
-              </select>
-            </div>
-            <div className="col-12 col-md-3">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Referencia"
-                value={filtros.referencia}
-                onChange={(event) => setFiltros((prev) => ({ ...prev, referencia: event.target.value }))}
-              />
-            </div>
-            <div className="col-12 col-md-3 d-flex gap-2">
-              <button type="button" className="btn btn-outline-primary w-100" onClick={aplicarFiltros} disabled={loadingListado}>
-                Buscar
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={cerrarModal} disabled={loading}>
+                Cancelar
               </button>
-              <button type="button" className="btn btn-outline-secondary w-100" onClick={limpiarFiltros} disabled={loadingListado}>
-                Limpiar
+              <button type="submit" className={botonClase} disabled={loading}>
+                {loading ? 'Procesando...' : boton}
               </button>
             </div>
-          </div>
-
-          <div className="alert alert-light border mb-3">
-            <strong>Total:</strong> {totalReservas} | <strong>Activas:</strong> {resumenReservas.activas} | <strong>Liberadas:</strong> {resumenReservas.liberadas} | <strong>Consumidas:</strong> {resumenReservas.consumidas}
-          </div>
-
-          <div className="table-responsive">
-            <table className="table table-sm table-striped align-middle">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Fecha</th>
-                  <th>Producto</th>
-                  <th>Ubicacion</th>
-                  <th>Cantidad</th>
-                  <th>Estado</th>
-                  <th>Referencia</th>
-                  <th>Usuario</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!loadingListado && reservas.length === 0 && (
-                  <tr>
-                    <td colSpan="9" className="text-center text-muted">
-                      No hay reservas registradas.
-                    </td>
-                  </tr>
-                )}
-                {reservas.map((r) => {
-                  const estado = String(r.estado || '').toUpperCase();
-                  const activa = estado === 'ACTIVA';
-                  return (
-                    <tr key={r.cod_reserva}>
-                      <td>{r.cod_reserva}</td>
-                      <td>{formatearFecha(r.fecha_creacion)}</td>
-                      <td>{r.nombre_producto || r.cod_producto}</td>
-                      <td>{r.ubicacion || r.cod_ubicacion}</td>
-                      <td>{r.cantidad}</td>
-                      <td>{estado}</td>
-                      <td>{r.referencia || '-'}</td>
-                      <td>{r.usuario_creacion || '-'}</td>
-                      <td className="d-flex gap-2">
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-warning"
-                          disabled={!activa || savingLiberar}
-                          onClick={() => liberarReserva(r.cod_reserva)}
-                        >
-                          Liberar
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          disabled={!activa || savingConsumir}
-                          onClick={() => consumirReserva(r.cod_reserva)}
-                        >
-                          Consumir
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          </form>
         </div>
       </div>
     </div>
   );
 };
 
-export default InventarioReservasPage;
+const InventarioReservasPage = () => {
+  const [filtros, setFiltros] = useState(filtrosIniciales);
+  const [consulta, setConsulta] = useState(filtrosIniciales);
+  const [productos, setProductos] = useState([]);
+  const [filas, setFilas] = useState([]);
+  const [meta, setMeta] = useState({
+    total: 0,
+    pagina: 1,
+    limite: LIMITE_PAGINA,
+    totalPaginas: 1
+  });
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [modalReservaAbierto, setModalReservaAbierto] = useState(false);
+  const [procesandoId, setProcesandoId] = useState(null);
+  const [accionModal, setAccionModal] = useState({
+    abierto: false,
+    tipo: '',
+    reserva: null
+  });
+
+  const { ubicaciones, loadingUbicaciones } = useUbicaciones();
+
+  const cargarReservas = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      if (consulta.fecha_desde && consulta.fecha_hasta) {
+        const desde = new Date(consulta.fecha_desde);
+        const hasta = new Date(consulta.fecha_hasta);
+        if (!Number.isNaN(desde.getTime()) && !Number.isNaN(hasta.getTime()) && desde > hasta) {
+          setFilas([]);
+          setMeta((prev) => ({ ...prev, total: 0, totalPaginas: 1 }));
+          setError('fecha_desde no puede ser mayor que fecha_hasta');
+          return;
+        }
+      }
+
+      const params = limpiarParamsConsulta({
+        page: Number(consulta.pagina || 1),
+        limit: Number(consulta.limite || LIMITE_PAGINA),
+        cod_producto: normalizarCodProducto(consulta.cod_producto),
+        cod_ubicacion: normalizarCodUbicacion(consulta.cod_ubicacion),
+        estado: consulta.estado || 'TODAS',
+        referencia: String(consulta.referencia || '').trim(),
+        fecha_desde: consulta.fecha_desde || undefined,
+        fecha_hasta: consulta.fecha_hasta || undefined
+      });
+
+      const { data } = await inventarioReservasApi.listar(params);
+
+      if (data?.ok) {
+        const normalizado = normalizarRespuesta(data.data, Number(params.limit || LIMITE_PAGINA));
+        setFilas(normalizado.filas);
+        setMeta(normalizado.meta);
+      } else {
+        setFilas([]);
+        setMeta({ total: 0, pagina: 1, limite: Number(params.limit || LIMITE_PAGINA), totalPaginas: 1 });
+        setError('Respuesta invalida del servidor al consultar reservas');
+      }
+    } catch (err) {
+      setFilas([]);
+      setMeta((prev) => ({ ...prev, total: 0, totalPaginas: 1 }));
+      setError(obtenerMensajeError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [consulta]);
+
+  useEffect(() => {
+    cargarReservas();
+  }, [cargarReservas]);
+
+  useEffect(() => {
+    const cargarProductos = async () => {
+      try {
+        const { data } = await inventarioMovimientosApi.listarProductos();
+        setProductos(Array.isArray(data?.data) ? data.data : []);
+      } catch {
+        setProductos([]);
+      }
+    };
+    cargarProductos();
+  }, []);
+
+  const resumenPagina = useMemo(() => ({
+    activas: filas.filter((item) => String(item.estado || '').toUpperCase() === 'ACTIVA').length,
+    liberadas: filas.filter((item) => String(item.estado || '').toUpperCase() === 'LIBERADA').length,
+    consumidas: filas.filter((item) => String(item.estado || '').toUpperCase() === 'CONSUMIDA').length
+  }), [filas]);
+
+  const manejarCambioFiltro = (campo, valor) => {
+    setFiltros((prev) => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
+  const aplicarFiltros = () => {
+    setError('');
+    setSuccess('');
+    setConsulta({
+      ...filtros,
+      pagina: 1,
+      limite: Number(filtros.limite || LIMITE_PAGINA)
+    });
+    setFiltros((prev) => ({
+      ...prev,
+      pagina: 1
+    }));
+  };
+
+  const limpiarFiltros = () => {
+    setError('');
+    setSuccess('');
+    setFiltros(filtrosIniciales);
+    setConsulta(filtrosIniciales);
+  };
+
+  const cambiarPagina = (nuevaPagina) => {
+    if (nuevaPagina < 1 || nuevaPagina > meta.totalPaginas) return;
+    setConsulta((prev) => ({ ...prev, pagina: nuevaPagina }));
+    setFiltros((prev) => ({ ...prev, pagina: nuevaPagina }));
+  };
+
+  const manejarReservaRegistrada = async () => {
+    setSuccess('Reserva registrada correctamente');
+    setError('');
+    await cargarReservas();
+  };
+
+  const abrirAccion = (tipo, reserva) => {
+    setAccionModal({
+      abierto: true,
+      tipo,
+      reserva
+    });
+  };
+
+  const cerrarAccion = () => {
+    if (procesandoId) return;
+    setAccionModal({
+      abierto: false,
+      tipo: '',
+      reserva: null
+    });
+  };
+
+  const confirmarAccion = async (payload) => {
+    try {
+      const codReserva = Number(accionModal?.reserva?.cod_reserva || 0);
+      if (!Number.isInteger(codReserva) || codReserva < 1) {
+        setError('No se pudo identificar la reserva seleccionada');
+        return;
+      }
+
+      setProcesandoId(codReserva);
+      setError('');
+      setSuccess('');
+
+      if (accionModal.tipo === 'liberar') {
+        const { data } = await inventarioReservasApi.liberar(codReserva, {
+          motivo: payload?.motivo || '',
+          observaciones: payload?.observaciones || ''
+        });
+        if (!data?.ok) {
+          setError('Respuesta invalida al liberar reserva');
+          return;
+        }
+        setSuccess(`Reserva #${codReserva} liberada correctamente`);
+      } else {
+        const { data } = await inventarioReservasApi.consumir(codReserva, {
+          referencia: payload?.referencia || '',
+          observaciones: payload?.observaciones || ''
+        });
+        if (!data?.ok) {
+          setError('Respuesta invalida al consumir reserva');
+          return;
+        }
+        setSuccess(`Reserva #${codReserva} consumida correctamente`);
+      }
+
+      cerrarAccion();
+      await cargarReservas();
+    } catch (err) {
+      setError(obtenerMensajeError(err));
+    } finally {
+      setProcesandoId(null);
+    }
+  };
+
+  const inicioMostrado = meta.total > 0 ? ((meta.pagina - 1) * meta.limite) + 1 : 0;
+  const finMostrado = meta.total > 0 ? Math.min(meta.pagina * meta.limite, meta.total) : 0;
+  const paginasVisibles = construirPaginasVisibles(meta.pagina, meta.totalPaginas);
+
+  return (
+    <section className="kdx-shell mt-4">
+      <div className="kdx-hero">
+        <div className="kdx-hero-head">
+          <div className="kdx-title-wrap">
+            <div className="kdx-title-icon">
+              <FiLock />
+            </div>
+            <div>
+              <h5 className="mb-0">Reservas</h5>
+              <p className="kdx-subtitle mb-0">Reserva de stock por producto y ubicacion con seguimiento de estado.</p>
+            </div>
+          </div>
+
+          <div className="ubi-hero-actions">
+            <div className="kdx-mini-kpi">
+              <span className="kdx-mini-kpi-label">Total</span>
+              <strong>{meta.total}</strong>
+            </div>
+            <button
+              type="button"
+              className="btn kdx-btn kdx-btn-accent"
+              onClick={() => setModalReservaAbierto(true)}
+            >
+              <FiPlus className="me-1" />
+              Nueva reserva
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="jyr-card kdx-filtros-card">
+        <div className="jyr-card-body">
+          {success && (
+            <div className="alert alert-success kdx-error-alert" role="alert">
+              {success}
+            </div>
+          )}
+          {error && (
+            <div className="alert alert-danger kdx-error-alert" role="alert">
+              {error}
+            </div>
+          )}
+
+          <div className="alert alert-light border mb-3">
+            <strong>En pagina:</strong> Activas {resumenPagina.activas} | Liberadas {resumenPagina.liberadas} | Consumidas {resumenPagina.consumidas}
+          </div>
+
+          <ReservasFiltros
+            filtros={filtros}
+            productos={productos}
+            ubicaciones={ubicaciones}
+            loading={loading}
+            onChange={manejarCambioFiltro}
+            onAplicar={aplicarFiltros}
+            onLimpiar={limpiarFiltros}
+          />
+        </div>
+      </div>
+
+      <div className="jyr-card kdx-table-card">
+        <div className="kdx-table-topbar">
+          <div className="kdx-table-topbar-left">
+            <FiDatabase />
+            <span>Reservas registradas</span>
+          </div>
+          <div className="kdx-table-topbar-right">
+            Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
+          </div>
+        </div>
+        <div className="jyr-card-body p-0">
+          <ReservasTabla
+            filas={filas}
+            loading={loading}
+            procesandoId={procesandoId}
+            onLiberar={(reserva) => abrirAccion('liberar', reserva)}
+            onConsumir={(reserva) => abrirAccion('consumir', reserva)}
+          />
+        </div>
+      </div>
+
+      <div className="kdx-pagination-bar">
+        <span className="kdx-pagination-summary">
+          Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
+        </span>
+
+        <div className="kdx-pagination-controls">
+          <button
+            type="button"
+            className="kdx-page-btn kdx-page-btn-nav"
+            onClick={() => cambiarPagina(meta.pagina - 1)}
+            disabled={loading || meta.pagina <= 1}
+            aria-label="Pagina anterior"
+          >
+            <FiChevronLeft size={15} />
+          </button>
+
+          {paginasVisibles.map((pagina, index) => (
+            <button
+              key={`${pagina}-${index}`}
+              type="button"
+              className={`kdx-page-btn ${pagina === meta.pagina ? 'is-active' : ''} ${pagina === '...' ? 'is-ellipsis' : ''}`}
+              onClick={() => (typeof pagina === 'number' ? cambiarPagina(pagina) : undefined)}
+              disabled={loading || pagina === '...'}
+            >
+              {pagina}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            className="kdx-page-btn kdx-page-btn-nav"
+            onClick={() => cambiarPagina(meta.pagina + 1)}
+            disabled={loading || meta.pagina >= meta.totalPaginas}
+            aria-label="Pagina siguiente"
+          >
+            <FiChevronRight size={15} />
+          </button>
+
+          <span className="kdx-page-state">
+            Pagina {meta.pagina} de {meta.totalPaginas}
+          </span>
+        </div>
+      </div>
+
+      <ReservaForm
+        abierto={modalReservaAbierto}
+        onClose={() => setModalReservaAbierto(false)}
+        onReservaRegistrada={manejarReservaRegistrada}
+        productos={productos}
+        ubicaciones={ubicaciones}
+        loadingUbicaciones={loadingUbicaciones}
+      />
+
+      <ReservaAccionModal
+        abierto={accionModal.abierto}
+        tipo={accionModal.tipo}
+        reserva={accionModal.reserva}
+        loading={Boolean(procesandoId)}
+        onClose={cerrarAccion}
+        onConfirm={confirmarAccion}
+      />
+    </section>
+  );
+};
+
+export default InventarioReservasPage;
