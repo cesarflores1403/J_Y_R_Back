@@ -241,9 +241,9 @@ export const construirSelectMovimientoTransferenciaFormateadoSql = ({ schemaMovi
       p.nombre_producto,
       ${exprCodUbicacion} AS cod_ubicacion,
       COALESCE(
-        NULLIF(u.codigo_producto, ''),
         NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
-        CAST(u.cod_ubicacion AS TEXT)
+        CAST(u.cod_ubicacion AS TEXT),
+        '-'
       ) AS ubicacion,
       CAST(m.${schemaMovimiento.fecha} AS TIMESTAMP) AS fecha_movimiento,
       UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) AS tipo,

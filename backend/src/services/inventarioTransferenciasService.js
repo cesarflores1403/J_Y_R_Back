@@ -84,8 +84,6 @@ const ubicacionActiva = (estadoUbi) => {
 // // Arma etiqueta de ubicacion para respuestas fallback cuando no se puede reconsultar movimiento
 const construirEtiquetaUbicacion = (u) => {
   if (!u) return null;
-  const qr = String(u.codigo_producto || '').trim();
-  if (qr) return qr;
   const partes = [u.pasillo, u.estanteria, u.nivel_1, u.nivel_2]
     .map((p) => String(p || '').trim())
     .filter(Boolean);
@@ -234,6 +232,180 @@ class InventarioTransferenciasService {
     return filasActualizadas[0] || null;
   }
 
+  // // Obtiene y bloquea una transferencia por id para anularla de forma segura
+  async obtenerTransferenciaConBloqueoPorId({ codTransferencia, transaction }) {
+    const [fila] = await sequelize.query(`
+      SELECT *
+      FROM transferencia_inventario
+      WHERE cod_transferencia_inventario = :codTransferencia
+      LIMIT 1
+      FOR UPDATE
+    `, {
+      replacements: { codTransferencia },
+      type: sequelize.QueryTypes.SELECT,
+      transaction
+    });
+
+    return fila || null;
+  }
+
+  // // Valida que la transferencia no este anulada y normaliza estado operativo
+  validarTransferenciaNoAnulada(transferencia) {
+    const estado = String(transferencia?.estado || '').trim().toUpperCase();
+    if (estado === 'ANULADA') {
+      throw Object.assign(new Error('La transferencia ya fue anulada previamente'), { status: 409 });
+    }
+  }
+
+  // // Lee inventario por id con lock pesimista y fallback para schemas sin stock_reservado
+  async obtenerInventarioPorIdConBloqueo({ codInventario, transaction }) {
+    try {
+      const [fila] = await sequelize.query(`
+        SELECT
+          cod_inventario,
+          cod_producto,
+          cod_ubicacion,
+          stock,
+          COALESCE(stock_reservado, 0) AS stock_reservado,
+          stock_minimo,
+          stock_maximo,
+          fecha_ult_mov
+        FROM inventario
+        WHERE cod_inventario = :codInventario
+        LIMIT 1
+        FOR UPDATE
+      `, {
+        replacements: { codInventario },
+        type: sequelize.QueryTypes.SELECT,
+        transaction
+      });
+
+      return {
+        inventario: fila || null,
+        usaStockReservado: true
+      };
+    } catch (error) {
+      if (!esErrorColumnaNoExiste(error, 'stock_reservado')) {
+        throw error;
+      }
+
+      const [fila] = await sequelize.query(`
+        SELECT
+          cod_inventario,
+          cod_producto,
+          cod_ubicacion,
+          stock,
+          0 AS stock_reservado,
+          stock_minimo,
+          stock_maximo,
+          fecha_ult_mov
+        FROM inventario
+        WHERE cod_inventario = :codInventario
+        LIMIT 1
+        FOR UPDATE
+      `, {
+        replacements: { codInventario },
+        type: sequelize.QueryTypes.SELECT,
+        transaction
+      });
+
+      return {
+        inventario: fila || null,
+        usaStockReservado: false
+      };
+    }
+  }
+
+  // // Descuenta destino al anular transferencia con guardia anti-stock negativo/disponible
+  async descontarDestinoSeguro({ codInventarioDestino, cantidad, usaStockReservado, transaction }) {
+    const [filas] = await sequelize.query(`
+      UPDATE inventario
+      SET stock = stock - :cantidad,
+          fecha_ult_mov = NOW()
+      WHERE cod_inventario = :codInventarioDestino
+        AND ${
+          usaStockReservado
+            ? '(stock - COALESCE(stock_reservado, 0)) >= :cantidad'
+            : 'stock >= :cantidad'
+        }
+      RETURNING cod_inventario, cod_producto, cod_ubicacion, stock, fecha_ult_mov
+    `, {
+      replacements: { codInventarioDestino, cantidad },
+      transaction
+    });
+
+    const filasActualizadas = Array.isArray(filas) ? filas : [];
+    return filasActualizadas[0] || null;
+  }
+
+  // // Incrementa origen al anular transferencia (reversa del descuento original)
+  async incrementarOrigen({ codInventarioOrigen, cantidad, transaction }) {
+    const [filas] = await sequelize.query(`
+      UPDATE inventario
+      SET stock = stock + :cantidad,
+          fecha_ult_mov = NOW()
+      WHERE cod_inventario = :codInventarioOrigen
+      RETURNING cod_inventario, cod_producto, cod_ubicacion, stock, fecha_ult_mov
+    `, {
+      replacements: { codInventarioOrigen, cantidad },
+      transaction
+    });
+
+    const filasActualizadas = Array.isArray(filas) ? filas : [];
+    return filasActualizadas[0] || null;
+  }
+
+  // // Actualiza cabecera de transferencia como ANULADA con metadatos de auditoria si existen columnas
+  async marcarTransferenciaAnulada({
+    codTransferencia,
+    codUsuario,
+    codMovimientoSalidaAnulacion,
+    codMovimientoEntradaAnulacion,
+    transaction
+  }) {
+    const columnas = await sequelize.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'transferencia_inventario'
+    `, {
+      type: sequelize.QueryTypes.SELECT,
+      transaction
+    });
+
+    const setColumnas = new Set((columnas || []).map((c) => c.column_name));
+    const setSql = ['estado = :estado'];
+    const replacements = {
+      codTransferencia,
+      estado: 'ANULADA'
+    };
+
+    if (setColumnas.has('fecha_anulacion')) {
+      setSql.push('fecha_anulacion = NOW()');
+    }
+    if (setColumnas.has('cod_usuario_anulacion')) {
+      setSql.push('cod_usuario_anulacion = :codUsuarioAnulacion');
+      replacements.codUsuarioAnulacion = codUsuario || null;
+    }
+    if (setColumnas.has('cod_movimiento_salida_anulacion')) {
+      setSql.push('cod_movimiento_salida_anulacion = :codMovSalidaAnu');
+      replacements.codMovSalidaAnu = codMovimientoSalidaAnulacion || null;
+    }
+    if (setColumnas.has('cod_movimiento_entrada_anulacion')) {
+      setSql.push('cod_movimiento_entrada_anulacion = :codMovEntradaAnu');
+      replacements.codMovEntradaAnu = codMovimientoEntradaAnulacion || null;
+    }
+
+    await sequelize.query(`
+      UPDATE transferencia_inventario
+      SET ${setSql.join(', ')}
+      WHERE cod_transferencia_inventario = :codTransferencia
+    `, {
+      replacements,
+      transaction
+    });
+  }
+
   // // Inserta cabecera persistente de transferencia para trazabilidad del submodulo
   async insertarTransferenciaInventario({
     codProducto,
@@ -290,6 +462,7 @@ class InventarioTransferenciasService {
     referencia,
     motivo,
     observaciones,
+    refTipo = 'TRANSFERENCIA',
     refId,
     transaction
   }) {
@@ -304,7 +477,7 @@ class InventarioTransferenciasService {
       referencia,
       motivo,
       observaciones,
-      refTipo: 'TRANSFERENCIA',
+      refTipo,
       refId: refId ?? null
     });
 
@@ -635,6 +808,214 @@ class InventarioTransferenciasService {
     }
   }
 
+  // // Revierte una transferencia completada con doble movimiento compensatorio y control transaccional
+  async anularTransferencia(codTransferenciaInput, payload = {}, options = {}) {
+    const codTransferencia = Number(codTransferenciaInput);
+    if (!Number.isInteger(codTransferencia) || codTransferencia < 1) {
+      throw Object.assign(new Error('id de transferencia invalido para anulacion'), { status: 400 });
+    }
+
+    const motivo = normalizarTexto(payload.motivo) || 'ANULACION_TRANSFERENCIA';
+    const referenciaManual = normalizarTexto(payload.referencia);
+    const observacionesManual = normalizarTexto(payload.observaciones);
+    const codUsuario = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
+
+    const schemaMovimiento = await inventarioMovimientosSchemaService.obtenerSchemaMovimiento();
+    const t = await sequelize.transaction();
+    let transaccionConfirmada = false;
+
+    try {
+      const transferencia = await this.obtenerTransferenciaConBloqueoPorId({
+        codTransferencia,
+        transaction: t
+      });
+      if (!transferencia) {
+        throw Object.assign(new Error('Transferencia no encontrada'), { status: 404 });
+      }
+
+      this.validarTransferenciaNoAnulada(transferencia);
+
+      const codProducto = Number(transferencia.cod_producto || 0);
+      const codInventarioOrigen = Number(transferencia.cod_inventario_origen || 0);
+      const codInventarioDestino = Number(transferencia.cod_inventario_destino || 0);
+      const codUbicacionOrigen = Number(transferencia.cod_ubicacion_origen || 0);
+      const codUbicacionDestino = Number(transferencia.cod_ubicacion_destino || 0);
+      const cantidad = Number(transferencia.cantidad || 0);
+
+      if (
+        !Number.isInteger(codInventarioOrigen)
+        || codInventarioOrigen < 1
+        || !Number.isInteger(codInventarioDestino)
+        || codInventarioDestino < 1
+        || !Number.isInteger(cantidad)
+        || cantidad <= 0
+      ) {
+        throw Object.assign(new Error('La transferencia tiene datos inconsistentes para anulacion'), { status: 409 });
+      }
+
+      // // Bloqueamos inventarios de origen y destino para serializar la reversa de la transferencia
+      const [invOrigenWrap, invDestinoWrap] = await Promise.all([
+        this.obtenerInventarioPorIdConBloqueo({ codInventario: codInventarioOrigen, transaction: t }),
+        this.obtenerInventarioPorIdConBloqueo({ codInventario: codInventarioDestino, transaction: t })
+      ]);
+
+      const inventarioOrigenAntes = invOrigenWrap?.inventario || null;
+      const inventarioDestinoAntes = invDestinoWrap?.inventario || null;
+      const usaStockReservado = Boolean(invOrigenWrap?.usaStockReservado && invDestinoWrap?.usaStockReservado);
+
+      if (!inventarioOrigenAntes || !inventarioDestinoAntes) {
+        throw Object.assign(new Error('No se pudieron bloquear inventarios origen/destino para anular transferencia'), { status: 404 });
+      }
+
+      const stockOrigenAntes = Number(inventarioOrigenAntes.stock || 0);
+      const stockDestinoAntes = Number(inventarioDestinoAntes.stock || 0);
+      const stockReservadoDestino = Number(inventarioDestinoAntes.stock_reservado || 0);
+      const stockDisponibleDestino = stockDestinoAntes - stockReservadoDestino;
+
+      if (stockDisponibleDestino < cantidad) {
+        throw Object.assign(
+          new Error(`No se puede anular transferencia: destino disponible ${stockDisponibleDestino}, cantidad a revertir ${cantidad}`),
+          { status: 409 }
+        );
+      }
+
+      // // Reversa real: descontar destino y devolver a origen dentro de la misma transaccion
+      const destinoActualizadoTx = await this.descontarDestinoSeguro({
+        codInventarioDestino,
+        cantidad,
+        usaStockReservado,
+        transaction: t
+      });
+      if (!destinoActualizadoTx) {
+        throw Object.assign(
+          new Error('Conflicto de concurrencia al descontar destino durante anulacion de transferencia'),
+          { status: 409 }
+        );
+      }
+
+      const origenActualizadoTx = await this.incrementarOrigen({
+        codInventarioOrigen,
+        cantidad,
+        transaction: t
+      });
+      if (!origenActualizadoTx) {
+        throw Object.assign(
+          new Error('Conflicto de concurrencia al incrementar origen durante anulacion de transferencia'),
+          { status: 409 }
+        );
+      }
+
+      const referenciaOriginal = normalizarTexto(transferencia.referencia);
+      const referenciaBase = referenciaOriginal
+        ? referenciaOriginal.replace(/\s+/g, '-')
+        : `TRF-${codTransferencia}`;
+      const referenciaReversa = (referenciaManual || `ANULA-${referenciaBase}`).slice(0, 200);
+      const observacionesSistema = [
+        `Anulacion de transferencia #${codTransferencia}`,
+        observacionesManual
+      ].filter(Boolean).join(' | ').slice(0, 500);
+
+      // // Movimientos compensatorios: SALIDA en destino y ENTRADA en origen
+      const movimientoSalidaAnulacionRow = await this.insertarMovimientoTransferencia({
+        schemaMovimiento,
+        tipoMovimiento: 'SALIDA',
+        codInventario: codInventarioDestino,
+        codProducto,
+        codUbicacion: codUbicacionDestino,
+        codUsuario,
+        cantidad,
+        referencia: referenciaReversa,
+        motivo,
+        observaciones: observacionesSistema,
+        refTipo: 'ANULACION_TRANSFERENCIA',
+        refId: codTransferencia,
+        transaction: t
+      });
+
+      const movimientoEntradaAnulacionRow = await this.insertarMovimientoTransferencia({
+        schemaMovimiento,
+        tipoMovimiento: 'ENTRADA',
+        codInventario: codInventarioOrigen,
+        codProducto,
+        codUbicacion: codUbicacionOrigen,
+        codUsuario,
+        cantidad,
+        referencia: referenciaReversa,
+        motivo,
+        observaciones: observacionesSistema,
+        refTipo: 'ANULACION_TRANSFERENCIA',
+        refId: codTransferencia,
+        transaction: t
+      });
+
+      const movimientoSalidaAnulacion = await this.obtenerMovimientoFormateado({
+        schemaMovimiento,
+        movimientoRow: movimientoSalidaAnulacionRow,
+        transaction: t
+      });
+      const movimientoEntradaAnulacion = await this.obtenerMovimientoFormateado({
+        schemaMovimiento,
+        movimientoRow: movimientoEntradaAnulacionRow,
+        transaction: t
+      });
+
+      await this.marcarTransferenciaAnulada({
+        codTransferencia,
+        codUsuario,
+        codMovimientoSalidaAnulacion: schemaMovimiento.pk
+          ? (movimientoSalidaAnulacionRow?.[schemaMovimiento.pk] ?? null)
+          : null,
+        codMovimientoEntradaAnulacion: schemaMovimiento.pk
+          ? (movimientoEntradaAnulacionRow?.[schemaMovimiento.pk] ?? null)
+          : null,
+        transaction: t
+      });
+
+      await t.commit();
+      transaccionConfirmada = true;
+
+      const inventarioOrigenActualizado = await inventarioExistenciasService.obtenerExistenciaPorId(codInventarioOrigen);
+      const inventarioDestinoActualizado = await inventarioExistenciasService.obtenerExistenciaPorId(codInventarioDestino);
+      const stockOrigenDespues = Number(inventarioOrigenActualizado?.stock ?? origenActualizadoTx.stock ?? (stockOrigenAntes + cantidad));
+      const stockDestinoDespues = Number(inventarioDestinoActualizado?.stock ?? destinoActualizadoTx.stock ?? (stockDestinoAntes - cantidad));
+
+      return {
+        transferencia: {
+          cod_transferencia: codTransferencia,
+          referencia: transferencia.referencia,
+          estado: 'ANULADA'
+        },
+        movimientos: {
+          salida_anulacion: movimientoSalidaAnulacion || null,
+          entrada_anulacion: movimientoEntradaAnulacion || null
+        },
+        inventario_origen: inventarioOrigenActualizado,
+        inventario_destino: inventarioDestinoActualizado,
+        resumen: {
+          cod_transferencia: codTransferencia,
+          cod_producto: codProducto,
+          cod_inventario_origen: codInventarioOrigen,
+          cod_inventario_destino: codInventarioDestino,
+          cod_ubicacion_origen: codUbicacionOrigen,
+          cod_ubicacion_destino: codUbicacionDestino,
+          cantidad_revertida: cantidad,
+          referencia_anulacion: referenciaReversa,
+          stock_origen_antes: stockOrigenAntes,
+          stock_origen_despues: stockOrigenDespues,
+          stock_destino_antes: stockDestinoAntes,
+          stock_destino_reservado: stockReservadoDestino,
+          stock_destino_disponible_antes: stockDisponibleDestino,
+          stock_destino_despues: stockDestinoDespues
+        }
+      };
+    } catch (error) {
+      if (!transaccionConfirmada) {
+        await t.rollback();
+      }
+      throw error;
+    }
+  }
+
   // // Lista transferencias persistidas con filtros y paginacion para frontend operativo
   async listarTransferencias(query = {}) {
     const { page, limit, offset } = resolverPaginacion(query);
@@ -665,9 +1046,15 @@ class InventarioTransferenciasService {
       whereParts.push('t.cod_ubicacion_destino = :codUbicacionDestino');
       replacements.codUbicacionDestino = codUbicacionDestino;
     }
-    if (estado) {
-      whereParts.push('UPPER(t.estado) = :estado');
-      replacements.estado = estado;
+    if (estado && estado !== 'TODAS') {
+      if (estado === 'ACTIVAS') {
+        whereParts.push(`UPPER(t.estado) IN ('COMPLETADA', 'ACTIVA')`);
+      } else if (estado === 'ANULADAS') {
+        whereParts.push(`UPPER(t.estado) = 'ANULADA'`);
+      } else {
+        whereParts.push('UPPER(t.estado) = :estado');
+        replacements.estado = estado;
+      }
     }
     if (referencia) {
       whereParts.push('t.referencia ILIKE :referencia');
@@ -712,15 +1099,15 @@ class InventarioTransferenciasService {
           t.cod_inventario_destino,
           t.cod_ubicacion_origen,
           COALESCE(
-            NULLIF(uo.codigo_producto, ''),
             NULLIF(CONCAT_WS('-', uo.pasillo, uo.estanteria, uo.nivel_1, uo.nivel_2), ''),
-            CAST(uo.cod_ubicacion AS TEXT)
+            CAST(uo.cod_ubicacion AS TEXT),
+            '-'
           ) AS ubicacion_origen,
           t.cod_ubicacion_destino,
           COALESCE(
-            NULLIF(ud.codigo_producto, ''),
             NULLIF(CONCAT_WS('-', ud.pasillo, ud.estanteria, ud.nivel_1, ud.nivel_2), ''),
-            CAST(ud.cod_ubicacion AS TEXT)
+            CAST(ud.cod_ubicacion AS TEXT),
+            '-'
           ) AS ubicacion_destino,
           t.cod_usuario,
           usu.nombre_usuario,

@@ -93,3 +93,40 @@ export const registrarTransferencia = async (req, res, next) => {
     next(error);
   }
 };
+
+// // PATCH /api/inventario/transferencias/:id/anular
+// // Revierte transferencia completada entre ubicaciones con doble movimiento compensatorio
+export const anularTransferencia = async (req, res, next) => {
+  try {
+    const resultado = await inventarioTransferenciasService.anularTransferencia(req.params.id, req.body, {
+      usuario: req.usuario
+    });
+
+    logger.info('inventario.transferencias.anulada', {
+      modulo: 'inventario',
+      accion: 'anular_transferencia',
+      usuario: req.usuario ? {
+        cod_usuario: req.usuario.cod_usuario ?? null,
+        nombre_usuario: req.usuario.nombre_usuario ?? null,
+        rol: req.usuario.rol ?? null
+      } : null,
+      cod_transferencia: Number(req.params?.id || 0),
+      motivo: req.body?.motivo ?? 'ANULACION_TRANSFERENCIA',
+      referencia: req.body?.referencia ?? null,
+      cod_inventario_origen: resultado?.resumen?.cod_inventario_origen ?? null,
+      cod_inventario_destino: resultado?.resumen?.cod_inventario_destino ?? null,
+      stock_origen_antes: resultado?.resumen?.stock_origen_antes ?? null,
+      stock_origen_despues: resultado?.resumen?.stock_origen_despues ?? null,
+      stock_destino_antes: resultado?.resumen?.stock_destino_antes ?? null,
+      stock_destino_despues: resultado?.resumen?.stock_destino_despues ?? null
+    });
+
+    return sendOk(res, {
+      status: 200,
+      message: 'Transferencia anulada correctamente',
+      data: resultado
+    });
+  } catch (error) {
+    next(error);
+  }
+};

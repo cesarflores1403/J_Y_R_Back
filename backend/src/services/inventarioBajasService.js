@@ -57,6 +57,13 @@ const construirDescripcionBaja = ({ motivo, descripcion, referencia }) => {
   return bloques.join(' | ');
 };
 
+// // Normaliza texto opcional para evitar guardar espacios vacios
+const normalizarTexto = (valor) => {
+  if (valor === undefined || valor === null) return null;
+  const limpio = String(valor).trim();
+  return limpio.length > 0 ? limpio : null;
+};
+
 class InventarioBajasService {
   // // Obtiene schema de baja_inventario; si no existe devuelve metadata controlada
   async obtenerSchemaBajaInventario({ forceRefresh = false } = {}) {
@@ -193,6 +200,56 @@ class InventarioBajasService {
     return bajaCreada || null;
   }
 
+  // // Actualiza baja_inventario por PK cuando existen columnas de auditoria/estado en el schema real
+  async actualizarBajaInventarioPorPk({ schemaBaja, codBaja, cambios = {}, transaction }) {
+    if (!schemaBaja?.existe || !schemaBaja.pk) return;
+    if (!Number.isInteger(Number(codBaja)) || Number(codBaja) <= 0) return;
+
+    const columnasSet = new Set(schemaBaja.columns || []);
+    const setSql = [];
+    const replacements = {
+      pkBaja: Number(codBaja)
+    };
+
+    const agregarCambio = (candidatos, claveCambio, transform = (value) => value) => {
+      if (!(claveCambio in cambios)) return;
+      const columna = resolverColumna(columnasSet, candidatos);
+      if (!columna) return;
+      const placeholder = `valor_${columna}`;
+      setSql.push(`${columna} = :${placeholder}`);
+      replacements[placeholder] = transform(cambios[claveCambio]);
+    };
+
+    agregarCambio(['estado'], 'estado', (value) => String(value || '').trim().toUpperCase());
+    agregarCambio(['cod_movimiento_baja', 'cod_movimiento'], 'codMovimientoBaja', (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      const numero = Number(value);
+      return Number.isInteger(numero) && numero > 0 ? numero : null;
+    });
+    agregarCambio(['cod_movimiento_anulacion'], 'codMovimientoAnulacion', (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      const numero = Number(value);
+      return Number.isInteger(numero) && numero > 0 ? numero : null;
+    });
+    agregarCambio(['cod_usuario_anulacion'], 'codUsuarioAnulacion', (value) => {
+      if (value === null || value === undefined || value === '') return null;
+      const numero = Number(value);
+      return Number.isInteger(numero) && numero > 0 ? numero : null;
+    });
+    agregarCambio(['fecha_anulacion'], 'fechaAnulacion', (value) => value || null);
+
+    if (setSql.length === 0) return;
+
+    await sequelize.query(`
+      UPDATE ${schemaBaja.tableName}
+      SET ${setSql.join(', ')}
+      WHERE ${schemaBaja.pk} = :pkBaja
+    `, {
+      replacements,
+      transaction
+    });
+  }
+
   // // Inserta movimiento para baja usando tipo BAJA como contrato oficial
   async insertarMovimientoBaja({
     schemaMovimiento,
@@ -240,6 +297,238 @@ class InventarioBajasService {
       tipoAplicado: 'BAJA',
       fallbackTipo: false
     };
+  }
+
+  // // Obtiene y bloquea un movimiento especifico para anular bajas con seguridad transaccional
+  async obtenerMovimientoConBloqueoPorId({ schemaMovimiento, codMovimiento, transaction }) {
+    if (!schemaMovimiento.pk) {
+      throw Object.assign(
+        new Error('Schema de movimiento_inventario sin PK; no es posible anular bajas de forma segura'),
+        { status: 500 }
+      );
+    }
+
+    const exprCodProducto = schemaMovimiento.codProducto
+      ? `m.${schemaMovimiento.codProducto}`
+      : 'i.cod_producto';
+    const exprCodUbicacion = schemaMovimiento.codUbicacion
+      ? `m.${schemaMovimiento.codUbicacion}`
+      : 'i.cod_ubicacion';
+    const joinInventario = schemaMovimiento.codInventario
+      ? `LEFT JOIN inventario i ON i.cod_inventario = m.${schemaMovimiento.codInventario}`
+      : '';
+
+    const [fila] = await sequelize.query(`
+      SELECT
+        m.*,
+        ${schemaMovimiento.codInventario ? `m.${schemaMovimiento.codInventario}` : 'NULL::int'} AS ref_cod_inventario,
+        ${exprCodProducto} AS ref_cod_producto,
+        ${exprCodUbicacion} AS ref_cod_ubicacion
+      FROM ${schemaMovimiento.tableName} m
+      ${joinInventario}
+      WHERE m.${schemaMovimiento.pk} = :codMovimiento
+      LIMIT 1
+      FOR UPDATE OF m
+    `, {
+      replacements: { codMovimiento },
+      type: sequelize.QueryTypes.SELECT,
+      transaction
+    });
+
+    return fila || null;
+  }
+
+  // // Valida que la baja no haya sido anulada previamente para evitar doble reverso
+  async validarBajaNoAnulada({ schemaMovimiento, codMovimiento, transaction }) {
+    if (!schemaMovimiento.refTipo || !schemaMovimiento.refId) {
+      throw Object.assign(
+        new Error('Schema de movimiento_inventario no soporta ref_tipo/ref_id para anular bajas de forma segura'),
+        { status: 500 }
+      );
+    }
+
+    const [fila] = await sequelize.query(`
+      SELECT 1 AS existe
+      FROM ${schemaMovimiento.tableName} m
+      WHERE UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA'
+        AND CAST(m.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_BAJA'
+        AND m.${schemaMovimiento.refId} = :codMovimiento
+      LIMIT 1
+    `, {
+      replacements: { codMovimiento },
+      type: sequelize.QueryTypes.SELECT,
+      transaction
+    });
+
+    if (fila?.existe) {
+      throw Object.assign(new Error('La baja ya fue anulada previamente'), { status: 409 });
+    }
+  }
+
+  // // Lee inventario por id con lock y soporte a schemas sin stock_reservado
+  async obtenerInventarioPorIdConBloqueo({ codInventario, transaction }) {
+    try {
+      const [fila] = await sequelize.query(`
+        SELECT
+          cod_inventario,
+          cod_producto,
+          cod_ubicacion,
+          stock,
+          COALESCE(stock_reservado, 0) AS stock_reservado,
+          stock_minimo,
+          stock_maximo,
+          fecha_ult_mov
+        FROM inventario
+        WHERE cod_inventario = :codInventario
+        LIMIT 1
+        FOR UPDATE
+      `, {
+        replacements: { codInventario },
+        type: sequelize.QueryTypes.SELECT,
+        transaction
+      });
+
+      return fila || null;
+    } catch (error) {
+      if (!esErrorColumnaNoExiste(error, 'stock_reservado')) {
+        throw error;
+      }
+
+      const [fila] = await sequelize.query(`
+        SELECT
+          cod_inventario,
+          cod_producto,
+          cod_ubicacion,
+          stock,
+          0 AS stock_reservado,
+          stock_minimo,
+          stock_maximo,
+          fecha_ult_mov
+        FROM inventario
+        WHERE cod_inventario = :codInventario
+        LIMIT 1
+        FOR UPDATE
+      `, {
+        replacements: { codInventario },
+        type: sequelize.QueryTypes.SELECT,
+        transaction
+      });
+
+      return fila || null;
+    }
+  }
+
+  // // Incrementa stock para revertir una baja anulada
+  async incrementarStockPorAnulacion({ codInventario, cantidad, transaction }) {
+    const [filas] = await sequelize.query(`
+      UPDATE inventario
+      SET stock = stock + :cantidad,
+          fecha_ult_mov = NOW()
+      WHERE cod_inventario = :codInventario
+      RETURNING cod_inventario, cod_producto, cod_ubicacion, stock, fecha_ult_mov
+    `, {
+      replacements: { codInventario, cantidad },
+      transaction
+    });
+
+    const filasActualizadas = Array.isArray(filas) ? filas : [];
+    return filasActualizadas[0] || null;
+  }
+
+  // // Inserta movimiento ENTRADA que compensa una BAJA anulada
+  async insertarMovimientoAnulacionBaja({
+    schemaMovimiento,
+    codInventario,
+    codProducto,
+    codUbicacion,
+    codMovimientoBaja,
+    codUsuario,
+    cantidad,
+    referenciaDocumento,
+    motivo,
+    observaciones,
+    transaction
+  }) {
+    const columnas = [];
+    const valoresSql = [];
+    const replacements = {};
+
+    if (schemaMovimiento.codInventario) {
+      columnas.push(schemaMovimiento.codInventario);
+      valoresSql.push(':codInventario');
+      replacements.codInventario = codInventario;
+    }
+
+    if (schemaMovimiento.codProducto) {
+      columnas.push(schemaMovimiento.codProducto);
+      valoresSql.push(':codProducto');
+      replacements.codProducto = codProducto;
+    }
+
+    if (schemaMovimiento.codUbicacion) {
+      columnas.push(schemaMovimiento.codUbicacion);
+      valoresSql.push(':codUbicacion');
+      replacements.codUbicacion = codUbicacion;
+    }
+
+    if (schemaMovimiento.codUsuario && codUsuario) {
+      columnas.push(schemaMovimiento.codUsuario);
+      valoresSql.push(':codUsuario');
+      replacements.codUsuario = codUsuario;
+    }
+
+    columnas.push(schemaMovimiento.tipo);
+    valoresSql.push(':tipoMovimiento');
+    replacements.tipoMovimiento = 'ENTRADA';
+
+    columnas.push(schemaMovimiento.cantidad);
+    valoresSql.push(':cantidad');
+    replacements.cantidad = cantidad;
+
+    columnas.push(schemaMovimiento.fecha);
+    valoresSql.push('NOW()');
+
+    if (schemaMovimiento.referencia) {
+      columnas.push(schemaMovimiento.referencia);
+      valoresSql.push(':referenciaDocumento');
+      replacements.referenciaDocumento = referenciaDocumento;
+    }
+
+    if (schemaMovimiento.observaciones) {
+      columnas.push(schemaMovimiento.observaciones);
+      valoresSql.push(':observaciones');
+      replacements.observaciones = observaciones || null;
+    }
+
+    if (schemaMovimiento.motivo) {
+      columnas.push(schemaMovimiento.motivo);
+      valoresSql.push(':motivo');
+      replacements.motivo = motivo;
+    }
+
+    if (schemaMovimiento.refTipo) {
+      columnas.push(schemaMovimiento.refTipo);
+      valoresSql.push(':refTipo');
+      replacements.refTipo = 'ANULACION_BAJA';
+    }
+
+    if (schemaMovimiento.refId) {
+      columnas.push(schemaMovimiento.refId);
+      valoresSql.push(':refId');
+      replacements.refId = codMovimientoBaja;
+    }
+
+    const [filas] = await sequelize.query(`
+      INSERT INTO ${schemaMovimiento.tableName} (${columnas.join(', ')})
+      VALUES (${valoresSql.join(', ')})
+      RETURNING *
+    `, {
+      replacements,
+      transaction
+    });
+
+    const movimientoCreado = Array.isArray(filas) ? filas[0] : null;
+    return movimientoCreado || null;
   }
 
   // // Relee movimiento insertado y entrega payload consistente para respuesta y kardex
@@ -372,6 +661,23 @@ class InventarioBajasService {
         transaction: t
       });
 
+      // // Si existe baja_inventario, sincronizamos cod_movimiento y estado inicial para auditoria cruzada
+      if (schemaBaja.existe && Number.isInteger(Number(codBaja)) && Number(codBaja) > 0) {
+        const codMovimientoBaja = schemaMovimiento.pk
+          ? (insercionMovimiento?.movimientoRow?.[schemaMovimiento.pk] ?? null)
+          : null;
+
+        await this.actualizarBajaInventarioPorPk({
+          schemaBaja,
+          codBaja: Number(codBaja),
+          cambios: {
+            estado: 'ACTIVA',
+            codMovimientoBaja
+          },
+          transaction: t
+        });
+      }
+
       // // Finalmente descontamos stock; si falla, rollback elimina baja y movimiento
       const inventarioActualizadoTx = await this.descontarStockSeguro({
         codInventario,
@@ -436,6 +742,194 @@ class InventarioBajasService {
       };
     } catch (error) {
       // // Rollback total para no dejar datos huerfanos o inventario inconsistente
+      if (!transaccionConfirmada) {
+        await t.rollback();
+      }
+      throw error;
+    }
+  }
+
+  // // Revierte una BAJA con movimiento compensatorio ENTRADA y control transaccional
+  async anularBaja(codMovimientoBaja, payload = {}, options = {}) {
+    const codMovimiento = Number(codMovimientoBaja);
+    if (!Number.isInteger(codMovimiento) || codMovimiento < 1) {
+      throw Object.assign(new Error('id de movimiento invalido para anular baja'), { status: 400 });
+    }
+
+    const motivo = normalizarTexto(payload.motivo) || 'ANULACION_BAJA';
+    const referenciaManual = normalizarTexto(payload.referencia);
+    const observacionesManual = normalizarTexto(payload.observaciones);
+    const codUsuario = options?.usuario?.cod_usuario ? Number(options.usuario.cod_usuario) : null;
+
+    const schemaMovimiento = await inventarioMovimientosSchemaService.obtenerSchemaMovimiento();
+    const schemaBaja = await this.obtenerSchemaBajaInventario();
+    const t = await sequelize.transaction();
+    let transaccionConfirmada = false;
+
+    try {
+      const movimientoBaja = await this.obtenerMovimientoConBloqueoPorId({
+        schemaMovimiento,
+        codMovimiento,
+        transaction: t
+      });
+
+      if (!movimientoBaja) {
+        throw Object.assign(new Error('Movimiento de baja no encontrado'), { status: 404 });
+      }
+
+      const tipoMovimiento = String(movimientoBaja[schemaMovimiento.tipo] || '').trim().toUpperCase();
+      if (tipoMovimiento !== 'BAJA') {
+        throw Object.assign(new Error('Solo se pueden anular movimientos tipo BAJA'), { status: 409 });
+      }
+
+      await this.validarBajaNoAnulada({
+        schemaMovimiento,
+        codMovimiento,
+        transaction: t
+      });
+
+      const cantidad = Number(movimientoBaja[schemaMovimiento.cantidad] || 0);
+      if (!Number.isInteger(cantidad) || cantidad <= 0) {
+        throw Object.assign(new Error('El movimiento de baja tiene cantidad invalida para anulacion'), { status: 409 });
+      }
+
+      let codInventario = Number(movimientoBaja.ref_cod_inventario || 0);
+      let codProducto = Number(movimientoBaja.ref_cod_producto || 0);
+      let codUbicacion = Number(movimientoBaja.ref_cod_ubicacion || 0);
+
+      if (!codInventario && Number.isInteger(codProducto) && codProducto > 0 && Number.isInteger(codUbicacion) && codUbicacion > 0) {
+        const inventarioAsociado = await this.obtenerInventarioConBloqueo({
+          codProducto,
+          codUbicacion,
+          transaction: t
+        });
+        codInventario = Number(inventarioAsociado?.inventario?.cod_inventario || 0);
+      }
+
+      if (!codInventario) {
+        throw Object.assign(new Error('No fue posible resolver inventario asociado a la baja'), { status: 500 });
+      }
+
+      const inventarioAntes = await this.obtenerInventarioPorIdConBloqueo({
+        codInventario,
+        transaction: t
+      });
+
+      if (!inventarioAntes) {
+        throw Object.assign(new Error('Inventario asociado no encontrado para anular baja'), { status: 404 });
+      }
+
+      codProducto = Number(codProducto || inventarioAntes.cod_producto || 0);
+      codUbicacion = Number(codUbicacion || inventarioAntes.cod_ubicacion || 0);
+
+      const stockAntes = Number(inventarioAntes.stock || 0);
+      const stockReservado = Number(inventarioAntes.stock_reservado || 0);
+
+      const inventarioActualizadoTx = await this.incrementarStockPorAnulacion({
+        codInventario,
+        cantidad,
+        transaction: t
+      });
+
+      if (!inventarioActualizadoTx) {
+        throw Object.assign(
+          new Error('Conflicto de concurrencia al anular baja. Intente nuevamente'),
+          { status: 409 }
+        );
+      }
+
+      const referenciaOriginal = schemaMovimiento.referencia
+        ? normalizarTexto(movimientoBaja[schemaMovimiento.referencia])
+        : null;
+      const referenciaBase = referenciaOriginal
+        ? referenciaOriginal.replace(/\s+/g, '-')
+        : `MOV-${codMovimiento}`;
+      const referenciaDocumento = (referenciaManual || `ANULA-${referenciaBase}`).slice(0, 200);
+
+      const observacionesSistema = [
+        `Anulacion de baja #${codMovimiento}`,
+        observacionesManual
+      ].filter(Boolean).join(' | ').slice(0, 500);
+
+      const movimientoRow = await this.insertarMovimientoAnulacionBaja({
+        schemaMovimiento,
+        codInventario,
+        codProducto,
+        codUbicacion,
+        codMovimientoBaja: codMovimiento,
+        codUsuario,
+        cantidad,
+        referenciaDocumento,
+        motivo,
+        observaciones: observacionesSistema,
+        transaction: t
+      });
+
+      // // Si existe baja_inventario y la BAJA original trae ref_id al registro, marcamos ANULADA
+      const codBaja = schemaMovimiento.refId
+        ? Number(movimientoBaja[schemaMovimiento.refId] || 0)
+        : 0;
+      if (schemaBaja.existe && Number.isInteger(codBaja) && codBaja > 0) {
+        const codMovimientoAnulacion = schemaMovimiento.pk
+          ? (movimientoRow?.[schemaMovimiento.pk] ?? null)
+          : null;
+
+        await this.actualizarBajaInventarioPorPk({
+          schemaBaja,
+          codBaja,
+          cambios: {
+            estado: 'ANULADA',
+            codMovimientoAnulacion,
+            codUsuarioAnulacion: codUsuario || null,
+            fechaAnulacion: new Date()
+          },
+          transaction: t
+        });
+      }
+
+      const movimientoAnulacion = await this.obtenerMovimientoFormateado({
+        schemaMovimiento,
+        movimientoRow,
+        transaction: t
+      });
+
+      await t.commit();
+      transaccionConfirmada = true;
+
+      const inventarioActualizado = await inventarioExistenciasService.obtenerExistenciaPorId(codInventario);
+
+      return {
+        movimiento_original: {
+          cod_movimiento: codMovimiento,
+          cod_inventario: codInventario,
+          cod_producto: codProducto,
+          cod_ubicacion: codUbicacion,
+          fecha_movimiento: movimientoBaja[schemaMovimiento.fecha] ?? null,
+          tipo: 'BAJA',
+          cantidad,
+          referencia_documento: referenciaOriginal
+        },
+        movimiento_anulacion: movimientoAnulacion || {
+          cod_inventario: codInventario,
+          cod_producto: codProducto,
+          cod_ubicacion: codUbicacion,
+          tipo: 'ENTRADA',
+          cantidad,
+          referencia_documento: referenciaDocumento,
+          observaciones: observacionesSistema,
+          cod_usuario: codUsuario,
+          nombre_usuario: options?.usuario?.nombre_usuario ?? null
+        },
+        inventario: inventarioActualizado,
+        resumen: {
+          cod_inventario: codInventario,
+          stock_antes: stockAntes,
+          stock_reservado: stockReservado,
+          cantidad_revertida: cantidad,
+          stock_despues: Number(inventarioActualizado?.stock ?? inventarioActualizadoTx.stock ?? (stockAntes + cantidad))
+        }
+      };
+    } catch (error) {
       if (!transaccionConfirmada) {
         await t.rollback();
       }

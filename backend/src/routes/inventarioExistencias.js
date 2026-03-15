@@ -6,8 +6,8 @@ import { listarExistencias, listarAlertasStockBajo, actualizarMinMax } from '../
 import { listarMovimientos } from '../controllers/inventarioMovimientosController.js';
 import { registrarEntrada, anularEntrada } from '../controllers/inventarioEntradasController.js';
 import { registrarSalida, anularSalida } from '../controllers/inventarioSalidasController.js';
-import { registrarBaja } from '../controllers/inventarioBajasController.js';
-import { listarTransferencias, registrarTransferencia } from '../controllers/inventarioTransferenciasController.js';
+import { registrarBaja, anularBaja } from '../controllers/inventarioBajasController.js';
+import { listarTransferencias, registrarTransferencia, anularTransferencia } from '../controllers/inventarioTransferenciasController.js';
 import { listarConteos, listarDetallesConteo, abrirConteo, registrarDetalleConteo, cerrarConteo } from '../controllers/inventarioConteosController.js';
 import { listarReservas, crearReserva, liberarReserva, consumirReserva } from '../controllers/inventarioReservasController.js';
 
@@ -459,6 +459,35 @@ router.post('/bajas', autorizar(...ROLES_INVENTARIO), [
   validarCampos
 ], registrarBaja);
 
+// // PATCH /api/inventario/bajas/:id/anular
+// // Revierte una baja con entrada compensatoria y trazabilidad de auditoria
+router.patch('/bajas/:id/anular', autorizar(...ROLES_INVENTARIO), [
+  // // Id del movimiento BAJA en kardex
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('id de movimiento debe ser un entero mayor a 0')
+    .toInt(),
+  // // Motivo opcional de anulacion (si no llega se usa motivo por defecto)
+  body('motivo')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('motivo debe tener entre 1 y 200 caracteres'),
+  // // Referencia opcional del reverso para auditoria cruzada
+  body('referencia')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('referencia debe tener entre 1 y 200 caracteres'),
+  // // Observaciones opcionales
+  body('observaciones')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('observaciones no puede exceder 500 caracteres'),
+  validarCampos
+], anularBaja);
+
 // // POST /api/inventario/transferencias
 // // Registra transferencia entre ubicaciones con doble movimiento y transaccion real
 router.post('/transferencias', autorizar(...ROLES_INVENTARIO), [
@@ -527,6 +556,35 @@ router.post('/transferencias', autorizar(...ROLES_INVENTARIO), [
   // // Respuesta 400 estandar cuando falla cualquier validacion
   validarCampos
 ], registrarTransferencia);
+
+// // PATCH /api/inventario/transferencias/:id/anular
+// // Revierte transferencia completada con movimientos compensatorios y control transaccional
+router.patch('/transferencias/:id/anular', autorizar(...ROLES_INVENTARIO), [
+  // // Id de transferencia persistida en tabla transferencia_inventario
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('id de transferencia debe ser un entero mayor a 0')
+    .toInt(),
+  // // Motivo opcional de anulacion
+  body('motivo')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 120 })
+    .withMessage('motivo debe tener entre 1 y 120 caracteres'),
+  // // Referencia opcional del reverso para auditoria cruzada
+  body('referencia')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('referencia debe tener entre 1 y 200 caracteres'),
+  // // Observaciones opcionales
+  body('observaciones')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('observaciones no puede exceder 500 caracteres'),
+  validarCampos
+], anularTransferencia);
 
 // // GET /api/inventario/transferencias
 // // Lista transferencias persistidas con filtros y paginacion

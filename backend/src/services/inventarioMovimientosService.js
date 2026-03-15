@@ -89,7 +89,13 @@ class InventarioMovimientosService {
     const codUbicacion = query.cod_ubicacion ? Number(query.cod_ubicacion) : null;
     const tipo = normalizarTexto(query.tipo)?.toUpperCase() || null;
     const estado = normalizarTexto(query.estado)?.toUpperCase() || null;
-    const excluirRefTipo = normalizarTexto(query.excluir_ref_tipo ?? query.excluirRefTipo)?.toUpperCase() || null;
+    const excluirRefTipoRaw = normalizarTexto(query.excluir_ref_tipo ?? query.excluirRefTipo);
+    const excluirRefTipos = excluirRefTipoRaw
+      ? excluirRefTipoRaw
+        .split(',')
+        .map((item) => String(item || '').trim().toUpperCase())
+        .filter(Boolean)
+      : [];
     const fechaDesde = normalizarFecha(query.fecha_desde);
     const fechaHasta = normalizarFecha(query.fecha_hasta);
 
@@ -134,12 +140,16 @@ class InventarioMovimientosService {
     }
 
     // // Permite excluir subtipos tecnicos (ej. ANULACION_ENTRADA) cuando el schema soporta ref_tipo
-    if (excluirRefTipo && schemaMovimiento.refTipo) {
+    if (excluirRefTipos.length > 0 && schemaMovimiento.refTipo) {
+      const placeholders = excluirRefTipos.map((_, index) => `:excluirRefTipo${index}`);
+      excluirRefTipos.forEach((valor, index) => {
+        replacements[`excluirRefTipo${index}`] = valor;
+      });
+
       whereParts.push(`(
         m.${schemaMovimiento.refTipo} IS NULL
-        OR UPPER(CAST(m.${schemaMovimiento.refTipo} AS TEXT)) <> :excluirRefTipo
+        OR UPPER(CAST(m.${schemaMovimiento.refTipo} AS TEXT)) NOT IN (${placeholders.join(', ')})
       )`);
-      replacements.excluirRefTipo = excluirRefTipo;
     }
 
     const soportaTrazabilidadAnulacion = Boolean(
@@ -165,10 +175,20 @@ class InventarioMovimientosService {
             AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
         )`
       : 'false';
+    const exprBajaAnulada = soportaTrazabilidadAnulacion
+      ? `EXISTS (
+          SELECT 1
+          FROM ${schemaMovimiento.tableName} ma
+          WHERE UPPER(CAST(ma.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA'
+            AND CAST(ma.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_BAJA'
+            AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
+        )`
+      : 'false';
     const exprAnuladoSegunTipo = soportaTrazabilidadAnulacion
       ? `CASE
           WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA' THEN (${exprEntradaAnulada})
           WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'SALIDA' THEN (${exprSalidaAnulada})
+          WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'BAJA' THEN (${exprBajaAnulada})
           ELSE false
         END`
       : 'false';
@@ -177,7 +197,9 @@ class InventarioMovimientosService {
     if (estado && estado !== 'TODAS' && soportaTrazabilidadAnulacion) {
       const exprAnuladoEstado = tipo === 'ENTRADA'
         ? exprEntradaAnulada
-        : (tipo === 'SALIDA' ? exprSalidaAnulada : exprAnuladoSegunTipo);
+        : (tipo === 'SALIDA'
+          ? exprSalidaAnulada
+          : (tipo === 'BAJA' ? exprBajaAnulada : exprAnuladoSegunTipo));
 
       if (estado === 'ANULADAS') {
         whereParts.push(exprAnuladoEstado);
@@ -240,6 +262,15 @@ class InventarioMovimientosService {
             ORDER BY ma.${schemaMovimiento.fecha} DESC
             LIMIT 1
           )
+          WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'BAJA' THEN (
+            SELECT ma.${schemaMovimiento.pk}
+            FROM ${schemaMovimiento.tableName} ma
+            WHERE UPPER(CAST(ma.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA'
+              AND CAST(ma.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_BAJA'
+              AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
+            ORDER BY ma.${schemaMovimiento.fecha} DESC
+            LIMIT 1
+          )
           ELSE NULL
         END`
       : 'NULL::int';
@@ -260,6 +291,15 @@ class InventarioMovimientosService {
             FROM ${schemaMovimiento.tableName} ma
             WHERE UPPER(CAST(ma.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA'
               AND CAST(ma.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_SALIDA'
+              AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
+            ORDER BY ma.${schemaMovimiento.fecha} DESC
+            LIMIT 1
+          )
+          WHEN UPPER(CAST(m.${schemaMovimiento.tipo} AS TEXT)) = 'BAJA' THEN (
+            SELECT CAST(ma.${schemaMovimiento.fecha} AS TIMESTAMP)
+            FROM ${schemaMovimiento.tableName} ma
+            WHERE UPPER(CAST(ma.${schemaMovimiento.tipo} AS TEXT)) = 'ENTRADA'
+              AND CAST(ma.${schemaMovimiento.refTipo} AS TEXT) = 'ANULACION_BAJA'
               AND ma.${schemaMovimiento.refId} = m.${schemaMovimiento.pk}
             ORDER BY ma.${schemaMovimiento.fecha} DESC
             LIMIT 1

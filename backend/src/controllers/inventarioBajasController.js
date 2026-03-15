@@ -70,3 +70,37 @@ export const registrarBaja = async (req, res, next) => {
     next(error);
   }
 };
+
+// // PATCH /api/inventario/bajas/:id/anular
+// // Revierte una baja con entrada compensatoria y trazabilidad de auditoria
+export const anularBaja = async (req, res, next) => {
+  try {
+    const data = await inventarioBajasService.anularBaja(req.params.id, req.body, {
+      usuario: req.usuario
+    });
+
+    logger.info('inventario.bajas.anulada', {
+      modulo: 'inventario',
+      accion: 'anular_baja',
+      usuario: req.usuario ? {
+        cod_usuario: req.usuario.cod_usuario ?? null,
+        nombre_usuario: req.usuario.nombre_usuario ?? null,
+        rol: req.usuario.rol ?? null
+      } : null,
+      cod_movimiento_baja: Number(req.params?.id || 0),
+      motivo: req.body?.motivo ?? 'ANULACION_BAJA',
+      referencia: req.body?.referencia ?? null,
+      cod_inventario: data?.resumen?.cod_inventario ?? null,
+      stock_antes: data?.resumen?.stock_antes ?? null,
+      stock_despues: data?.resumen?.stock_despues ?? null
+    });
+
+    return sendOk(res, {
+      status: 200,
+      message: 'Baja anulada correctamente',
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
