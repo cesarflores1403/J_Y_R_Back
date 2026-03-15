@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { FiMinusCircle } from 'react-icons/fi';
+import React, { useEffect, useState } from 'react';
 import { inventarioSalidasApi } from './inventarioSalidas.api.js';
+import { useUbicaciones } from '../../hooks/useUbicaciones.js';
 
-// // Estado inicial del formulario de salidas
+// // Estado inicial del formulario modal de salidas
 const estadoInicial = {
   cod_producto: '',
   cod_ubicacion: '',
@@ -11,26 +11,92 @@ const estadoInicial = {
   observaciones: ''
 };
 
-// // Traduce error HTTP a mensaje funcional para la vista de salidas
+const formatearCodigoProducto = (producto) => {
+  const codigo = String(producto?.codigo_producto || '').trim().toUpperCase();
+  if (codigo) return codigo;
+
+  const id = Number(producto?.cod_producto || 0);
+  if (Number.isInteger(id) && id > 0) {
+    return `PROD-${String(id).padStart(4, '0')}`;
+  }
+
+  return '';
+};
+
+const formatearEtiquetaUbicacion = (ubicacion) => {
+  const pasillo = String(ubicacion?.pasillo || '').trim();
+  const estanteria = String(ubicacion?.estanteria || '').trim();
+  const nivel1 = String(ubicacion?.nivel_1 || '').trim();
+  const nivel2 = String(ubicacion?.nivel_2 || '').trim();
+  const textoDescripcion = String(ubicacion?.descripcion || '').trim();
+
+  const traza = [
+    pasillo ? `P:${pasillo}` : null,
+    estanteria ? `E:${estanteria}` : null,
+    nivel1 ? `N1:${nivel1}` : null,
+    nivel2 ? `N2:${nivel2}` : null
+  ].filter(Boolean).join(' ');
+
+  if (textoDescripcion) {
+    return `${traza || 'Ubicacion'} - ${textoDescripcion}`;
+  }
+  return traza || `Ubicacion ${ubicacion?.cod_ubicacion ?? ''}`.trim();
+};
+
+// // Traduce errores HTTP/red a mensajes operativos claros para la UI de salidas
 const obtenerMensajeError = (error) => {
+  if (!error?.response) {
+    return 'No se pudo conectar con la API. Verifica backend y frontend, luego recarga la pagina.';
+  }
+
   const status = error?.response?.status;
   const serverMessage = error?.response?.data?.message || error?.response?.data?.mensaje;
+  const erroresValidacion = error?.response?.data?.errors || error?.response?.data?.errores;
+
+  if (Array.isArray(erroresValidacion) && erroresValidacion.length > 0) {
+    const primero = erroresValidacion[0];
+    return primero?.msg || primero?.mensaje || serverMessage || 'Datos invalidos para registrar la salida';
+  }
 
   if (status === 400) return serverMessage || 'Datos invalidos para registrar la salida';
   if (status === 404) return serverMessage || 'Producto, ubicacion o inventario no encontrado';
   if (status === 409) return serverMessage || 'Stock insuficiente para completar la salida';
+  if (status === 401) return serverMessage || 'Sesion expirada o invalida. Inicia sesion nuevamente';
+  if (status === 403) return serverMessage || 'No tienes permisos para registrar salidas';
+  if (status >= 500) return serverMessage || 'Error interno del backend al registrar la salida';
   return serverMessage || 'Error inesperado al registrar la salida';
 };
 
-const SalidaForm = ({ onSalidaRegistrada }) => {
-  // // Estado local de formulario y feedback de proceso
+const SalidaForm = ({ abierto = false, onClose, onSalidaRegistrada, productos = [] }) => {
   const [form, setForm] = useState(estadoInicial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [ultimoResultado, setUltimoResultado] = useState(null);
+  const { ubicaciones, loadingUbicaciones } = useUbicaciones();
 
-  // // Actualiza un campo controlado del formulario de salida
+  const opcionesProducto = productos
+    .filter((item) => String(item?.estado_producto || '').toLowerCase() === 'activo')
+    .map((item) => ({
+      cod_producto: item.cod_producto,
+      nombre_producto: item.nombre_producto || 'Sin nombre',
+      codigo_producto: formatearCodigoProducto(item)
+    }))
+    .filter((item) => Number.isInteger(Number(item.cod_producto)) && Number(item.cod_producto) > 0);
+
+  const opcionesUbicacion = (Array.isArray(ubicaciones) ? ubicaciones : [])
+    .filter((item) => Number.isInteger(Number(item?.cod_ubicacion)) && Number(item.cod_ubicacion) > 0);
+
+  useEffect(() => {
+    if (!abierto) {
+      setForm(estadoInicial);
+      setError('');
+    }
+  }, [abierto]);
+
+  const cerrarModal = () => {
+    if (saving) return;
+    if (typeof onClose === 'function') onClose();
+  };
+
   const actualizarCampo = (campo, valor) => {
     setForm((prev) => ({
       ...prev,
@@ -38,23 +104,19 @@ const SalidaForm = ({ onSalidaRegistrada }) => {
     }));
   };
 
-  // // Envia solicitud de salida al backend con validacion cliente basica
   const registrarSalida = async (event) => {
     event.preventDefault();
 
     try {
       setSaving(true);
       setError('');
-      setSuccess('');
 
-      // // Validacion cliente para evitar request trivialmente invalido
       const cantidad = Number(form.cantidad);
       if (!Number.isInteger(cantidad) || cantidad <= 0) {
         setError('cantidad debe ser un entero mayor a 0');
         return;
       }
 
-      // // Payload segun contrato del endpoint de salidas
       const payload = {
         cod_producto: Number(form.cod_producto),
         cod_ubicacion: Number(form.cod_ubicacion),
@@ -63,153 +125,155 @@ const SalidaForm = ({ onSalidaRegistrada }) => {
         observaciones: String(form.observaciones || '').trim()
       };
 
-      // // Request POST al endpoint transaccional de salidas
       const { data } = await inventarioSalidasApi.registrar(payload);
 
-      // // Contrato de exito segun helper sendOk del backend
       if (data?.ok) {
-        setSuccess('Salida registrada correctamente');
-        setUltimoResultado(data.data || null);
         setForm(estadoInicial);
 
-        // // Refresca estado padre si la pagina provee callback
         if (typeof onSalidaRegistrada === 'function') {
           await onSalidaRegistrada(data.data);
         }
+
+        cerrarModal();
       } else {
         setError('Respuesta invalida del servidor al registrar la salida');
       }
     } catch (err) {
-      // // Error HTTP funcional (incluye 409 por stock insuficiente)
       setError(obtenerMensajeError(err));
     } finally {
       setSaving(false);
     }
   };
 
+  if (!abierto) return null;
+
   return (
-    <div className="jyr-card mt-4">
-      <div className="jyr-card-body">
-        <div className="d-flex align-items-center gap-2 mb-3">
-          <FiMinusCircle />
-          <h5 className="mb-0">Registrar Salida</h5>
-        </div>
-
-        {success && (
-          // // Confirmacion visual de salida registrada
-          <div className="alert alert-success" role="alert">
-            {success}
+    <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onMouseDown={(e) => {
+      if (e.target === e.currentTarget) cerrarModal();
+    }}>
+      <div className="modal-dialog modal-lg">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">Registrar salida</h5>
+            <button type="button" className="btn-close" onClick={cerrarModal} disabled={saving} />
           </div>
-        )}
-
-        {error && (
-          // // Error funcional/validacion para la salida
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={registrarSalida}>
-          <div className="row g-3">
-            <div className="col-12 col-md-6">
-              <label className="form-label">Cod. Producto</label>
-              <input
-                // // Producto al que se descontara stock
-                type="number"
-                min="1"
-                className="form-control"
-                value={form.cod_producto}
-                onChange={(event) => actualizarCampo('cod_producto', event.target.value)}
-                placeholder="Ej: 23"
-                required
-              />
-            </div>
-
-            <div className="col-12 col-md-6">
-              <label className="form-label">Cod. Ubicacion</label>
-              <input
-                // // Ubicacion donde se aplica la salida
-                type="number"
-                min="1"
-                className="form-control"
-                value={form.cod_ubicacion}
-                onChange={(event) => actualizarCampo('cod_ubicacion', event.target.value)}
-                placeholder="Ej: 1"
-                required
-              />
-            </div>
-
-            <div className="col-12 col-md-4">
-              <label className="form-label">Cantidad</label>
-              <input
-                // // Cantidad de unidades a descontar (entero > 0)
-                type="number"
-                min="1"
-                step="1"
-                className="form-control"
-                value={form.cantidad}
-                onChange={(event) => actualizarCampo('cantidad', event.target.value)}
-                placeholder="Ej: 5"
-                required
-              />
-            </div>
-
-            <div className="col-12 col-md-8">
-              <label className="form-label">Referencia</label>
-              <input
-                // // Referencia de venta para trazabilidad en kardex
-                type="text"
-                className="form-control"
-                value={form.referencia}
-                onChange={(event) => actualizarCampo('referencia', event.target.value)}
-                placeholder="Factura o comprobante de venta"
-                maxLength={200}
-                required
-              />
-            </div>
-
-            <div className="col-12">
-              <label className="form-label">Observaciones (opcional)</label>
-              <textarea
-                // // Notas internas de la salida de inventario
-                className="form-control"
-                rows="3"
-                value={form.observaciones}
-                onChange={(event) => actualizarCampo('observaciones', event.target.value)}
-                placeholder="Detalle adicional de la salida"
-                maxLength={500}
-              />
-            </div>
-          </div>
-
-          <div className="d-flex justify-content-end mt-3">
-            <button
-              // // Submit de salida con feedback de guardado
-              type="submit"
-              className="btn btn-danger"
-              disabled={saving}
-            >
-              {saving ? (
-                <>
-                  <span className="spinner-border spinner-border-sm me-2" />
-                  Guardando...
-                </>
-              ) : (
-                'Registrar salida'
+          <form onSubmit={registrarSalida}>
+            <div className="modal-body">
+              {error && (
+                <div className="alert alert-danger mb-3" role="alert">
+                  {error}
+                </div>
               )}
-            </button>
-          </div>
-        </form>
 
-        {ultimoResultado?.resumen && (
-          // // Resumen de impacto de stock post salida
-          <div className="alert alert-light border mt-3 mb-0" role="alert">
-            <div><strong>Stock antes:</strong> {ultimoResultado.resumen.stock_antes}</div>
-            <div><strong>Disponible antes:</strong> {ultimoResultado.resumen.stock_disponible_antes}</div>
-            <div><strong>Cantidad salida:</strong> {ultimoResultado.resumen.cantidad_salida}</div>
-            <div><strong>Stock despues:</strong> {ultimoResultado.resumen.stock_despues}</div>
-          </div>
-        )}
+              <div className="row g-3">
+                <div className="col-12 col-md-6">
+                  <label className="form-label">Codigo de producto *</label>
+                  <select
+                    className="form-select"
+                    value={form.cod_producto}
+                    onChange={(event) => actualizarCampo('cod_producto', event.target.value)}
+                    disabled={saving || opcionesProducto.length === 0}
+                    required
+                  >
+                    <option value="">
+                      {opcionesProducto.length === 0 ? 'Cargando productos...' : 'Seleccione un producto real'}
+                    </option>
+                    {opcionesProducto.map((item) => (
+                      <option key={item.cod_producto} value={String(item.cod_producto)}>
+                        {item.codigo_producto} - {item.nombre_producto}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="text-muted">
+                    Este campo se toma del listado real de productos activos.
+                  </small>
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <label className="form-label">Cod. Ubicacion *</label>
+                  <select
+                    className="form-select"
+                    value={form.cod_ubicacion}
+                    onChange={(event) => actualizarCampo('cod_ubicacion', event.target.value)}
+                    disabled={saving || loadingUbicaciones || opcionesUbicacion.length === 0}
+                    required
+                  >
+                    <option value="">
+                      {loadingUbicaciones ? 'Cargando ubicaciones...' : 'Seleccione una ubicacion activa'}
+                    </option>
+                    {opcionesUbicacion.map((item) => (
+                      <option key={item.cod_ubicacion} value={String(item.cod_ubicacion)}>
+                        {formatearEtiquetaUbicacion(item)}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="text-muted">
+                    Este campo se toma del catalogo real de ubicaciones activas.
+                  </small>
+                </div>
+
+                <div className="col-12 col-md-4">
+                  <label className="form-label">Cantidad *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    className="form-control"
+                    value={form.cantidad}
+                    onChange={(event) => actualizarCampo('cantidad', event.target.value)}
+                    placeholder="Ej: 5"
+                    required
+                  />
+                </div>
+
+                <div className="col-12 col-md-8">
+                  <label className="form-label">Referencia documento *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={form.referencia}
+                    onChange={(event) => actualizarCampo('referencia', event.target.value)}
+                    placeholder="Factura o comprobante de venta"
+                    maxLength={200}
+                    required
+                  />
+                </div>
+
+                <div className="col-12">
+                  <label className="form-label">Observaciones (opcional)</label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    value={form.observaciones}
+                    onChange={(event) => actualizarCampo('observaciones', event.target.value)}
+                    placeholder="Detalle adicional de la salida"
+                    maxLength={500}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={cerrarModal} disabled={saving}>
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="btn btn-danger"
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" />
+                    Guardando...
+                  </>
+                ) : (
+                  'Registrar salida'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

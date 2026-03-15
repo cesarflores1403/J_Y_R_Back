@@ -4,4 +4,6 @@ import api from '../../services/axiosApi.js';
 export const inventarioSalidasApi = {
   // // POST para registrar una salida transaccional por venta confirmada
   registrar: (data) => api.post('/inventario/salidas', data),
+  // // PATCH para anular una salida por id de movimiento
+  anular: (id, data = {}) => api.patch(`/inventario/salidas/${id}/anular`, data),
 };
