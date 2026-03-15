@@ -1,192 +1,407 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FiRepeat } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiDatabase, FiPlus, FiRepeat } from 'react-icons/fi';
 import TransferenciaForm from './TransferenciaForm.jsx';
+import TransferenciasFiltros from './TransferenciasFiltros.jsx';
+import TransferenciasTabla from './TransferenciasTabla.jsx';
 import { inventarioTransferenciasApi } from './inventarioTransferencias.api.js';
+import { inventarioMovimientosApi } from './inventarioMovimientos.api.js';
+import { useUbicaciones } from '../../hooks/useUbicaciones.js';
 
-const normalizarListado = (payload) => {
+const LIMITE_PAGINA = 10;
+
+const filtrosIniciales = {
+  fecha_desde: '',
+  fecha_hasta: '',
+  cod_producto: '',
+  cod_ubicacion_origen: '',
+  cod_ubicacion_destino: '',
+  referencia: '',
+  estado: 'TODAS',
+  pagina: 1,
+  limite: LIMITE_PAGINA
+};
+
+const limpiarParamsConsulta = (params = {}) => {
+  const limpio = {};
+  Object.entries(params).forEach(([clave, valor]) => {
+    if (valor === undefined || valor === null) return;
+    if (typeof valor === 'string' && valor.trim() === '') return;
+    limpio[clave] = valor;
+  });
+  return limpio;
+};
+
+const normalizarEnteroPositivo = (valor) => {
+  if (valor === undefined || valor === null) return '';
+  const texto = String(valor).trim();
+  if (!texto) return '';
+  const cod = Number.parseInt(texto, 10);
+  return Number.isNaN(cod) || cod < 1 ? '' : cod;
+};
+
+const normalizarRespuesta = (payload, fallbackLimite = LIMITE_PAGINA) => {
   if (Array.isArray(payload?.data) && payload?.meta) {
     return {
       filas: payload.data,
-      total: Number(payload.meta.total || 0)
+      meta: {
+        total: Number(payload.meta.total || 0),
+        pagina: Number(payload.meta.page || 1),
+        limite: Number(payload.meta.limit || fallbackLimite),
+        totalPaginas: Number(payload.meta.totalPages || 1)
+      }
     };
   }
 
   return {
     filas: Array.isArray(payload?.datos) ? payload.datos : [],
-    total: Number(payload?.total || 0)
+    meta: {
+      total: Number(payload?.total || 0),
+      pagina: Number(payload?.pagina || payload?.page || 1),
+      limite: Number(payload?.limite || payload?.limit || fallbackLimite),
+      totalPaginas: Number(payload?.totalPaginas || payload?.totalPages || 1)
+    }
   };
 };
 
-const formatearFecha = (valor) => {
-  if (!valor) return '-';
-  const fecha = new Date(valor);
-  if (Number.isNaN(fecha.getTime())) return '-';
-  return fecha.toLocaleString();
+const obtenerMensajeError = (error) => {
+  const status = error?.response?.status;
+  const serverMessage = error?.response?.data?.message || error?.response?.data?.mensaje;
+
+  if (!error?.response) return 'No se pudo conectar con la API. Verifica backend y frontend, luego recarga la pagina.';
+  if (status === 400) return serverMessage || 'Filtros invalidos para consultar transferencias';
+  if (status === 404) return serverMessage || 'No se encontro el recurso solicitado';
+  return serverMessage || 'Error inesperado al consultar transferencias';
+};
+
+const construirPaginasVisibles = (paginaActual, totalPaginas, maxVisibles = 5) => {
+  if (totalPaginas <= 1) return [1];
+  if (totalPaginas <= maxVisibles) {
+    return Array.from({ length: totalPaginas }, (_, idx) => idx + 1);
+  }
+
+  let inicio = Math.max(1, paginaActual - 2);
+  let fin = Math.min(totalPaginas, inicio + maxVisibles - 1);
+  inicio = Math.max(1, fin - maxVisibles + 1);
+
+  const paginas = [];
+  if (inicio > 1) paginas.push(1);
+  if (inicio > 2) paginas.push('...');
+  for (let pagina = inicio; pagina <= fin; pagina += 1) paginas.push(pagina);
+  if (fin < totalPaginas - 1) paginas.push('...');
+  if (fin < totalPaginas) paginas.push(totalPaginas);
+  return paginas;
 };
 
 const InventarioTransferenciasPage = () => {
-  // // Estado local para mostrar resumen de la ultima transferencia registrada
-  const [ultimaTransferencia, setUltimaTransferencia] = useState(null);
-  const [transferencias, setTransferencias] = useState([]);
-  const [totalTransferencias, setTotalTransferencias] = useState(0);
+  const [filtros, setFiltros] = useState(filtrosIniciales);
+  const [consulta, setConsulta] = useState(filtrosIniciales);
+  const [productos, setProductos] = useState([]);
+  const [filas, setFilas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [errorListado, setErrorListado] = useState('');
-  const [filtroReferencia, setFiltroReferencia] = useState('');
+  const [error, setError] = useState('');
+  const [feedbackAnulacion, setFeedbackAnulacion] = useState('');
+  const [meta, setMeta] = useState({
+    total: 0,
+    pagina: 1,
+    limite: LIMITE_PAGINA,
+    totalPaginas: 1
+  });
+  const [ultimaTransferencia, setUltimaTransferencia] = useState(null);
+  const [modalTransferenciaAbierto, setModalTransferenciaAbierto] = useState(false);
+  const [anulandoId, setAnulandoId] = useState(null);
+  const { ubicaciones } = useUbicaciones();
 
-  // // Carga historial persistente de transferencias desde backend
-  const cargarTransferencias = useCallback(async (referencia = '') => {
+  const cargarTransferencias = useCallback(async () => {
     try {
       setLoading(true);
-      setErrorListado('');
+      setError('');
 
-      const params = {
-        page: 1,
-        limit: 20
-      };
-      if (referencia && referencia.trim()) {
-        params.referencia = referencia.trim();
+      if (consulta.fecha_desde && consulta.fecha_hasta) {
+        const desde = new Date(consulta.fecha_desde);
+        const hasta = new Date(consulta.fecha_hasta);
+        if (!Number.isNaN(desde.getTime()) && !Number.isNaN(hasta.getTime()) && desde > hasta) {
+          setFilas([]);
+          setMeta((prev) => ({ ...prev, total: 0, totalPaginas: 1 }));
+          setError('fecha_desde no puede ser mayor que fecha_hasta');
+          return;
+        }
       }
+
+      const params = limpiarParamsConsulta({
+        ...consulta,
+        cod_producto: normalizarEnteroPositivo(consulta.cod_producto),
+        cod_ubicacion_origen: normalizarEnteroPositivo(consulta.cod_ubicacion_origen),
+        cod_ubicacion_destino: normalizarEnteroPositivo(consulta.cod_ubicacion_destino),
+        estado: consulta.estado || 'TODAS',
+        page: Number(consulta.pagina || 1),
+        limit: Number(consulta.limite || LIMITE_PAGINA)
+      });
 
       const { data } = await inventarioTransferenciasApi.listar(params);
-      if (!data?.ok) {
-        setTransferencias([]);
-        setTotalTransferencias(0);
-        setErrorListado('Respuesta invalida al listar transferencias');
-        return;
-      }
 
-      const normalizado = normalizarListado(data.data);
-      setTransferencias(normalizado.filas);
-      setTotalTransferencias(normalizado.total);
-    } catch (error) {
-      const mensaje = error?.response?.data?.message
-        || error?.response?.data?.mensaje
-        || 'Error al listar transferencias';
-      setTransferencias([]);
-      setTotalTransferencias(0);
-      setErrorListado(mensaje);
+      if (data?.ok) {
+        const normalizado = normalizarRespuesta(data.data, Number(params.limit || LIMITE_PAGINA));
+        setFilas(normalizado.filas);
+        setMeta(normalizado.meta);
+      } else {
+        setFilas([]);
+        setMeta({ total: 0, pagina: 1, limite: Number(params.limit || LIMITE_PAGINA), totalPaginas: 1 });
+        setError('Respuesta invalida del servidor al consultar transferencias');
+      }
+    } catch (err) {
+      setFilas([]);
+      setMeta((prev) => ({ ...prev, total: 0, totalPaginas: 1 }));
+      setError(obtenerMensajeError(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [consulta]);
 
   useEffect(() => {
     cargarTransferencias();
   }, [cargarTransferencias]);
 
-  // // Callback del formulario para refrescar feedback de origen y destino en esta pagina
-  const manejarTransferenciaRegistrada = async (resultado) => {
-    setUltimaTransferencia(resultado || null);
-    await cargarTransferencias(filtroReferencia);
+  useEffect(() => {
+    const cargarProductos = async () => {
+      try {
+        const { data } = await inventarioMovimientosApi.listarProductos();
+        setProductos(Array.isArray(data?.data) ? data.data : []);
+      } catch {
+        setProductos([]);
+      }
+    };
+    cargarProductos();
+  }, []);
+
+  const manejarCambioFiltro = (campo, valor) => {
+    setFiltros((prev) => ({
+      ...prev,
+      [campo]: valor
+    }));
   };
 
+  const aplicarFiltros = () => {
+    setError('');
+    setConsulta({
+      ...filtros,
+      pagina: 1,
+      limite: Number(filtros.limite || LIMITE_PAGINA)
+    });
+    setFiltros((prev) => ({
+      ...prev,
+      pagina: 1
+    }));
+  };
+
+  const limpiarFiltros = () => {
+    setError('');
+    setFeedbackAnulacion('');
+    setFiltros(filtrosIniciales);
+    setConsulta(filtrosIniciales);
+  };
+
+  const cambiarPagina = (nuevaPagina) => {
+    if (nuevaPagina < 1 || nuevaPagina > meta.totalPaginas) return;
+    setConsulta((prev) => ({ ...prev, pagina: nuevaPagina }));
+    setFiltros((prev) => ({ ...prev, pagina: nuevaPagina }));
+  };
+
+  const manejarTransferenciaRegistrada = async (resultado) => {
+    setUltimaTransferencia(resultado || null);
+    setFeedbackAnulacion('');
+    await cargarTransferencias();
+  };
+
+  const anularTransferencia = async (fila) => {
+    const codTransferencia = Number(fila?.cod_transferencia || 0);
+    if (!Number.isInteger(codTransferencia) || codTransferencia < 1) {
+      setError('No se pudo identificar la transferencia a anular');
+      return;
+    }
+
+    const estado = String(fila?.estado || '').trim().toUpperCase();
+    if (estado === 'ANULADA') {
+      setError('La transferencia seleccionada ya esta anulada');
+      return;
+    }
+
+    const confirmar = window.confirm(`Se anulara la transferencia #${codTransferencia}. Deseas continuar?`);
+    if (!confirmar) return;
+
+    const motivo = window.prompt('Motivo de anulacion (opcional):', 'ANULACION_TRANSFERENCIA') || 'ANULACION_TRANSFERENCIA';
+
+    try {
+      setAnulandoId(codTransferencia);
+      setError('');
+      setFeedbackAnulacion('');
+
+      const { data } = await inventarioTransferenciasApi.anular(codTransferencia, {
+        motivo: String(motivo).trim() || 'ANULACION_TRANSFERENCIA'
+      });
+
+      if (data?.ok) {
+        setFeedbackAnulacion(`Transferencia #${codTransferencia} anulada correctamente`);
+        await cargarTransferencias();
+      } else {
+        setError('Respuesta invalida del servidor al anular la transferencia');
+      }
+    } catch (err) {
+      const status = err?.response?.status;
+      const serverMessage = err?.response?.data?.message || err?.response?.data?.mensaje;
+      if (status === 409) {
+        setError(serverMessage || 'No se puede anular la transferencia por reglas de stock o porque ya fue anulada');
+      } else {
+        setError(serverMessage || 'Error inesperado al anular la transferencia');
+      }
+    } finally {
+      setAnulandoId(null);
+    }
+  };
+
+  const inicioMostrado = meta.total > 0 ? ((meta.pagina - 1) * meta.limite) + 1 : 0;
+  const finMostrado = meta.total > 0 ? Math.min(meta.pagina * meta.limite, meta.total) : 0;
+  const paginasVisibles = construirPaginasVisibles(meta.pagina, meta.totalPaginas);
+
   return (
-    <div>
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div className="d-flex align-items-center gap-2">
-          <FiRepeat />
-          <h3 className="mb-0">Transferencias</h3>
+    <section className="kdx-shell mt-4">
+      <div className="kdx-hero">
+        <div className="kdx-hero-head">
+          <div className="kdx-title-wrap">
+            <div className="kdx-title-icon">
+              <FiRepeat />
+            </div>
+            <div>
+              <h5 className="mb-0">Transferencias</h5>
+              <p className="kdx-subtitle mb-0">Traslados internos entre ubicaciones con doble movimiento y trazabilidad completa.</p>
+            </div>
+          </div>
+
+          <div className="ubi-hero-actions">
+            <div className="kdx-mini-kpi">
+              <span className="kdx-mini-kpi-label">Total</span>
+              <strong>{meta.total}</strong>
+            </div>
+            <button
+              type="button"
+              className="btn kdx-btn kdx-btn-accent"
+              onClick={() => setModalTransferenciaAbierto(true)}
+            >
+              <FiPlus className="me-1" />
+              Nueva transferencia
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {ultimaTransferencia?.resumen && (
+        <div className="jyr-card">
+          <div className="jyr-card-body">
+            <h6 className="mb-2">Ultima transferencia aplicada</h6>
+            <div><strong>Referencia:</strong> {ultimaTransferencia?.resumen?.referencia_transferencia ?? '-'}</div>
+            <div><strong>Stock origen antes:</strong> {ultimaTransferencia?.resumen?.stock_origen_antes ?? '-'}</div>
+            <div><strong>Stock origen despues:</strong> {ultimaTransferencia?.resumen?.stock_origen_despues ?? '-'}</div>
+            <div><strong>Stock destino antes:</strong> {ultimaTransferencia?.resumen?.stock_destino_antes ?? '-'}</div>
+            <div><strong>Stock destino despues:</strong> {ultimaTransferencia?.resumen?.stock_destino_despues ?? '-'}</div>
+          </div>
+        </div>
+      )}
+
+      <div className="jyr-card kdx-filtros-card">
+        <div className="jyr-card-body">
+          {feedbackAnulacion && (
+            <div className="alert alert-success kdx-error-alert" role="alert">
+              {feedbackAnulacion}
+            </div>
+          )}
+          {error && (
+            <div className="alert alert-danger kdx-error-alert" role="alert">
+              {error}
+            </div>
+          )}
+          <TransferenciasFiltros
+            filtros={filtros}
+            productos={productos}
+            ubicaciones={ubicaciones}
+            loading={loading}
+            onChange={manejarCambioFiltro}
+            onAplicar={aplicarFiltros}
+            onLimpiar={limpiarFiltros}
+          />
+        </div>
+      </div>
+
+      <div className="jyr-card kdx-table-card">
+        <div className="kdx-table-topbar">
+          <div className="kdx-table-topbar-left">
+            <FiDatabase />
+            <span>Transferencias registradas</span>
+          </div>
+          <div className="kdx-table-topbar-right">
+            Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
+          </div>
+        </div>
+        <div className="jyr-card-body p-0">
+          <TransferenciasTabla
+            filas={filas}
+            loading={loading}
+            anulandoId={anulandoId}
+            onAnular={anularTransferencia}
+          />
+        </div>
+      </div>
+
+      <div className="kdx-pagination-bar">
+        <span className="kdx-pagination-summary">
+          Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
+        </span>
+
+        <div className="kdx-pagination-controls">
+          <button
+            type="button"
+            className="kdx-page-btn kdx-page-btn-nav"
+            onClick={() => cambiarPagina(meta.pagina - 1)}
+            disabled={loading || meta.pagina <= 1}
+            aria-label="Pagina anterior"
+          >
+            <FiChevronLeft size={15} />
+          </button>
+
+          {paginasVisibles.map((pagina, index) => (
+            <button
+              key={`${pagina}-${index}`}
+              type="button"
+              className={`kdx-page-btn ${pagina === meta.pagina ? 'is-active' : ''} ${pagina === '...' ? 'is-ellipsis' : ''}`}
+              onClick={() => (typeof pagina === 'number' ? cambiarPagina(pagina) : undefined)}
+              disabled={loading || pagina === '...'}
+            >
+              {pagina}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            className="kdx-page-btn kdx-page-btn-nav"
+            onClick={() => cambiarPagina(meta.pagina + 1)}
+            disabled={loading || meta.pagina >= meta.totalPaginas}
+            aria-label="Pagina siguiente"
+          >
+            <FiChevronRight size={15} />
+          </button>
+
+          <span className="kdx-page-state">
+            Pagina {meta.pagina} de {meta.totalPaginas}
+          </span>
         </div>
       </div>
 
       <TransferenciaForm
-        // // Submodulo dedicado para transferencias entre ubicaciones
+        abierto={modalTransferenciaAbierto}
+        onClose={() => setModalTransferenciaAbierto(false)}
         onTransferenciaRegistrada={manejarTransferenciaRegistrada}
+        productos={productos}
+        ubicaciones={ubicaciones}
       />
-
-      <div className="jyr-card mt-4">
-        <div className="jyr-card-body">
-          <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-            <h5 className="mb-0">Historial persistente de transferencias</h5>
-            <div className="d-flex gap-2">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Filtrar por referencia"
-                value={filtroReferencia}
-                onChange={(event) => setFiltroReferencia(event.target.value)}
-              />
-              <button
-                type="button"
-                className="btn btn-outline-primary"
-                onClick={() => cargarTransferencias(filtroReferencia)}
-                disabled={loading}
-              >
-                Buscar
-              </button>
-            </div>
-          </div>
-
-          {errorListado && (
-            <div className="alert alert-danger py-2" role="alert">
-              {errorListado}
-            </div>
-          )}
-
-          <div className="alert alert-light border py-2">
-            <strong>Total:</strong> {totalTransferencias}
-          </div>
-
-          <div className="table-responsive">
-            <table className="table table-sm table-striped align-middle">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Fecha</th>
-                  <th>Producto</th>
-                  <th>Origen</th>
-                  <th>Destino</th>
-                  <th>Cantidad</th>
-                  <th>Referencia</th>
-                  <th>Usuario</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!loading && transferencias.length === 0 && (
-                  <tr>
-                    <td colSpan="9" className="text-center text-muted">
-                      No hay transferencias registradas.
-                    </td>
-                  </tr>
-                )}
-                {transferencias.map((item) => (
-                  <tr key={item.cod_transferencia}>
-                    <td>{item.cod_transferencia}</td>
-                    <td>{formatearFecha(item.fecha)}</td>
-                    <td>{item.nombre_producto || item.cod_producto}</td>
-                    <td>{item.ubicacion_origen || item.cod_ubicacion_origen}</td>
-                    <td>{item.ubicacion_destino || item.cod_ubicacion_destino}</td>
-                    <td>{item.cantidad}</td>
-                    <td>{item.referencia || '-'}</td>
-                    <td>{item.nombre_usuario || '-'}</td>
-                    <td>{item.estado || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {ultimaTransferencia?.origen && ultimaTransferencia?.destino && (
-        // // Resumen de existencias impactadas tras una transferencia exitosa
-        <div className="jyr-card mt-4">
-          <div className="jyr-card-body">
-            <h5 className="mb-3">Existencias tras transferencia</h5>
-            <div><strong>Referencia:</strong> {ultimaTransferencia.referencia}</div>
-            <hr />
-            <div><strong>Origen (ubicacion {ultimaTransferencia.origen.cod_ubicacion}):</strong></div>
-            <div>Stock actual: {ultimaTransferencia.origen.stock_actual}</div>
-            <div>Disponible: {ultimaTransferencia.origen.stock_disponible}</div>
-            <hr />
-            <div><strong>Destino (ubicacion {ultimaTransferencia.destino.cod_ubicacion}):</strong></div>
-            <div>Stock actual: {ultimaTransferencia.destino.stock_actual}</div>
-            <div>Disponible: {ultimaTransferencia.destino.stock_disponible}</div>
-          </div>
-        </div>
-      )}
-    </div>
+    </section>
   );
 };
 

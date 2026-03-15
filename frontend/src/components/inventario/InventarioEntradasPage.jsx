@@ -176,6 +176,8 @@ const InventarioEntradasPage = () => {
       const params = limpiarParamsConsulta({
         ...consulta,
         tipo: 'ENTRADA',
+        // // Excluye entradas tecnicas de anulacion para mantener vista operativa limpia
+        excluir_ref_tipo: 'ANULACION_SALIDA,ANULACION_BAJA',
         estado: consulta.estado || 'TODAS',
         cod_producto: normalizarCodProducto(consulta.cod_producto),
         cod_ubicacion: normalizarCodUbicacion(consulta.cod_ubicacion),
