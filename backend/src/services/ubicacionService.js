@@ -132,6 +132,14 @@ class UbicacionService {
     return ubicacion;
   }
 
+  async reactivar(id) {
+    const ubicacion = await this.obtenerPorId(id);
+    if (ubicacion.estado_ubi !== ESTADO_ACTIVA) {
+      await ubicacion.update({ estado_ubi: ESTADO_ACTIVA });
+    }
+    return ubicacion;
+  }
+
   async eliminar(id) {
     const ubicacion = await this.obtenerPorId(id);
     const [usoInventario] = await sequelize.query(

@@ -78,3 +78,16 @@ export const desactivar = async (req, res, next) => {
     next(error);
   }
 };
+
+export const reactivar = async (req, res, next) => {
+  try {
+    const data = await ubicacionService.reactivar(req.params.id);
+    return sendOk(res, {
+      status: 200,
+      message: 'Ubicacion reactivada correctamente',
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};

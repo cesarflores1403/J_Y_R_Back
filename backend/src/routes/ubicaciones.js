@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import { validarCampos } from '../middlewares/validar.js';
 import { autenticar } from '../middlewares/auth.js';
-import { listar, obtener, crear, actualizar, eliminar, desactivar } from '../controllers/ubicacionController.js';
+import { listar, obtener, crear, actualizar, eliminar, desactivar, reactivar } from '../controllers/ubicacionController.js';
 
 const router = Router();
 
@@ -90,5 +90,12 @@ router.patch('/:id/desactivar', [
     .withMessage('El id de ubicacion debe ser numerico'),
   validarCampos
 ], desactivar);
+
+router.patch('/:id/reactivar', [
+  param('id')
+    .isInt({ min: 1 })
+    .withMessage('El id de ubicacion debe ser numerico'),
+  validarCampos
+], reactivar);
 
 export default router;

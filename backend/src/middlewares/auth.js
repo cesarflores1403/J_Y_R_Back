@@ -7,21 +7,38 @@ const JWT_SECRET = process.env.JWT_SECRET || 'CAMBIA_ESTE_SECRET_EN_ENV';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 // =============================================
-// AUTH BEARER TOKEN (para módulos Sequelize: auth, clientes, proveedores, reportes)
+// AUTH BEARER TOKEN (para modulos Sequelize: auth, clientes, proveedores, reportes)
 // =============================================
 export const autenticar = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      ok: false,
+      mensaje: 'Token de autenticacion no proporcionado'
+    });
+  }
+
+  const token = authHeader.split(' ')[1];
+  let decoded = null;
+
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        ok: false,
-        mensaje: 'Token de autenticación no proporcionado'
-      });
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ ok: false, mensaje: 'Token expirado' });
     }
 
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    if (error.name === 'JsonWebTokenError' || error.name === 'NotBeforeError') {
+      return res.status(401).json({ ok: false, mensaje: 'Token invalido' });
+    }
 
+    return res.status(500).json({
+      ok: false,
+      mensaje: 'Error interno al validar el token'
+    });
+  }
+
+  try {
     const usuario = await Usuario.findByPk(decoded.id, {
       include: [{ model: Rol, as: 'roles', through: { attributes: [] } }]
     });
@@ -29,7 +46,7 @@ export const autenticar = async (req, res, next) => {
     if (!usuario || !usuario.estado_usuario) {
       return res.status(401).json({
         ok: false,
-        mensaje: 'Token inválido o usuario desactivado'
+        mensaje: 'Token invalido o usuario desactivado'
       });
     }
 
@@ -37,12 +54,15 @@ export const autenticar = async (req, res, next) => {
     req.usuario.rol = usuario.roles && usuario.roles.length > 0
       ? usuario.roles[0].nombre_rol
       : 'Sin rol';
-    next();
+
+    return next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ ok: false, mensaje: 'Token expirado' });
-    }
-    return res.status(401).json({ ok: false, mensaje: 'Token inválido' });
+    // No convertir errores internos de BD en 401 para no forzar logout falso
+    console.error('Error interno en autenticar (consulta usuario/rol):', error.message);
+    return res.status(500).json({
+      ok: false,
+      mensaje: 'Error interno al validar la sesion'
+    });
   }
 };
 
@@ -60,12 +80,12 @@ export const autorizar = (...rolesPermitidos) => {
         mensaje: `Acceso denegado. Se requiere rol: ${rolesPermitidos.join(' o ')}`
       });
     }
-    next();
+    return next();
   };
 };
 
 // =============================================
-// AUTH COOKIE (para módulo producto original)
+// AUTH COOKIE (para modulo producto original)
 // =============================================
 
 export const authRequired = (req, res, next) => {
@@ -79,8 +99,8 @@ export const authRequired = (req, res, next) => {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = payload;
     return next();
-  } catch (err) {
-    // Si el token expiró o es inválido, limpiamos cookies
+  } catch (_err) {
+    // Si el token expiro o es invalido, limpiamos cookies
     const isProd = process.env.NODE_ENV === 'production';
     const sameSite = isProd ? 'none' : 'lax';
     const secure = isProd;
@@ -88,7 +108,7 @@ export const authRequired = (req, res, next) => {
     res.clearCookie('access_token', { path: '/', sameSite, secure });
     res.clearCookie('csrf_token', { path: '/', sameSite, secure });
 
-    return res.status(401).json({ error: true, message: 'Sesión expirada o inválida' });
+    return res.status(401).json({ error: true, message: 'Sesion expirada o invalida' });
   }
 };
 
@@ -99,7 +119,7 @@ export const csrfProtect = (req, res, next) => {
   const csrfHeader = req.get('x-csrf-token');
 
   if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
-    return res.status(403).json({ error: true, message: 'CSRF token inválido' });
+    return res.status(403).json({ error: true, message: 'CSRF token invalido' });
   }
 
   return next();
