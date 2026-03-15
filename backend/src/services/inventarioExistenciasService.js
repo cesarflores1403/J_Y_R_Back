@@ -1,4 +1,4 @@
-import { sequelize } from '../config/sequelize.js';
+﻿import { sequelize } from '../config/sequelize.js';
 
 // // Valor por defecto para paginacion de listado
 const PAGINA_DEFAULT = 1;
@@ -162,7 +162,7 @@ const construirSelectExistenciasBase = () => `
     p.nombre_producto,
     COALESCE(i.cod_ubicacion, p.cod_ubicacion) AS cod_ubicacion,
     COALESCE(
-      NULLIF(u.codigo_qr, ''),
+      NULLIF(u.codigo_producto, ''),
       NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
       CASE
         WHEN COALESCE(i.cod_ubicacion, p.cod_ubicacion) IS NOT NULL
@@ -235,7 +235,7 @@ class InventarioExistenciasService {
       whereParts.push(`
         (
           CAST(COALESCE(i.cod_ubicacion, p.cod_ubicacion) AS TEXT) ILIKE :ubicacion
-          OR COALESCE(u.codigo_qr, '') ILIKE :ubicacion
+          OR COALESCE(u.codigo_producto, '') ILIKE :ubicacion
           OR COALESCE(u.pasillo, '') ILIKE :ubicacion
           OR COALESCE(u.estanteria, '') ILIKE :ubicacion
           OR COALESCE(u.nivel_1, '') ILIKE :ubicacion
@@ -362,7 +362,7 @@ class InventarioExistenciasService {
       whereBaseParts.push(`
         (
           CAST(COALESCE(i.cod_ubicacion, p.cod_ubicacion) AS TEXT) ILIKE :ubicacion
-          OR COALESCE(u.codigo_qr, '') ILIKE :ubicacion
+          OR COALESCE(u.codigo_producto, '') ILIKE :ubicacion
           OR COALESCE(u.pasillo, '') ILIKE :ubicacion
           OR COALESCE(u.estanteria, '') ILIKE :ubicacion
           OR COALESCE(u.nivel_1, '') ILIKE :ubicacion
@@ -519,3 +519,4 @@ class InventarioExistenciasService {
 }
 
 export default new InventarioExistenciasService();
+

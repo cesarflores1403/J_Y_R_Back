@@ -1,4 +1,4 @@
-import { sequelize } from '../config/sequelize.js';
+﻿import { sequelize } from '../config/sequelize.js';
 import ProductoSeq from '../models/ProductoSeq.js';
 import Ubicacion from '../models/Ubicacion.js';
 import inventarioMovimientosSchemaService from './inventarioMovimientosSchemaService.js';
@@ -258,7 +258,7 @@ class InventarioReservasService {
         p.nombre_producto,
         ${exprCodUbicacion} AS cod_ubicacion,
         COALESCE(
-          NULLIF(u.codigo_qr, ''),
+          NULLIF(u.codigo_producto, ''),
           NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
           CAST(u.cod_ubicacion AS TEXT)
         ) AS ubicacion,
@@ -680,3 +680,4 @@ class InventarioReservasService {
 }
 
 export default new InventarioReservasService();
+

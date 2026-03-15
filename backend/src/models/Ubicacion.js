@@ -23,7 +23,11 @@ const Ubicacion = sequelize.define('ubicacion', {
     type: DataTypes.STRING(80),
     allowNull: true
   },
-  codigo_qr: {
+  cod_producto: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  codigo_producto: {
     type: DataTypes.STRING(120),
     allowNull: true
   },
@@ -39,3 +43,4 @@ const Ubicacion = sequelize.define('ubicacion', {
 });
 
 export default Ubicacion;
+

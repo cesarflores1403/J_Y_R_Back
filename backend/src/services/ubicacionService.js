@@ -4,6 +4,8 @@ import { sequelize } from '../config/sequelize.js';
 
 const ESTADO_ACTIVA = 'ACTIVA';
 const ESTADO_INACTIVA = 'INACTIVA';
+const LIMITE_DEFECTO = 10;
+const LIMITE_MAXIMO = 200;
 
 const normalizarTexto = (valor) => {
   if (valor === undefined || valor === null) return null;
@@ -16,29 +18,79 @@ const normalizarMayuscula = (valor) => {
   return limpio ? limpio.toUpperCase() : null;
 };
 
+const formatearCodigoProducto = (codProducto) => `PROD-${String(Number(codProducto)).padStart(4, '0')}`;
+
+const extraerCodProducto = (valor) => {
+  const limpio = normalizarMayuscula(valor);
+  if (!limpio) return null;
+
+  const match = limpio.match(/(\d+)$/);
+  if (!match) return null;
+
+  const numero = Number.parseInt(match[1], 10);
+  if (Number.isNaN(numero) || numero < 1) return null;
+  return numero;
+};
+
 const parsearBoolean = (valor) => {
   if (typeof valor === 'boolean') return valor;
   if (typeof valor !== 'string') return false;
   return ['true', '1', 'yes', 'si'].includes(valor.trim().toLowerCase());
 };
 
+const parsearEntero = (valor, defecto, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) => {
+  const numero = Number.parseInt(valor, 10);
+  if (Number.isNaN(numero)) return defecto;
+  return Math.min(max, Math.max(min, numero));
+};
+
 const construirPayload = (datos) => {
+  const codProducto = extraerCodProducto(datos.codigo_producto);
   return {
     pasillo: normalizarMayuscula(datos.pasillo),
     estanteria: normalizarMayuscula(datos.estanteria),
     nivel_1: normalizarMayuscula(datos.nivel_1),
     nivel_2: normalizarMayuscula(datos.nivel_2),
-    codigo_qr: normalizarMayuscula(datos.codigo_qr),
+    cod_producto: codProducto,
+    codigo_producto: codProducto ? formatearCodigoProducto(codProducto) : null,
     descripcion: normalizarTexto(datos.descripcion)
   };
 };
 
 class UbicacionService {
-  async listar({ includeInactive = 'false' }) {
+  async validarProductoExiste(codProducto) {
+    if (!Number.isInteger(codProducto) || codProducto < 1) {
+      throw Object.assign(new Error('El codigo_producto es requerido'), { status: 400 });
+    }
+
+    const [producto] = await sequelize.query(
+      `
+        SELECT p.cod_producto
+        FROM producto p
+        WHERE p.cod_producto = :codProducto
+        LIMIT 1
+      `,
+      {
+        replacements: { codProducto },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
+
+    if (!producto) {
+      throw Object.assign(new Error('El codigo_producto no existe en el catalogo real de productos'), { status: 400 });
+    }
+
+    return formatearCodigoProducto(producto.cod_producto);
+  }
+
+  async listar({ includeInactive = 'false', page = 1, limit = LIMITE_DEFECTO }) {
     const incluirInactivas = parsearBoolean(includeInactive);
+    const pagina = parsearEntero(page, 1, { min: 1 });
+    const limite = parsearEntero(limit, LIMITE_DEFECTO, { min: 1, max: LIMITE_MAXIMO });
+    const offset = (pagina - 1) * limite;
     const whereClause = incluirInactivas ? {} : { estado_ubi: ESTADO_ACTIVA };
 
-    return Ubicacion.findAll({
+    const { rows, count } = await Ubicacion.findAndCountAll({
       where: whereClause,
       order: [
         ['estado_ubi', 'ASC'],
@@ -47,8 +99,22 @@ class UbicacionService {
         ['nivel_1', 'ASC'],
         ['nivel_2', 'ASC'],
         ['cod_ubicacion', 'ASC']
-      ]
+      ],
+      offset,
+      limit: limite
     });
+
+    const totalPaginas = Math.max(1, Math.ceil(count / limite));
+
+    return {
+      data: rows,
+      meta: {
+        total: Number(count || 0),
+        page: pagina,
+        limit: limite,
+        totalPages: totalPaginas
+      }
+    };
   }
 
   async obtenerPorId(id) {
@@ -61,19 +127,6 @@ class UbicacionService {
 
   async validarDuplicados(payload, idExcluir = null) {
     const whereId = idExcluir ? { cod_ubicacion: { [Op.ne]: idExcluir } } : {};
-
-    const porCodigo = await Ubicacion.findOne({
-      where: {
-        ...whereId,
-        [Op.and]: [
-          where(fn('LOWER', col('codigo_qr')), payload.codigo_qr.toLowerCase())
-        ]
-      }
-    });
-
-    if (porCodigo) {
-      throw Object.assign(new Error('Ya existe una ubicacion con ese codigo/comb'), { status: 409 });
-    }
 
     const condicionesCombinacion = [
       where(fn('LOWER', col('pasillo')), payload.pasillo.toLowerCase()),
@@ -100,12 +153,13 @@ class UbicacionService {
     });
 
     if (porCombinacion) {
-      throw Object.assign(new Error('Ya existe una ubicacion con ese codigo/comb'), { status: 409 });
+      throw Object.assign(new Error('Ya existe una ubicacion con esa combinacion fisica'), { status: 409 });
     }
   }
 
   async crear(datos) {
     const payload = construirPayload(datos);
+    payload.codigo_producto = await this.validarProductoExiste(payload.cod_producto);
     await this.validarDuplicados(payload);
 
     return Ubicacion.create({
@@ -118,6 +172,7 @@ class UbicacionService {
     const ubicacion = await this.obtenerPorId(id);
     const payload = construirPayload(datos);
 
+    payload.codigo_producto = await this.validarProductoExiste(payload.cod_producto);
     await this.validarDuplicados(payload, id);
     await ubicacion.update(payload);
 
@@ -163,3 +218,4 @@ class UbicacionService {
 }
 
 export default new UbicacionService();
+

@@ -1,4 +1,4 @@
-// // SQL base para leer inventarios de origen/destino con lock pesimista y orden estable
+﻿// // SQL base para leer inventarios de origen/destino con lock pesimista y orden estable
 export const obtenerSelectInventariosTransferenciaConBloqueo = ({ usarStockReservado = true } = {}) => `
   SELECT
     i.cod_inventario,
@@ -241,7 +241,7 @@ export const construirSelectMovimientoTransferenciaFormateadoSql = ({ schemaMovi
       p.nombre_producto,
       ${exprCodUbicacion} AS cod_ubicacion,
       COALESCE(
-        NULLIF(u.codigo_qr, ''),
+        NULLIF(u.codigo_producto, ''),
         NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
         CAST(u.cod_ubicacion AS TEXT)
       ) AS ubicacion,
@@ -264,3 +264,4 @@ export const construirSelectMovimientoTransferenciaFormateadoSql = ({ schemaMovi
     LIMIT 1
   `;
 };
+

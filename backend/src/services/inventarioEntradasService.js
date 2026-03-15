@@ -1,4 +1,4 @@
-import { sequelize } from '../config/sequelize.js';
+﻿import { sequelize } from '../config/sequelize.js';
 import ProductoSeq from '../models/ProductoSeq.js';
 import Ubicacion from '../models/Ubicacion.js';
 import inventarioExistenciasService from './inventarioExistenciasService.js';
@@ -23,7 +23,7 @@ const ubicacionActiva = (estadoUbi) => {
 // // Construye representacion de ubicacion legible para respuestas
 const construirEtiquetaUbicacion = (u) => {
   if (!u) return null;
-  const qr = String(u.codigo_qr || '').trim();
+  const qr = String(u.codigo_producto || '').trim();
   if (qr) return qr;
   const partes = [u.pasillo, u.estanteria, u.nivel_1, u.nivel_2]
     .map((p) => String(p || '').trim())
@@ -244,7 +244,7 @@ class InventarioEntradasService {
         p.nombre_producto,
         ${exprCodUbicacion} AS cod_ubicacion,
         COALESCE(
-          NULLIF(u.codigo_qr, ''),
+          NULLIF(u.codigo_producto, ''),
           NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
           CAST(u.cod_ubicacion AS TEXT)
         ) AS ubicacion,
@@ -419,3 +419,4 @@ class InventarioEntradasService {
 }
 
 export default new InventarioEntradasService();
+

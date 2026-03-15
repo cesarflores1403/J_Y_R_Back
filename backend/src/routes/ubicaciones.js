@@ -13,6 +13,14 @@ router.get('/', [
     .optional()
     .isBoolean()
     .withMessage('includeInactive debe ser true o false'),
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('page debe ser un entero mayor o igual a 1'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 200 })
+    .withMessage('limit debe ser un entero entre 1 y 200'),
   validarCampos
 ], listar);
 
@@ -35,10 +43,10 @@ router.post('/', [
     .trim()
     .notEmpty()
     .withMessage('El nivel_1 es requerido'),
-  body('codigo_qr')
+  body('codigo_producto')
     .trim()
     .notEmpty()
-    .withMessage('El codigo_qr es requerido'),
+    .withMessage('El codigo_producto es requerido'),
   body('nivel_2')
     .optional({ nullable: true })
     .trim(),
@@ -64,10 +72,10 @@ router.put('/:id', [
     .trim()
     .notEmpty()
     .withMessage('El nivel_1 es requerido'),
-  body('codigo_qr')
+  body('codigo_producto')
     .trim()
     .notEmpty()
-    .withMessage('El codigo_qr es requerido'),
+    .withMessage('El codigo_producto es requerido'),
   body('nivel_2')
     .optional({ nullable: true })
     .trim(),
@@ -99,3 +107,4 @@ router.patch('/:id/reactivar', [
 ], reactivar);
 
 export default router;
+

@@ -1,4 +1,4 @@
-// // SQL base para buscar inventario por producto + ubicacion con lock pesimista
+﻿// // SQL base para buscar inventario por producto + ubicacion con lock pesimista
 export const obtenerSelectInventarioBajaPorProductoUbicacion = ({ usarStockReservado = true } = {}) => `
   SELECT
     i.cod_inventario,
@@ -221,7 +221,7 @@ export const construirSelectMovimientoBajaFormateadoSql = ({ schemaMovimiento })
       p.nombre_producto,
       ${exprCodUbicacion} AS cod_ubicacion,
       COALESCE(
-        NULLIF(u.codigo_qr, ''),
+        NULLIF(u.codigo_producto, ''),
         NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
         CAST(u.cod_ubicacion AS TEXT)
       ) AS ubicacion,
@@ -244,3 +244,4 @@ export const construirSelectMovimientoBajaFormateadoSql = ({ schemaMovimiento })
     LIMIT 1
   `;
 };
+

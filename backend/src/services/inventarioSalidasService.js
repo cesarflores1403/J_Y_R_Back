@@ -1,4 +1,4 @@
-import { sequelize } from '../config/sequelize.js';
+﻿import { sequelize } from '../config/sequelize.js';
 import ProductoSeq from '../models/ProductoSeq.js';
 import Ubicacion from '../models/Ubicacion.js';
 import inventarioExistenciasService from './inventarioExistenciasService.js';
@@ -29,7 +29,7 @@ const ubicacionActiva = (estadoUbi) => {
 // // Construye etiqueta legible de ubicacion para respuesta fallback
 const construirEtiquetaUbicacion = (u) => {
   if (!u) return null;
-  const qr = String(u.codigo_qr || '').trim();
+  const qr = String(u.codigo_producto || '').trim();
   if (qr) return qr;
   const partes = [u.pasillo, u.estanteria, u.nivel_1, u.nivel_2]
     .map((p) => String(p || '').trim())
@@ -307,3 +307,4 @@ class InventarioSalidasService {
 }
 
 export default new InventarioSalidasService();
+

@@ -1,4 +1,4 @@
-import { sequelize } from '../config/sequelize.js';
+﻿import { sequelize } from '../config/sequelize.js';
 import ProductoSeq from '../models/ProductoSeq.js';
 import Ubicacion from '../models/Ubicacion.js';
 import inventarioExistenciasService from './inventarioExistenciasService.js';
@@ -84,7 +84,7 @@ const ubicacionActiva = (estadoUbi) => {
 // // Arma etiqueta de ubicacion para respuestas fallback cuando no se puede reconsultar movimiento
 const construirEtiquetaUbicacion = (u) => {
   if (!u) return null;
-  const qr = String(u.codigo_qr || '').trim();
+  const qr = String(u.codigo_producto || '').trim();
   if (qr) return qr;
   const partes = [u.pasillo, u.estanteria, u.nivel_1, u.nivel_2]
     .map((p) => String(p || '').trim())
@@ -712,13 +712,13 @@ class InventarioTransferenciasService {
           t.cod_inventario_destino,
           t.cod_ubicacion_origen,
           COALESCE(
-            NULLIF(uo.codigo_qr, ''),
+            NULLIF(uo.codigo_producto, ''),
             NULLIF(CONCAT_WS('-', uo.pasillo, uo.estanteria, uo.nivel_1, uo.nivel_2), ''),
             CAST(uo.cod_ubicacion AS TEXT)
           ) AS ubicacion_origen,
           t.cod_ubicacion_destino,
           COALESCE(
-            NULLIF(ud.codigo_qr, ''),
+            NULLIF(ud.codigo_producto, ''),
             NULLIF(CONCAT_WS('-', ud.pasillo, ud.estanteria, ud.nivel_1, ud.nivel_2), ''),
             CAST(ud.cod_ubicacion AS TEXT)
           ) AS ubicacion_destino,
@@ -775,3 +775,4 @@ class InventarioTransferenciasService {
 }
 
 export default new InventarioTransferenciasService();
+

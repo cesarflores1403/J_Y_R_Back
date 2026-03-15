@@ -1,4 +1,4 @@
-import pool from '../config/db-connection.js';
+﻿import pool from '../config/db-connection.js';
 
 // =====================================================
 // MODELO: Producto
@@ -7,7 +7,7 @@ import pool from '../config/db-connection.js';
 // =====================================================
 
 // =======================
-// HU-04: Generar código formateado PROD-XXXX
+// HU-04: Generar cÃ³digo formateado PROD-XXXX
 // =======================
 export const formatCodProducto = (cod) => {
   if (!cod) return null;
@@ -15,7 +15,7 @@ export const formatCodProducto = (cod) => {
 };
 
 // =======================
-// GET PRODUCTOS (con detalle ISV del catálogo)
+// GET PRODUCTOS (con detalle ISV del catÃ¡logo)
 // =======================
 export const getProducto = async () => {
   const query = `
@@ -26,7 +26,7 @@ export const getProducto = async () => {
            p.estado_producto, p.imagen_url, p.cod_ubicacion,
            u.pasillo AS ubi_pasillo, u.estanteria AS ubi_estanteria,
            u.nivel_1 AS ubi_nivel_1, u.nivel_2 AS ubi_nivel_2,
-           u.codigo_qr AS ubi_codigo_qr
+           u.codigo_producto AS ubi_codigo_producto
     FROM producto p
     LEFT JOIN catalogo_isv i ON p.cod_isv = i.cod_isv
     LEFT JOIN ubicacion u ON p.cod_ubicacion = u.cod_ubicacion
@@ -52,7 +52,7 @@ export const createProducto = async (datos) => {
   // // 1. Insertar producto
   await pool.query(queryInsert, [tabla, datosJson]);
 
-  // // 2. Buscar el producto recién creado por nombre (método confiable con Supabase pooler)
+  // // 2. Buscar el producto reciÃ©n creado por nombre (mÃ©todo confiable con Supabase pooler)
   const buscar = `
     SELECT cod_producto, nombre_producto, cod_categoria,
            unidad_medida, precio_venta, cod_isv, estado_producto
@@ -95,9 +95,9 @@ export const updateProducto = async ({ cod_producto, datos }) => {
   const tabla = 'producto'; // // Tabla real
   const id_campo = 'cod_producto'; // // PK real
 
-  // // Validación mínima
+  // // ValidaciÃ³n mÃ­nima
   if (!datos || typeof datos !== 'object' || Array.isArray(datos)) {
-    throw new Error('Datos inválidos para actualizar');
+    throw new Error('Datos invÃ¡lidos para actualizar');
   }
 
   const entries = Object.entries(datos);
@@ -135,3 +135,4 @@ export const deleteProducto = async (cod_producto) => {
     String(cod_producto), // // Valor como texto
   ]);
 };
+

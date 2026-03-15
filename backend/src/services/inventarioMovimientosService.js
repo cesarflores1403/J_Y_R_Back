@@ -1,4 +1,4 @@
-import { sequelize } from '../config/sequelize.js';
+﻿import { sequelize } from '../config/sequelize.js';
 import inventarioMovimientosSchemaService from './inventarioMovimientosSchemaService.js';
 
 // // Defaults de paginacion siguiendo el patron usado en Inventario HU2
@@ -160,7 +160,7 @@ class InventarioMovimientosService {
         p.nombre_producto,
         ${exprCodUbicacion} AS cod_ubicacion,
         COALESCE(
-          NULLIF(u.codigo_qr, ''),
+          NULLIF(u.codigo_producto, ''),
           NULLIF(CONCAT_WS('-', u.pasillo, u.estanteria, u.nivel_1, u.nivel_2), ''),
           CAST(u.cod_ubicacion AS TEXT)
         ) AS ubicacion,
@@ -209,3 +209,4 @@ class InventarioMovimientosService {
 }
 
 export default new InventarioMovimientosService();
+
