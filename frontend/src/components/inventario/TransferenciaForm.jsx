@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { FiRepeat } from 'react-icons/fi';
 import { inventarioTransferenciasApi } from './inventarioTransferencias.api.js';
 import { useUbicaciones } from '../../hooks/useUbicaciones.js';
@@ -35,7 +35,7 @@ const esUbicacionActiva = (estado) => {
 // // Construye etiqueta legible de ubicacion para selects operativos
 const formatearEtiquetaUbicacion = (u) => {
   if (!u) return '';
-  const qr = String(u.codigo_qr || '').trim();
+  const qr = String(u.codigo_producto || '').trim();
   const desc = String(u.descripcion || '').trim();
   const partes = [u.pasillo, u.estanteria, u.nivel_1, u.nivel_2]
     .map((p) => String(p || '').trim())
@@ -350,3 +350,4 @@ const TransferenciaForm = ({ onTransferenciaRegistrada }) => {
 };
 
 export default TransferenciaForm;
+

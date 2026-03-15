@@ -1,4 +1,4 @@
-import { FiX, FiEdit2, FiPackage, FiCheckCircle, FiAlertTriangle, FiXCircle } from 'react-icons/fi';
+﻿import { FiX, FiEdit2, FiPackage, FiCheckCircle, FiAlertTriangle, FiXCircle } from 'react-icons/fi';
 
 // =====================================================
 // HU-09: Ficha completa del producto (modal)
@@ -25,7 +25,7 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
       ? FiAlertTriangle
       : FiXCircle;
 
-  const categoria = categoriasMap[producto.cod_categoria] || `Categoría ${producto.cod_categoria}`;
+  const categoria = categoriasMap[producto.cod_categoria] || `CategorÃ­a ${producto.cod_categoria}`;
 
   return (
     // Overlay
@@ -102,7 +102,7 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
                 <span style={{ fontSize: 12, marginTop: 6 }}>Sin imagen</span>
               </div>
             )}
-            {/* Código debajo de la imagen */}
+            {/* CÃ³digo debajo de la imagen */}
             <span style={{
               fontFamily: 'var(--font-mono)', fontWeight: 700,
               fontSize: 15, color: 'var(--jyr-red)',
@@ -123,10 +123,10 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
               marginTop: 16, display: 'grid',
               gridTemplateColumns: '1fr 1fr', gap: '12px 20px'
             }}>
-              {/* Categoría */}
+              {/* CategorÃ­a */}
               <div>
                 <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
-                  Categoría
+                  CategorÃ­a
                 </span>
                 <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 600, color: 'var(--jyr-gray-700)' }}>
                   {categoria}
@@ -175,20 +175,20 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
                 </p>
               </div>
 
-              {/* Código interno */}
+              {/* CÃ³digo interno */}
               <div>
                 <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
-                  Código interno
+                  CÃ³digo interno
                 </span>
                 <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--jyr-gray-700)' }}>
                   {producto.cod_producto}
                 </p>
               </div>
 
-              {/* HU-10: Ubicación en bodega */}
+              {/* HU-10: UbicaciÃ³n en bodega */}
               <div style={{ gridColumn: '1 / -1' }}>
                 <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
-                  Ubicación en bodega
+                  UbicaciÃ³n en bodega
                 </span>
                 {producto.cod_ubicacion ? (
                   <div style={{ margin: '4px 0 0', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -204,7 +204,7 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
                       background: '#f0fdf4', color: '#16a34a',
                       padding: '4px 10px', borderRadius: 6, fontSize: 13, fontWeight: 600
                     }}>
-                      Estantería {producto.ubi_estanteria}
+                      EstanterÃ­a {producto.ubi_estanteria}
                     </span>
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -222,15 +222,15 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
                         Nivel 2: {producto.ubi_nivel_2}
                       </span>
                     )}
-                    {producto.ubi_codigo_qr && (
+                    {producto.ubi_codigo_producto && (
                       <span style={{ fontSize: 12, color: 'var(--jyr-gray-500)', alignSelf: 'center' }}>
-                        QR: {producto.ubi_codigo_qr}
+                        Cod. producto ubicacion: {producto.ubi_codigo_producto}
                       </span>
                     )}
                   </div>
                 ) : (
                   <p style={{ margin: '2px 0 0', fontSize: 14, color: 'var(--jyr-gray-400)', fontStyle: 'italic' }}>
-                    Sin ubicación asignada
+                    Sin ubicaciÃ³n asignada
                   </p>
                 )}
               </div>
@@ -266,3 +266,4 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
 };
 
 export default ProductoFicha;
+

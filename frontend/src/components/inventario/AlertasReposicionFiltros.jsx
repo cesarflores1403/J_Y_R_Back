@@ -71,7 +71,7 @@ const AlertasReposicionFiltros = ({
                 name="ubicacion"
                 value={filtros.ubicacion}
                 onChange={handleInput}
-                placeholder="QR, pasillo, nivel"
+                placeholder="Codigo producto, pasillo, nivel"
               />
             </div>
           </div>

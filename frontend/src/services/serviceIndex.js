@@ -33,7 +33,12 @@ export const ubicacionService = {
   crear: (data) => api.post('/ubicaciones', data),
   actualizar: (id, data) => api.put(`/ubicaciones/${id}`, data),
   desactivar: (id) => api.patch(`/ubicaciones/${id}/desactivar`),
+  reactivar: (id) => api.patch(`/ubicaciones/${id}/reactivar`),
   eliminar: (id) => api.delete(`/ubicaciones/${id}`),
+};
+
+export const productoService = {
+  listar: () => api.get('/producto'),
 };
 
 // ==================== REPORTES ====================

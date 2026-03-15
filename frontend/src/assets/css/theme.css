@@ -979,6 +979,34 @@ a {
   color: #111827;
 }
 
+.ubi-hero-actions {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ubi-switch-wrap {
+  min-height: 42px;
+  border: 1px solid var(--jyr-gray-300);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ubi-switch-wrap .form-check-input {
+  margin: 0;
+}
+
+.ubi-switch-wrap .form-check-label {
+  margin-left: 8px;
+  color: var(--jyr-gray-700);
+  font-weight: 600;
+}
+
 .kdx-kpi-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1329,6 +1357,11 @@ a {
 
   .kdx-mini-kpi {
     align-items: flex-start;
+  }
+
+  .ubi-hero-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .kdx-btn {
