@@ -255,24 +255,46 @@ class CotizacionService {
       let subtotalGeneral = 0, descuentoLineasTotal = 0, isvGeneral = 0;
       const detallesFactura = [];
 
+      if (!cotizacion.detalles || cotizacion.detalles.length === 0) {
+        throw Object.assign(new Error('La cotización no tiene detalles para convertir'), { statusCode: 400 });
+      }
+
+      const requeridosPorProducto = new Map();
       for (const det of cotizacion.detalles) {
-        const producto = await ProductoSeq.findByPk(det.cod_producto, { transaction: t });
+        const actual = requeridosPorProducto.get(det.cod_producto) || 0;
+        requeridosPorProducto.set(det.cod_producto, actual + Number(det.cantidad || 0));
+      }
+
+      const contextoProductos = new Map();
+      for (const [codProducto, cantidadRequerida] of requeridosPorProducto.entries()) {
+        const producto = await ProductoSeq.findByPk(codProducto, { transaction: t });
         if (!producto || producto.estado_producto !== 'Activo') {
-          throw Object.assign(new Error(`Producto "${producto?.nombre_producto || det.cod_producto}" no disponible`), { statusCode: 400 });
+          throw Object.assign(new Error(`Producto "${producto?.nombre_producto || codProducto}" no disponible`), { statusCode: 400 });
         }
 
-        // Verificar stock
-        const [invResult] = await sequelize.query(
-          'SELECT stock FROM inventario WHERE cod_producto = :codProd LIMIT 1',
-          { replacements: { codProd: det.cod_producto }, type: sequelize.QueryTypes.SELECT, transaction: t }
+        const inventarioRows = await sequelize.query(
+          `SELECT cod_inventario,
+                  COALESCE(stock, 0) AS stock,
+                  COALESCE(stock_reservado, 0) AS stock_reservado
+           FROM inventario
+           WHERE cod_producto = :codProd
+           ORDER BY cod_inventario ASC
+           FOR UPDATE`,
+          { replacements: { codProd: codProducto }, type: sequelize.QueryTypes.SELECT, transaction: t }
         );
-        const stockActual = invResult ? parseInt(invResult.stock) : 0;
-        if (stockActual < det.cantidad) {
-          throw Object.assign(new Error(`Stock insuficiente para "${producto.nombre_producto}". Disponible: ${stockActual}, solicitado: ${det.cantidad}`), { statusCode: 400 });
+
+        const stockDisponibleTotal = inventarioRows.reduce((acc, row) => {
+          const disponible = Math.max(0, Number(row.stock) - Number(row.stock_reservado));
+          return acc + disponible;
+        }, 0);
+
+        if (stockDisponibleTotal < cantidadRequerida) {
+          throw Object.assign(
+            new Error(`Stock insuficiente para "${producto.nombre_producto}". Disponible: ${stockDisponibleTotal}, solicitado: ${cantidadRequerida}`),
+            { statusCode: 400 }
+          );
         }
 
-        // Recalcular con precio actual del producto
-        const precioUnitario = round2(producto.precio_venta);
         let isvPorcentaje = 0;
         if (producto.cod_isv) {
           const [isvInfo] = await sequelize.query(
@@ -281,6 +303,17 @@ class CotizacionService {
           );
           isvPorcentaje = isvInfo ? parseFloat(isvInfo.porcentaje) : 0;
         }
+
+        contextoProductos.set(codProducto, { producto, inventarioRows, isvPorcentaje });
+      }
+
+      for (const det of cotizacion.detalles) {
+        const contextoProducto = contextoProductos.get(det.cod_producto);
+        const producto = contextoProducto.producto;
+
+        // Recalcular con precio actual del producto
+        const precioUnitario = round2(producto.precio_venta);
+        const isvPorcentaje = contextoProducto.isvPorcentaje;
 
         const subtotalBruto = round2(precioUnitario * det.cantidad);
         let montoDescuento = 0;
@@ -354,12 +387,31 @@ class CotizacionService {
       const detallesConFac = detallesFactura.map(d => ({ ...d, cod_factura: factura.cod_factura }));
       await DetalleFactura.bulkCreate(detallesConFac, { transaction: t });
 
-      // Descontar inventario
-      for (const det of cotizacion.detalles) {
-        await sequelize.query(
-          'UPDATE inventario SET stock = stock - :cant, fecha_ult_mov = NOW() WHERE cod_producto = :codProd',
-          { replacements: { cant: det.cantidad, codProd: det.cod_producto }, transaction: t }
-        );
+      // Descontar inventario por filas disponibles (considerando stock_reservado)
+      for (const [codProducto, cantidadRequerida] of requeridosPorProducto.entries()) {
+        const { inventarioRows } = contextoProductos.get(codProducto);
+        let restante = Number(cantidadRequerida);
+
+        for (const row of inventarioRows) {
+          if (restante <= 0) break;
+
+          const disponible = Math.max(0, Number(row.stock) - Number(row.stock_reservado));
+          if (disponible <= 0) continue;
+
+          const descontar = Math.min(restante, disponible);
+          await sequelize.query(
+            'UPDATE inventario SET stock = stock - :cant, fecha_ult_mov = NOW() WHERE cod_inventario = :codInv',
+            { replacements: { cant: descontar, codInv: row.cod_inventario }, transaction: t }
+          );
+          restante -= descontar;
+        }
+
+        if (restante > 0) {
+          throw Object.assign(
+            new Error(`No se pudo descontar inventario completo para producto ${codProducto}. Pendiente: ${restante}`),
+            { statusCode: 409 }
+          );
+        }
       }
 
       // Marcar cotización como convertida

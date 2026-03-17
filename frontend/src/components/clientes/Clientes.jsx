@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX } from 'react-icons/fi';
 import { confirmDialog } from '../../utils/notifications.js';
 
-const camposIniciales = { nombre: '', apellido: '', dni: '', empresa: '', telefono: '', correo: '', direccion: '' };
+const camposIniciales = { nombre: '', apellido: '', dni: '', rtn: '', empresa: '', telefono: '', correo: '', direccion: '' };
 const REGEX_TEXTO_CON_PUNTO = /^[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ.\s]+$/;
 const REGEX_CORREO_PERMITIDO = /^[A-Za-z0-9@.]+$/;
 
@@ -60,6 +60,7 @@ const Clientes = () => {
       nombre: cliente.nombre || '',
       apellido: cliente.apellido || '',
       dni: cliente.dni || '',
+      rtn: cliente.rtn || '',
       empresa: cliente.empresa || '',
       telefono: cliente.telefono || '',
       correo: cliente.correo || '',
@@ -77,6 +78,7 @@ const Clientes = () => {
     if (!form.apellido.trim()) return toast.warn('El apellido es obligatorio');
     if (!form.dni.trim()) return toast.warn('El DNI es obligatorio');
     if (!/^\d{13}$/.test(form.dni.trim())) return toast.warn('El DNI debe tener exactamente 13 dígitos numéricos');
+    if (form.rtn.trim() && !/^\d{14}$/.test(form.rtn.trim())) return toast.warn('El RTN debe tener exactamente 14 dígitos numéricos');
     if (!form.empresa.trim()) return toast.warn('La empresa es obligatoria');
     if (form.empresa.trim().length > 15) return toast.warn('La empresa no puede exceder 15 caracteres');
     if (!REGEX_TEXTO_CON_PUNTO.test(form.empresa.trim())) return toast.warn('La empresa solo permite letras, números, espacios y punto');
@@ -91,11 +93,16 @@ const Clientes = () => {
 
     setGuardando(true);
     try {
+      const payload = {
+        ...form,
+        rtn: form.rtn.trim() || null
+      };
+
       if (editando) {
-        await clienteService.actualizar(editando, form);
+        await clienteService.actualizar(editando, payload);
         toast.success('Cliente actualizado');
       } else {
-        await clienteService.crear(form);
+        await clienteService.crear(payload);
         toast.success('Cliente creado');
       }
       setModal(false);
@@ -218,20 +225,27 @@ const Clientes = () => {
                         onChange={(e) => setForm({...form, apellido: e.target.value})} required maxLength={10} />
                       <small className="text-muted">{form.apellido.length}/10</small>
                     </div>
-                    <div className="col-md-4">
+                    <div className="col-md-3">
                       <label className="form-label">DNI *</label>
                       <input type="text" className="form-control" value={form.dni}
                         onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 13) setForm({...form, dni: v}); }}
                         required maxLength={13} placeholder="13 dígitos" />
                       <small className="text-muted">{form.dni.length}/13</small>
                     </div>
-                    <div className="col-md-4">
+                    <div className="col-md-3">
+                      <label className="form-label">RTN (opcional)</label>
+                      <input type="text" className="form-control" value={form.rtn}
+                        onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 14) setForm({...form, rtn: v}); }}
+                        maxLength={14} placeholder="14 dígitos" />
+                      <small className="text-muted">{form.rtn.length}/14</small>
+                    </div>
+                    <div className="col-md-3">
                       <label className="form-label">Empresa *</label>
                       <input type="text" className="form-control" value={form.empresa}
                         onChange={(e) => setForm({...form, empresa: sanitizarTextoConPunto(e.target.value, 15)})} required maxLength={15} />
                       <small className="text-muted">{form.empresa.length}/15</small>
                     </div>
-                    <div className="col-md-4">
+                    <div className="col-md-3">
                       <label className="form-label">Teléfono *</label>
                       <input type="text" className="form-control" value={form.telefono}
                         onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 8) setForm({...form, telefono: v}); }}

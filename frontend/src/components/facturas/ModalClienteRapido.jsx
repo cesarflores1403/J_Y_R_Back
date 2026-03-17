@@ -29,6 +29,7 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
     nombre: '',
     apellido: '',
     dni: '',
+    rtn: '',
     empresa: '',
     telefono: '',
     correo: '',
@@ -49,13 +50,14 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
         nombre: clienteEditar.nombre || '',
         apellido: clienteEditar.apellido || '',
         dni: clienteEditar.dni || '',
+        rtn: clienteEditar.rtn || '',
         empresa: clienteEditar.empresa || '',
         telefono: clienteEditar.telefono || '',
         correo: clienteEditar.correo || '',
         direccion: clienteEditar.direccion || ''
       });
     } else {
-      setForm({ nombre: '', apellido: '', dni: '', empresa: '', telefono: '', correo: '', direccion: '' });
+      setForm({ nombre: '', apellido: '', dni: '', rtn: '', empresa: '', telefono: '', correo: '', direccion: '' });
     }
     setErrores({});
     setDuplicado(null);
@@ -118,6 +120,7 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
     if (form.correo && !REGEX_CORREO_PERMITIDO.test(form.correo.trim())) errs.correo = 'El correo solo permite letras, números, @ y punto';
     if (form.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo)) errs.correo = 'Correo inválido';
     if (form.dni && form.dni.trim().length < 5) errs.dni = 'El DNI debe tener al menos 5 caracteres';
+    if (form.rtn && !/^\d{14}$/.test(form.rtn.trim())) errs.rtn = 'El RTN debe tener exactamente 14 dígitos numéricos';
     if (form.direccion && form.direccion.trim().length > 60) errs.direccion = 'La dirección no puede exceder 60 caracteres';
     if (form.direccion && !REGEX_TEXTO_CON_PUNTO.test(form.direccion.trim())) errs.direccion = 'La dirección solo permite letras, números, espacios y punto';
     setErrores(errs);
@@ -129,11 +132,16 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
     if (!validar()) return;
     setGuardando(true);
     try {
+      const payload = {
+        ...form,
+        rtn: form.rtn.trim() || null
+      };
+
       let resp;
       if (clienteEditar) {
-        resp = await clienteService.actualizar(clienteEditar.cod_cliente, form);
+        resp = await clienteService.actualizar(clienteEditar.cod_cliente, payload);
       } else {
-        resp = await clienteService.crear(form);
+        resp = await clienteService.crear(payload);
       }
       const cliente = resp.data?.datos || resp.data;
       toast.success(clienteEditar ? 'Cliente actualizado' : 'Cliente creado y seleccionado');
@@ -220,7 +228,7 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
               placeholder="Apellido"
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
           </div>
-          <div className="col-6">
+          <div className="col-4">
             <label className="form-label small mb-1">
               DNI / Identidad
               {verificando && <span className="spinner-border spinner-border-sm ms-1" style={{ width: 12, height: 12 }} />}
@@ -231,7 +239,16 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
             {errores.dni && <div className="invalid-feedback">{errores.dni}</div>}
           </div>
-          <div className="col-6">
+          <div className="col-4">
+            <label className="form-label small mb-1">RTN (opcional)</label>
+            <input type="text" className={`form-control form-control-sm ${errores.rtn ? 'is-invalid' : ''}`}
+              value={form.rtn} onChange={e => handleChange('rtn', e.target.value.replace(/\D/g, '').slice(0, 14))}
+              maxLength={14}
+              placeholder="14 dígitos"
+              style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+            {errores.rtn && <div className="invalid-feedback">{errores.rtn}</div>}
+          </div>
+          <div className="col-4">
             <label className="form-label small mb-1">Empresa</label>
             <input type="text" className={`form-control form-control-sm ${errores.empresa ? 'is-invalid' : ''}`}
               value={form.empresa} onChange={e => handleChange('empresa', sanitizarTextoConPunto(e.target.value, 15))}

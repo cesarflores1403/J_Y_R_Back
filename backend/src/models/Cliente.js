@@ -17,6 +17,9 @@ const Cliente = sequelize.define('clientes', {
   dni: {
     type: DataTypes.STRING(20)
   },
+  rtn: {
+    type: DataTypes.STRING(14)
+  },
   empresa: {
     type: DataTypes.STRING(80)
   },

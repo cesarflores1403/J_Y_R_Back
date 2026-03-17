@@ -2,6 +2,15 @@ import { Op } from 'sequelize';
 import Cliente from '../models/Cliente.js';
 
 class ClienteService {
+  normalizarDatos(datos = {}) {
+    const normalizado = { ...datos };
+    if (typeof normalizado.rtn === 'string') {
+      const rtnLimpio = normalizado.rtn.trim();
+      normalizado.rtn = rtnLimpio === '' ? null : rtnLimpio;
+    }
+    return normalizado;
+  }
+
   async listar({ pagina = 1, limite = 15, buscar = '' }) {
     const where = {};
     if (buscar) {
@@ -31,15 +40,16 @@ class ClienteService {
   }
 
   async crear(datos) {
-    if (datos.dni) {
-      const existe = await Cliente.findOne({ where: { dni: datos.dni } });
+    const payload = this.normalizarDatos(datos);
+    if (payload.dni) {
+      const existe = await Cliente.findOne({ where: { dni: payload.dni } });
       if (existe) throw Object.assign(new Error('El DNI ya está registrado'), { statusCode: 409 });
     }
-    if (datos.correo) {
-      const existeCorreo = await Cliente.findOne({ where: { correo: datos.correo } });
+    if (payload.correo) {
+      const existeCorreo = await Cliente.findOne({ where: { correo: payload.correo } });
       if (existeCorreo) throw Object.assign(new Error('El correo ya está registrado'), { statusCode: 409 });
     }
-    return Cliente.create(datos);
+    return Cliente.create(payload);
   }
 
   async verificarDuplicado({ dni, correo }) {
@@ -56,8 +66,9 @@ class ClienteService {
   }
 
   async actualizar(id, datos) {
+    const payload = this.normalizarDatos(datos);
     const cliente = await this.obtenerPorId(id);
-    await cliente.update(datos);
+    await cliente.update(payload);
     return cliente;
   }
 

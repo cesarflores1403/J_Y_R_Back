@@ -10,6 +10,11 @@ const REGEX_CORREO_PERMITIDO = /^[A-Za-z0-9@.]+$/;
 
 const validarCliente = [
   body('nombre').notEmpty().withMessage('El nombre es requerido'),
+  body('rtn')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ min: 14, max: 14 }).withMessage('El RTN debe tener exactamente 14 dígitos')
+    .matches(/^\d+$/).withMessage('El RTN solo permite números'),
   body('empresa')
     .optional({ checkFalsy: true })
     .trim()

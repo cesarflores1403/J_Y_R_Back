@@ -4,7 +4,7 @@ dotenv.config(); // // Carga .env ANTES de importar app
 
 const { default: app } = await import('./app.js'); // // Import dinámico para respetar dotenv
 const { default: pool } = await import('./config/db-connection.js'); // // Pool BD (dinámico)
-const { testSequelizeConnection } = await import('./config/sequelize.js'); // // Sequelize ORM (dinámico)
+const { sequelize, testSequelizeConnection } = await import('./config/sequelize.js'); // // Sequelize ORM (dinámico)
 
 const PORT = process.env.PORT || 5000; // // Puerto configurable
 
@@ -19,6 +19,10 @@ app.listen(PORT, async () => {
   try {
     await testSequelizeConnection(); // // Verificar conexión Sequelize
     console.log('✅ Conectado correctamente a Supabase (Sequelize)');
+
+    // // Compatibilidad de esquema para clientes: agregar RTN si no existe
+    await sequelize.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rtn VARCHAR(14)');
+    console.log('✅ Esquema clientes verificado (rtn)');
   } catch (err) {
     console.error('❌ Error al conectar Sequelize:', err.message);
   }
