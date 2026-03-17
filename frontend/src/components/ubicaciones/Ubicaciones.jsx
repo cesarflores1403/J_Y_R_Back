@@ -11,8 +11,9 @@ import {
   FiTrash2
 } from 'react-icons/fi';
 import Alert from '../common/Alert.jsx';
-import { productoService, ubicacionService } from '../../services/serviceIndex.js';
 import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
+import { productoService, ubicacionService } from '../../services/serviceIndex.js';
+import { confirmDialog } from '../../utils/notifications.js';
 
 const formularioInicial = {
   pasillo: '',
@@ -23,8 +24,8 @@ const formularioInicial = {
   descripcion: ''
 };
 
-const MENSAJE_DUPLICADO = 'Ya existe una ubicacion con esa combinacion fisica.';
-const MENSAJE_PRODUCTOS = 'No se pudo cargar el catalogo de productos.';
+const MENSAJE_DUPLICADO = 'Ya existe una ubicación con esa combinación física.';
+const MENSAJE_PRODUCTOS = 'No se pudo cargar el catálogo de productos.';
 const TAMANIO_PAGINA = 10;
 
 const formatearCodigoProducto = (producto) => {
@@ -40,7 +41,7 @@ const formatearCodigoProducto = (producto) => {
 
 const extraerError = (error) => {
   if (!error?.response) {
-    return 'No se pudo conectar con el backend. Verifica que este corriendo en http://localhost:5000';
+    return 'No se pudo conectar con el backend. Verifica que esté corriendo en http://localhost:5000';
   }
 
   const backendMessage = error?.response?.data?.message
@@ -192,7 +193,7 @@ const Ubicaciones = () => {
     return [
       {
         cod_producto: `legacy-${form.codigo_producto}`,
-        nombre_producto: 'Codigo actual (legacy)',
+        nombre_producto: 'Código actual (legacy)',
         codigo_producto: form.codigo_producto
       },
       ...productos
@@ -286,11 +287,11 @@ const Ubicaciones = () => {
   };
 
   const desactivar = async (id) => {
-    const confirmado = await confirm({
-      title: 'Desactivar ubicacion',
-      message: 'Esta seguro de desactivar esta ubicacion?',
-      confirmText: 'Desactivar',
-      tone: 'danger'
+    const confirmado = await confirmDialog({
+      variant: 'deactivate',
+      title: 'Desactivar ubicación',
+      text: '¿Está seguro de desactivar esta ubicación?',
+      confirmText: 'Sí, desactivar'
     });
     if (!confirmado) return;
 
@@ -305,8 +306,8 @@ const Ubicaciones = () => {
 
   const reactivar = async (id) => {
     const confirmado = await confirm({
-      title: 'Reactivar ubicacion',
-      message: 'Esta seguro de reactivar esta ubicacion?',
+      title: 'Reactivar ubicación',
+      message: '¿Está seguro de reactivar esta ubicación?',
       confirmText: 'Reactivar',
       tone: 'default'
     });
@@ -322,11 +323,11 @@ const Ubicaciones = () => {
   };
 
   const eliminar = async (id) => {
-    const confirmado = await confirm({
-      title: 'Eliminar ubicacion',
-      message: 'Esta seguro de eliminar permanentemente esta ubicacion?',
-      confirmText: 'Eliminar',
-      tone: 'danger'
+    const confirmado = await confirmDialog({
+      variant: 'delete',
+      title: 'Eliminar ubicación',
+      text: '¿Está seguro de eliminar permanentemente esta ubicación?',
+      confirmText: 'Sí, eliminar'
     });
     if (!confirmado) return;
 
@@ -362,7 +363,7 @@ const Ubicaciones = () => {
             <div>
               <h5 className="mb-0">Ubicaciones</h5>
               <p className="kdx-subtitle mb-0">
-                Catalogo de posiciones fisicas para entradas, salidas, transferencias y reservas.
+                Catálogo de posiciones físicas para entradas, salidas, transferencias y reservas.
               </p>
             </div>
           </div>
@@ -374,7 +375,7 @@ const Ubicaciones = () => {
             </div>
             <button type="button" className="btn kdx-btn kdx-btn-accent" onClick={abrirCrear}>
               <FiPlus className="me-1" />
-              Nueva ubicacion
+              Nueva ubicación
             </button>
           </div>
         </div>
@@ -387,7 +388,7 @@ const Ubicaciones = () => {
           <div className="kdx-filters-form">
             <div className="kdx-filters-topbar mb-3">
               <div className="kdx-filters-topbar-left">
-                <span className="kdx-filters-chip">Filtros de busqueda</span>
+                <span className="kdx-filters-chip">Filtros de búsqueda</span>
               </div>
             </div>
 
@@ -442,12 +443,12 @@ const Ubicaciones = () => {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Codigo de producto</th>
+                  <th>Código de producto</th>
                   <th>Pasillo</th>
-                  <th>Estanteria</th>
+                  <th>Estantería</th>
                   <th>Nivel 1</th>
                   <th>Nivel 2</th>
-                  <th>Descripcion</th>
+                  <th>Descripción</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -544,7 +545,7 @@ const Ubicaciones = () => {
             className="btn btn-sm"
             onClick={() => cambiarPagina(paginaActual - 1)}
             disabled={loading || meta.page <= 1}
-            aria-label="Pagina anterior"
+            aria-label="Página anterior"
             style={{
               minWidth: 36,
               height: 36,
@@ -583,7 +584,7 @@ const Ubicaciones = () => {
             className="btn btn-sm"
             onClick={() => cambiarPagina(paginaActual + 1)}
             disabled={loading || meta.page >= totalPaginas}
-            aria-label="Pagina siguiente"
+            aria-label="Página siguiente"
             style={{
               minWidth: 36,
               height: 36,
@@ -604,7 +605,7 @@ const Ubicaciones = () => {
               whiteSpace: 'nowrap'
             }}
           >
-            Pagina {meta.page} de {totalPaginas}
+            Página {meta.page} de {totalPaginas}
           </span>
         </div>
       </div>
@@ -614,7 +615,7 @@ const Ubicaciones = () => {
           <div className="modal-dialog">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">{editandoId ? 'Editar ubicacion' : 'Nueva ubicacion'}</h5>
+                <h5 className="modal-title">{editandoId ? 'Editar ubicación' : 'Nueva ubicación'}</h5>
                 <button type="button" className="btn-close" onClick={cerrarModal} />
               </div>
               <form onSubmit={guardar}>
@@ -631,7 +632,7 @@ const Ubicaciones = () => {
                       />
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label">Estanteria *</label>
+                      <label className="form-label">Estantería *</label>
                       <input
                         type="text"
                         className="form-control"
@@ -660,7 +661,7 @@ const Ubicaciones = () => {
                       />
                     </div>
                     <div className="col-md-12">
-                      <label className="form-label">Codigo de producto *</label>
+                      <label className="form-label">Código de producto *</label>
                       <select
                         className="form-select"
                         value={form.codigo_producto}
@@ -678,11 +679,11 @@ const Ubicaciones = () => {
                         ))}
                       </select>
                       <small className="text-muted">
-                        Este campo se toma del catalogo real de productos.
+                        Este campo se toma del catálogo real de productos.
                       </small>
                     </div>
                     <div className="col-md-12">
-                      <label className="form-label">Descripcion</label>
+                      <label className="form-label">Descripción</label>
                       <textarea
                         className="form-control"
                         rows="2"

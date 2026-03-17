@@ -1,4 +1,41 @@
+import * as XLSX from 'xlsx';
 import bitacoraService from '../services/bitacoraFacturacionService.js';
+
+const EVENTO_LABELS = {
+  FACTURA_CREADA: 'Factura Creada',
+  FACTURA_ANULADA: 'Factura Anulada',
+  FACTURA_ELIMINADA: 'Factura Eliminada',
+  EXCEPCION_STOCK: 'Excepción Stock',
+  COTIZACION_CONVERTIDA: 'Cotización Convertida',
+  PAGO_REGISTRADO: 'Pago Registrado',
+  NOTA_CREDITO_CREADA: 'Nota de Crédito Creada',
+};
+
+const formatearValorDetalle = (valor) => {
+  if (valor === null || valor === undefined || valor === '') return '';
+  if (Array.isArray(valor)) {
+    return valor
+      .map((item, index) => {
+        if (item && typeof item === 'object') {
+          const partes = Object.entries(item)
+            .map(([clave, contenido]) => `${clave}: ${formatearValorDetalle(contenido)}`)
+            .filter(Boolean);
+          return `${index + 1}. ${partes.join(', ')}`;
+        }
+        return `${index + 1}. ${String(item)}`;
+      })
+      .join(' | ');
+  }
+  if (typeof valor === 'object') {
+    return Object.entries(valor)
+      .map(([clave, contenido]) => `${clave}: ${formatearValorDetalle(contenido)}`)
+      .filter(Boolean)
+      .join(' | ');
+  }
+  return String(valor);
+};
+
+const formatearDetalle = (detalle) => formatearValorDetalle(detalle);
 
 export const listar = async (req, res) => {
   try {
@@ -19,35 +56,43 @@ export const tiposEvento = async (req, res) => {
   }
 };
 
-export const exportarCSV = async (req, res) => {
+export const exportarExcel = async (req, res) => {
   try {
     const registros = await bitacoraService.exportar(req.query);
 
-    // Generar CSV
-    const headers = ['Código', 'Evento', 'Entidad', 'Factura', 'Usuario', 'Detalle', 'IP', 'Fecha'];
-    const rows = registros.map(r => [
-      r.cod_bitacora,
-      r.evento,
-      r.entidad,
-      r.cod_factura || '',
-      r.nombre_usuario || '',
-      r.detalle ? JSON.stringify(r.detalle).replace(/"/g, '""') : '',
-      r.ip || '',
-      r.fecha ? new Date(r.fecha).toLocaleString('es-HN') : ''
-    ]);
+    const encabezados = ['Código', 'Evento', 'Factura', 'Usuario', 'Fecha', 'Detalle'];
+    const filas = registros.map((registro) => ([
+      registro.cod_bitacora,
+      EVENTO_LABELS[registro.evento] || registro.evento,
+      registro.cod_factura ? `FAC-${String(registro.cod_factura).padStart(6, '0')}` : '—',
+      registro.nombre_usuario || 'Sistema',
+      registro.fecha ? new Date(registro.fecha).toLocaleString('es-HN') : '',
+      formatearDetalle(registro.detalle) || 'Sin detalle'
+    ]));
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet([encabezados, ...filas]);
 
-    // BOM para Excel
-    const bom = '\uFEFF';
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="bitacora_facturacion_${Date.now()}.csv"`);
-    res.send(bom + csvContent);
+    worksheet['!cols'] = [
+      { wch: 10 },
+      { wch: 24 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 24 },
+      { wch: 90 }
+    ];
+    worksheet['!autofilter'] = { ref: `A1:F${filas.length + 1}` };
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Auditoria');
+
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    const fechaArchivo = new Date().toISOString().slice(0, 10);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="auditoria_facturacion_${fechaArchivo}.xlsx"`);
+    res.send(buffer);
   } catch (error) {
-    console.error('❌ ERROR exportar CSV:', error.message);
+    console.error('❌ ERROR exportar Excel:', error.message);
     res.status(500).json({ ok: false, mensaje: error.message });
   }
 };

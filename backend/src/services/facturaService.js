@@ -399,6 +399,9 @@ class FacturaService {
     });
     if (!factura) throw Object.assign(new Error('Factura no encontrada'), { statusCode: 404 });
     if (!factura.estado) throw Object.assign(new Error('La factura ya está anulada'), { statusCode: 400 });
+    if (!factura.detalles || factura.detalles.length === 0) {
+      throw Object.assign(new Error('No se puede anular: la factura no tiene detalles para restaurar inventario'), { statusCode: 409 });
+    }
 
     const t = await sequelize.transaction();
     try {
@@ -406,6 +409,18 @@ class FacturaService {
       let inventarioReversado = false;
       for (const detalle of factura.detalles) {
         if (detalle.cod_producto) {
+          const [inventarioProducto] = await sequelize.query(
+            'SELECT cod_producto FROM inventario WHERE cod_producto = :codProd LIMIT 1 FOR UPDATE',
+            { replacements: { codProd: detalle.cod_producto }, type: sequelize.QueryTypes.SELECT, transaction: t }
+          );
+
+          if (!inventarioProducto) {
+            throw Object.assign(
+              new Error(`No se pudo restaurar inventario del producto ${detalle.cod_producto}: no existe registro en inventario`),
+              { statusCode: 409 }
+            );
+          }
+
           await sequelize.query(
             'UPDATE inventario SET stock = stock + :cant, fecha_ult_mov = NOW() WHERE cod_producto = :codProd',
             { replacements: { cant: detalle.cantidad, codProd: detalle.cod_producto }, transaction: t }

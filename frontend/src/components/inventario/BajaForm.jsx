@@ -37,13 +37,13 @@ const formatearEtiquetaUbicacion = (ubicacion) => {
     nivel2 ? `N2:${nivel2}` : null
   ].filter(Boolean).join(' ');
 
-  if (textoDescripcion) return `${traza || 'Ubicacion'} - ${textoDescripcion}`;
-  return traza || `Ubicacion ${ubicacion?.cod_ubicacion ?? ''}`.trim();
+  if (textoDescripcion) return `${traza || 'Ubicación'} - ${textoDescripcion}`;
+  return traza || `Ubicación ${ubicacion?.cod_ubicacion ?? ''}`.trim();
 };
 
 const obtenerMensajeError = (error) => {
   if (!error?.response) {
-    return 'No se pudo conectar con la API. Verifica backend y frontend, luego recarga la pagina.';
+    return 'No se pudo conectar con la API. Verifica backend y frontend, luego recarga la página.';
   }
 
   const status = error?.response?.status;
@@ -52,13 +52,13 @@ const obtenerMensajeError = (error) => {
 
   if (Array.isArray(erroresValidacion) && erroresValidacion.length > 0) {
     const primero = erroresValidacion[0];
-    return primero?.msg || primero?.mensaje || serverMessage || 'Datos invalidos para registrar la baja';
+    return primero?.msg || primero?.mensaje || serverMessage || 'Datos inválidos para registrar la baja';
   }
 
-  if (status === 400) return serverMessage || 'Datos invalidos para registrar la baja';
-  if (status === 404) return serverMessage || 'Producto, ubicacion o inventario no encontrado';
+  if (status === 400) return serverMessage || 'Datos inválidos para registrar la baja';
+  if (status === 404) return serverMessage || 'Producto, ubicación o inventario no encontrado';
   if (status === 409) return serverMessage || 'Stock insuficiente para registrar la baja';
-  if (status === 401) return serverMessage || 'Sesion expirada o invalida. Inicia sesion nuevamente';
+  if (status === 401) return serverMessage || 'Sesión expirada o inválida. Inicia sesión nuevamente';
   if (status === 403) return serverMessage || 'No tienes permisos para registrar bajas';
   if (status >= 500) return serverMessage || 'Error interno del backend al registrar la baja';
   return serverMessage || 'Error inesperado al registrar la baja';
@@ -110,14 +110,14 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
 
       const cantidad = Number(form.cantidad);
       if (!Number.isInteger(cantidad) || cantidad <= 0) {
-        setError('cantidad debe ser un entero mayor a 0');
+        setError('La cantidad debe ser un entero mayor a 0');
         return;
       }
 
       const motivo = String(form.motivo || '').trim();
       const descripcion = String(form.descripcion || '').trim();
       if (!motivo && !descripcion) {
-        setError('Debes ingresar motivo o descripcion');
+        setError('Debes ingresar motivo o descripción');
         return;
       }
 
@@ -139,7 +139,7 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
         }
         cerrarModal();
       } else {
-        setError('Respuesta invalida del servidor al registrar la baja');
+        setError('Respuesta inválida del servidor al registrar la baja');
       }
     } catch (err) {
       setError(obtenerMensajeError(err));
@@ -174,7 +174,7 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
 
               <div className="row g-3">
                 <div className="col-12 col-md-6">
-                  <label className="form-label">Codigo de producto *</label>
+                  <label className="form-label">Código de producto *</label>
                   <select
                     className="form-select"
                     value={form.cod_producto}
@@ -197,7 +197,7 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
                 </div>
 
                 <div className="col-12 col-md-6">
-                  <label className="form-label">Cod. Ubicacion *</label>
+                  <label className="form-label">Cod. Ubicación *</label>
                   <select
                     className="form-select"
                     value={form.cod_ubicacion}
@@ -206,7 +206,7 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
                     required
                   >
                     <option value="">
-                      {loadingUbicaciones ? 'Cargando ubicaciones...' : 'Seleccione una ubicacion activa'}
+                      {loadingUbicaciones ? 'Cargando ubicaciones...' : 'Seleccione una ubicación activa'}
                     </option>
                     {opcionesUbicacion.map((item) => (
                       <option key={item.cod_ubicacion} value={String(item.cod_ubicacion)}>
@@ -215,7 +215,7 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
                     ))}
                   </select>
                   <small className="text-muted">
-                    Este campo se toma del catalogo real de ubicaciones activas.
+                    Este campo se toma del catálogo real de ubicaciones activas.
                   </small>
                 </div>
 
@@ -240,13 +240,13 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
                     className="form-control"
                     value={form.motivo}
                     onChange={(event) => actualizarCampo('motivo', event.target.value)}
-                    placeholder="Ej: Dano en almacenamiento"
+                    placeholder="Ej: Daño en almacenamiento"
                     maxLength={120}
                   />
                 </div>
 
                 <div className="col-12">
-                  <label className="form-label">Descripcion</label>
+                  <label className="form-label">Descripción</label>
                   <textarea
                     className="form-control"
                     rows="3"

@@ -53,8 +53,43 @@ class UsuarioService {
     return this.obtenerPorId(usuario.cod_usuario);
   }
 
-  async actualizar(id, { nombre_usuario, contrasena, cod_rol }) {
+  async actualizar(id, { nombre_usuario, contrasena, cod_rol }, actor = {}) {
     const usuario = await this.obtenerPorId(id);
+    const actorRol = actor?.rol;
+    const actorId = Number(actor?.cod_usuario || 0);
+    const esSuperAdmin = actorRol === 'Super Administrador';
+    const esAdmin = actorRol === 'Administrador';
+    const objetivoEsSuperAdmin = (usuario.roles || []).some((r) => r.nombre_rol === 'Super Administrador');
+
+    if (!esSuperAdmin && !esAdmin) {
+      throw Object.assign(new Error('No tienes permisos para actualizar usuarios'), { statusCode: 403 });
+    }
+
+    if (objetivoEsSuperAdmin && contrasena && contrasena.trim() !== '') {
+      if (!esSuperAdmin || actorId !== Number(id)) {
+        throw Object.assign(new Error('Nadie puede cambiar la contraseña del Super Administrador desde gestión de usuarios'), { statusCode: 403 });
+      }
+      throw Object.assign(new Error('La contraseña del Super Administrador solo puede cambiarse desde su perfil'), { statusCode: 400 });
+    }
+
+    if (esAdmin) {
+      if (objetivoEsSuperAdmin) {
+        throw Object.assign(new Error('No tienes permisos para modificar la cuenta Super Administrador'), { statusCode: 403 });
+      }
+      if (nombre_usuario !== undefined && nombre_usuario !== usuario.nombre_usuario) {
+        throw Object.assign(new Error('Administrador solo puede cambiar contraseñas'), { statusCode: 403 });
+      }
+      if (cod_rol !== undefined) {
+        throw Object.assign(new Error('Administrador no puede cambiar roles de usuario'), { statusCode: 403 });
+      }
+      if (!contrasena || contrasena.trim().length < 6) {
+        throw Object.assign(new Error('Debes ingresar una contraseña válida de al menos 6 caracteres'), { statusCode: 400 });
+      }
+
+      const hash = await bcrypt.hash(contrasena, 12);
+      await usuario.update({ contrasena: hash });
+      return this.obtenerPorId(id);
+    }
 
     if (nombre_usuario && nombre_usuario !== usuario.nombre_usuario) {
       const existe = await Usuario.findOne({ where: { nombre_usuario, cod_usuario: { [Op.ne]: id } } });
@@ -81,12 +116,24 @@ class UsuarioService {
 
   async toggleEstado(id) {
     const usuario = await this.obtenerPorId(id);
+
+    const esCuentaSuperAdmin = (usuario.roles || []).some((rol) => rol.nombre_rol === 'Super Administrador');
+    if (esCuentaSuperAdmin) {
+      throw Object.assign(new Error('La cuenta Super Administrador no puede desactivarse'), { statusCode: 403 });
+    }
+
     await usuario.update({ estado_usuario: !usuario.estado_usuario });
     return this.obtenerPorId(id);
   }
 
   async eliminar(id) {
     const usuario = await this.obtenerPorId(id);
+
+    const esCuentaSuperAdmin = (usuario.roles || []).some((rol) => rol.nombre_rol === 'Super Administrador');
+    if (esCuentaSuperAdmin) {
+      throw Object.assign(new Error('La cuenta Super Administrador no puede eliminarse'), { statusCode: 403 });
+    }
+
     await UsuarioRol.destroy({ where: { cod_usuario: id } });
     await usuario.destroy();
   }

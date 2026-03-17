@@ -1,4 +1,4 @@
-import { Op } from 'sequelize';
+import { Op, ForeignKeyConstraintError } from 'sequelize';
 import Proveedor from '../models/ProveedorModel.js';
 
 class ProveedorService {
@@ -46,7 +46,18 @@ class ProveedorService {
 
   async eliminar(id) {
     const proveedor = await this.obtenerPorId(id);
-    await proveedor.destroy();
+    try {
+      await proveedor.destroy();
+      return { accion: 'eliminado', proveedor: null };
+    } catch (error) {
+      if (error instanceof ForeignKeyConstraintError) {
+        if (proveedor.estado_proveedor) {
+          await proveedor.update({ estado_proveedor: false });
+        }
+        return { accion: 'desactivado', proveedor };
+      }
+      throw error;
+    }
   }
 }
 

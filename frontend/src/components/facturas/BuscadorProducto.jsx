@@ -3,7 +3,7 @@ import { facturaService } from '../../services/serviceIndex.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { FiSearch, FiPackage, FiAlertTriangle, FiX, FiPlus } from 'react-icons/fi';
 import { toast } from 'react-toastify';
-import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
+import { confirmDialog } from '../../utils/notifications.js';
 
 const formatMoney = (v) => {
   const n = parseFloat(v) || 0;
@@ -88,12 +88,15 @@ const BuscadorProducto = ({ onAgregar, itemsActuales = [] }) => {
 
     // Si stock = 0 pero es admin, pedir confirmación
     if (producto.stock <= 0 && esAdmin) {
-      const ok = await confirm({
+      const ok = await confirmDialog({
+        variant: 'stock',
         title: 'Producto sin stock',
-        message: `"${producto.nombre_producto}" tiene stock 0. ¿Desea agregarlo de todas formas? (Permiso de Administrador)`,
-        confirmText: 'Agregar'
+        text: `"${producto.nombre_producto}" tiene stock 0. ¿Agregar de todas formas? (Permiso de Administrador)`,
+        confirmText: 'Sí, agregar'
       });
-      if (!ok) return;
+      if (!ok) {
+        return;
+      }
     }
 
     onAgregar({

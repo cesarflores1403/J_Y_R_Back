@@ -17,6 +17,7 @@ import notasCreditoRoutes from './notasCredito.js';
 import usuariosRoutes from './usuarios.js';
 import ordenesCompraRoutes from './ordenesCompra.js';
 import empresaConfigRoutes from './empresaConfig.js';
+import notificacionesSuperAdminRoutes from './notificacionesSuperAdmin.js';
 
 const router = express.Router();
 
@@ -38,6 +39,7 @@ router.use('/notas-credito', notasCreditoRoutes);
 router.use('/usuarios', usuariosRoutes);
 router.use('/compras', ordenesCompraRoutes);
 router.use('/empresa-config', empresaConfigRoutes);
+router.use('/notificaciones-superadmin', notificacionesSuperAdminRoutes);
 
 export default router;
 

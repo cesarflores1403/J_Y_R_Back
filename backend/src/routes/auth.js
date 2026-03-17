@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { validarCampos } from '../middlewares/validar.js';
 import { autenticar } from '../middlewares/auth.js';
-import { login, perfil, cambiarPassword } from '../controllers/authController.js';
+import { login, perfil, cambiarPassword, solicitarRecuperacion } from '../controllers/authController.js';
 
 const router = Router();
 
@@ -22,5 +22,11 @@ router.put('/cambiar-password', autenticar, [
   body('password_nuevo').isLength({ min: 6 }).withMessage('Mínimo 6 caracteres'),
   validarCampos
 ], cambiarPassword);
+
+// POST /api/auth/solicitar-recuperacion
+router.post('/solicitar-recuperacion', [
+  body('correo').isEmail().withMessage('Correo inválido'),
+  validarCampos
+], solicitarRecuperacion);
 
 export default router;

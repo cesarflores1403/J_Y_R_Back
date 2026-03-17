@@ -3,6 +3,23 @@ import { toast } from 'react-toastify';
 import { FiSave, FiX, FiUserPlus, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
 import { clienteService } from '../../services/serviceIndex.js';
 
+const REGEX_TEXTO_CON_PUNTO = /^[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ.\s]+$/;
+const REGEX_CORREO_PERMITIDO = /^[A-Za-z0-9@.]+$/;
+
+const sanitizarTextoConPunto = (valor = '', maximo = 100) => (
+  valor
+    .replace(/[^A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ.\s]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .slice(0, maximo)
+);
+
+const sanitizarCorreo = (valor = '', maximo = 30) => (
+  valor
+    .replace(/[^A-Za-z0-9@.]/g, '')
+    .toLowerCase()
+    .slice(0, maximo)
+);
+
 // ==========================================
 // MODAL CREACIÓN/EDICIÓN RÁPIDA DE CLIENTE
 // Usado desde NuevaFactura (HU-FAC-11)
@@ -97,8 +114,12 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
   const validar = () => {
     const errs = {};
     if (!form.nombre.trim()) errs.nombre = 'El nombre es requerido';
+    if (form.empresa && !REGEX_TEXTO_CON_PUNTO.test(form.empresa.trim())) errs.empresa = 'La empresa solo permite letras, números, espacios y punto';
+    if (form.correo && !REGEX_CORREO_PERMITIDO.test(form.correo.trim())) errs.correo = 'El correo solo permite letras, números, @ y punto';
     if (form.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo)) errs.correo = 'Correo inválido';
     if (form.dni && form.dni.trim().length < 5) errs.dni = 'El DNI debe tener al menos 5 caracteres';
+    if (form.direccion && form.direccion.trim().length > 60) errs.direccion = 'La dirección no puede exceder 60 caracteres';
+    if (form.direccion && !REGEX_TEXTO_CON_PUNTO.test(form.direccion.trim())) errs.direccion = 'La dirección solo permite letras, números, espacios y punto';
     setErrores(errs);
     return Object.keys(errs).length === 0;
   };
@@ -212,10 +233,12 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
           </div>
           <div className="col-6">
             <label className="form-label small mb-1">Empresa</label>
-            <input type="text" className="form-control form-control-sm"
-              value={form.empresa} onChange={e => handleChange('empresa', e.target.value)}
+            <input type="text" className={`form-control form-control-sm ${errores.empresa ? 'is-invalid' : ''}`}
+              value={form.empresa} onChange={e => handleChange('empresa', sanitizarTextoConPunto(e.target.value, 15))}
+              maxLength={15}
               placeholder="Empresa (opcional)"
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+            {errores.empresa && <div className="invalid-feedback">{errores.empresa}</div>}
           </div>
           <div className="col-6">
             <label className="form-label small mb-1">Teléfono</label>
@@ -227,17 +250,20 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
           <div className="col-6">
             <label className="form-label small mb-1">Correo</label>
             <input type="email" className={`form-control form-control-sm ${errores.correo ? 'is-invalid' : ''}`}
-              value={form.correo} onChange={e => handleChange('correo', e.target.value)}
+              value={form.correo} onChange={e => handleChange('correo', sanitizarCorreo(e.target.value, 30))}
+              maxLength={30}
               placeholder="correo@ejemplo.com"
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
             {errores.correo && <div className="invalid-feedback">{errores.correo}</div>}
           </div>
           <div className="col-12">
             <label className="form-label small mb-1">Dirección</label>
-            <input type="text" className="form-control form-control-sm"
-              value={form.direccion} onChange={e => handleChange('direccion', e.target.value)}
+            <input type="text" className={`form-control form-control-sm ${errores.direccion ? 'is-invalid' : ''}`}
+              value={form.direccion} onChange={e => handleChange('direccion', sanitizarTextoConPunto(e.target.value, 60))}
+              maxLength={60}
               placeholder="Dirección (opcional)"
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+            {errores.direccion && <div className="invalid-feedback">{errores.direccion}</div>}
           </div>
         </div>
 

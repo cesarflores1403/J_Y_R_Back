@@ -7,6 +7,7 @@ import {
   FiChevronLeft, FiChevronRight, FiPackage, FiRefreshCw, FiX
 } from 'react-icons/fi';
 import { notaCreditoService, facturaService } from '../../services/serviceIndex.js';
+import { confirmDialog } from '../../utils/notifications.js';
 
 // =====================================================
 // COMPONENTE: Notas de Crédito (HU-FAC-12)
@@ -154,11 +155,11 @@ const DetalleNotaCredito = ({ codNota, onVolver, onRecargar }) => {
   }, [codNota]);
 
   const handleAnular = async () => {
-    const ok = await confirm({
+    const ok = await confirmDialog({
+      variant: 'cancel',
       title: 'Anular nota de crédito',
-      message: '¿Está seguro de anular esta nota de crédito? Se revertirá el inventario si fue restaurado.',
-      confirmText: 'Anular',
-      tone: 'danger'
+      text: '¿Está seguro de anular esta nota de crédito? Se revertirá el inventario si fue restaurado.',
+      confirmText: 'Sí, anular'
     });
     if (!ok) return;
     setAnulando(true);

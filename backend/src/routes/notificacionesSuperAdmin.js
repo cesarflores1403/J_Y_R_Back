@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { autenticar, autorizar } from '../middlewares/auth.js';
-import { listar, tiposEvento, exportarExcel } from '../controllers/bitacoraFacturacionController.js';
+import { listar, marcarLeida, marcarTodasLeidas } from '../controllers/notificacionSuperAdminController.js';
 
 const router = Router();
 
@@ -8,8 +8,7 @@ router.use(autenticar);
 router.use(autorizar('Administrador'));
 
 router.get('/', listar);
-router.get('/tipos-evento', tiposEvento);
-router.get('/exportar-excel', exportarExcel);
-router.get('/exportar-csv', exportarExcel);
+router.patch('/:id/leida', marcarLeida);
+router.patch('/marcar-todas/leidas', marcarTodasLeidas);
 
 export default router;

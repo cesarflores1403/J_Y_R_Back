@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import Usuario from '../models/Usuario.js';
 import Rol from '../models/Rol.js';
+import notificacionSuperAdminService from './notificacionSuperAdminService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'CAMBIA_ESTE_SECRET_EN_ENV';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || process.env.JWT_EXPIRE || '8h';
@@ -62,6 +63,14 @@ class AuthService {
     const hash = await bcrypt.hash(passwordNuevo, 12);
     await usuario.update({ contrasena: hash, actualizado_en: new Date() });
     return { mensaje: 'Contraseña actualizada correctamente' };
+  }
+
+  async solicitarRecuperacion(correo) {
+    const correoLimpio = (correo || '').trim();
+    await notificacionSuperAdminService.crearSolicitudRecuperacion(correoLimpio);
+    return {
+      mensaje: 'En estos momentos le notificamos al administrador que solicitó el cambio de contraseña.'
+    };
   }
 }
 

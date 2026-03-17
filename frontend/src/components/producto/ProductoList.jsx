@@ -1,11 +1,11 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+﻿import { useState, useMemo, useRef, useEffect } from 'react';
 import { FiEdit2, FiTrash2, FiSearch, FiChevronUp, FiChevronDown, FiFilter, FiCamera, FiX, FiEye, FiCopy, FiPackage } from 'react-icons/fi';
 import Pagination from '../common/Pagination.jsx';
-import { useCategorias } from '../../hooks/useCategorias.js'; // // HU-07: Categorías dinámicas
-import { toast } from 'react-toastify';
+import { useCategorias } from '../../hooks/useCategorias.js'; // // HU-07: Categorias dinamicas
+import { alertDialog, confirmDialog } from '../../utils/notifications.js';
 
 // =====================================================
-// HU-06: Listado con búsqueda, filtros, paginación y ordenamiento
+// HU-06: Listado con busqueda, filtros, paginacion y ordenamiento
 // =====================================================
 
 const ITEMS_PER_PAGE = 6;
@@ -18,13 +18,13 @@ const estadoBadge = {
 };
 
 const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCambiarEstadoMasivo, onSubirImagen, onEliminarImagen, onVerFicha, onDuplicate }) => {
-  // HU-07: Categorías dinámicas desde BD
+  // HU-07: Categorias dinamicas desde BD
   const { categorias } = useCategorias();
   const fileInputRef = useRef(null); // // HU-08: ref para input file oculto
   const [uploadTarget, setUploadTarget] = useState(null); // // HU-08: producto al que se le sube imagen
   const [hoverImg, setHoverImg] = useState(null); // // HU-08: hover preview { src, x, y }
 
-  // Mapa de categorías para lookup rápido
+  // Mapa de categorias para lookup rapido
   const categoriasMap = useMemo(() => {
     const map = {};
     categorias.forEach(c => { map[c.cod_categoria] = c.nombre_categoria; });
@@ -32,7 +32,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
   }, [categorias]);
 
   // =====================================================
-  // ESTADOS: búsqueda, filtros, ordenamiento, paginación
+  // ESTADOS: busqueda, filtros, ordenamiento, paginacion
   // =====================================================
   const [busqueda, setBusqueda] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
@@ -40,7 +40,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
   const [ordenarPor, setOrdenarPor] = useState('cod_producto');
   const [ordenDir, setOrdenDir] = useState('asc');
   const [pagina, setPagina] = useState(1);
-  const [seleccionados, setSeleccionados] = useState([]); // HU-15: selección múltiple
+  const [seleccionados, setSeleccionados] = useState([]); // HU-15: seleccion multiple
   const [estadoMasivo, setEstadoMasivo] = useState(''); // HU-15: nuevo estado masivo
   const [confirmModal, setConfirmModal] = useState({
     open: false,
@@ -57,13 +57,13 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
   };
 
   // =====================================================
-  // 1. FILTRAR: búsqueda + categoría + estado
+  // 1. FILTRAR: busqueda + categoria + estado
   // =====================================================
   const productosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
 
     return productos.filter((p) => {
-      // Búsqueda por código o nombre
+      // Busqueda por codigo o nombre
       if (q) {
         const codigo = (p.codigo_producto || `PROD-${String(p.cod_producto).padStart(4, '0')}`).toLowerCase();
         const nombre = (p.nombre_producto || '').toLowerCase();
@@ -73,7 +73,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
         }
       }
 
-      // Filtro por categoría
+      // Filtro por categoria
       if (filtroCategoria && Number(p.cod_categoria) !== Number(filtroCategoria)) {
         return false;
       }
@@ -136,7 +136,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
     return productosPagina.filter((p) => getEstado(p) !== estadoMasivo);
   }, [productosPagina, estadoMasivo]);
 
-  // Si ya se eligió un estado masivo, quitar de la selección los que ya están en ese estado
+  // Si ya se eligio un estado masivo, quitar de la seleccion los que ya estan en ese estado
   useEffect(() => {
     if (!estadoMasivo) return;
 
@@ -147,7 +147,78 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
     }));
   }, [estadoMasivo, productos]);
 
-  // Reset página al cambiar filtros/búsqueda
+  // Limpiar seleccionados que ya no existen en la lista actual
+  useEffect(() => {
+    setSeleccionados((prev) => prev.filter((id) => productos.some((p) => p.cod_producto === id)));
+  }, [productos]);
+
+  const elegiblesPaginaIds = useMemo(
+    () => productosPaginaElegibles.map((p) => p.cod_producto),
+    [productosPaginaElegibles]
+  );
+
+  const sinElegiblesEnPagina = elegiblesPaginaIds.length === 0;
+  const todosSeleccionadosPagina =
+    elegiblesPaginaIds.length > 0 && elegiblesPaginaIds.every((id) => seleccionados.includes(id));
+
+  const toggleSeleccion = (codProducto) => {
+    setSeleccionados((prev) => (
+      prev.includes(codProducto)
+        ? prev.filter((id) => id !== codProducto)
+        : [...prev, codProducto]
+    ));
+  };
+
+  const toggleSeleccionPagina = () => {
+    if (sinElegiblesEnPagina) return;
+
+    setSeleccionados((prev) => {
+      if (todosSeleccionadosPagina) {
+        return prev.filter((id) => !elegiblesPaginaIds.includes(id));
+      }
+
+      const merged = new Set(prev);
+      elegiblesPaginaIds.forEach((id) => merged.add(id));
+      return Array.from(merged);
+    });
+  };
+
+  const cerrarConfirmModal = () => {
+    setConfirmModal({
+      open: false,
+      title: '',
+      message: '',
+      confirmText: 'Confirmar',
+      action: null,
+    });
+  };
+
+  const confirmarAccion = async () => {
+    if (typeof confirmModal.action === 'function') {
+      await confirmModal.action();
+    }
+    cerrarConfirmModal();
+  };
+
+  const ejecutarCambioMasivo = () => {
+    if (!estadoMasivo || seleccionados.length === 0 || !onCambiarEstadoMasivo) return;
+
+    setConfirmModal({
+      open: true,
+      title: 'Confirmar cambio masivo',
+      message: `Se actualizará el estado de ${seleccionados.length} producto(s) a "${estadoMasivo}".`,
+      confirmText: 'Sí, actualizar',
+      action: async () => {
+        const resultado = await onCambiarEstadoMasivo(seleccionados, estadoMasivo);
+        if (resultado) {
+          setSeleccionados([]);
+          setEstadoMasivo('');
+        }
+      },
+    });
+  };
+
+  // Reset pagina al cambiar filtros/busqueda
   const handleBusqueda = (val) => {
     setBusqueda(val);
     setPagina(1);
@@ -190,79 +261,33 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
     setPagina(1);
   };
 
-  const handleDelete = (p) => {
+  const handleDelete = async (p) => {
     const codigo = p.codigo_producto || `PROD-${String(p.cod_producto).padStart(4, '0')}`;
-
-    setConfirmModal({
-      open: true,
+    const ok = await confirmDialog({
+      variant: 'delete',
       title: 'Eliminar producto',
-      message: `¿Está seguro de eliminar el producto ${codigo} - ${p.nombre_producto}? Esta acción no se puede deshacer.`,
-      confirmText: 'Eliminar',
-      action: () => onDelete && onDelete({ cod_producto: p.cod_producto })
+      text: `¿Eliminar el producto ${codigo} - ${p.nombre_producto}?`,
+      confirmText: 'Sí, eliminar'
     });
+    if (!ok) return;
+    if (onDelete) onDelete({ cod_producto: p.cod_producto });
   };
 
-  const handleEstadoChange = (p, nuevoEstado) => {
+  const handleEstadoChange = async (p, nuevoEstado) => {
     if (nuevoEstado === getEstado(p)) return;
     const mensajes = {
       Inactivo: `¿Está seguro de inactivar "${p.nombre_producto}"? Ya no estará disponible para venta.`,
       Descontinuado: `¿Está seguro de marcar "${p.nombre_producto}" como descontinuado? No se podrá vender.`,
       Activo: `¿Está seguro de reactivar "${p.nombre_producto}"? Volverá a estar disponible para venta.`,
     };
-    setConfirmModal({
-      open: true,
+    const ok = await confirmDialog({
+      variant: nuevoEstado === 'Activo' ? 'restore' : 'deactivate',
       title: 'Cambiar estado',
-      message: mensajes[nuevoEstado] || `¿Cambiar estado a "${nuevoEstado}"?`,
-      confirmText: 'Cambiar',
-      action: () => onCambiarEstado && onCambiarEstado(p.cod_producto, nuevoEstado)
+      text: mensajes[nuevoEstado] || `¿Cambiar estado a "${nuevoEstado}"?`,
+      confirmText: 'Sí, cambiar'
     });
-  };
-
-  // =====================================================
-  // HU-15: Selección múltiple + acción masiva
-  // =====================================================
-  const toggleSeleccion = (codProducto) => {
-    setSeleccionados((prev) =>
-      prev.includes(codProducto)
-        ? prev.filter((id) => id !== codProducto)
-        : [...prev, codProducto]
-    );
-  };
-
-  const todosSeleccionadosPagina = productosPaginaElegibles.length > 0
-    && productosPaginaElegibles.every((p) => seleccionados.includes(p.cod_producto));
-
-  const sinElegiblesEnPagina = productosPaginaElegibles.length === 0;
-
-  const toggleSeleccionPagina = () => {
-    if (todosSeleccionadosPagina) {
-      setSeleccionados((prev) => prev.filter((id) => !productosPaginaElegibles.some((p) => p.cod_producto === id)));
-      return;
-    }
-
-    setSeleccionados((prev) => {
-      const set = new Set(prev);
-      productosPaginaElegibles.forEach((p) => set.add(p.cod_producto));
-      return Array.from(set);
-    });
-  };
-
-  const ejecutarCambioMasivo = async () => {
-    if (!estadoMasivo || seleccionados.length === 0 || !onCambiarEstadoMasivo) return;
-
-    setConfirmModal({
-      open: true,
-      title: 'Cambio masivo de estado',
-      message: `Se cambiará el estado de ${seleccionados.length} producto(s) a "${estadoMasivo}". ¿Desea continuar?`,
-      confirmText: 'Aplicar cambios',
-      action: async () => {
-        const res = await onCambiarEstadoMasivo(seleccionados, estadoMasivo);
-        if (res) {
-          setSeleccionados([]);
-          setEstadoMasivo('');
-        }
-      }
-    });
+    if (!ok) return;
+    if (onCambiarEstado) onCambiarEstado(p.cod_producto, nuevoEstado);
   };
 
   // =====================================================
@@ -275,21 +300,29 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !uploadTarget) return;
 
     // Validar tipo
     const tiposPermitidos = ['image/jpeg', 'image/png'];
     if (!tiposPermitidos.includes(file.type)) {
-      toast.error('Solo se permiten imágenes JPG o PNG.');
+      await alertDialog({
+        title: 'Formato no permitido',
+        text: 'Solo se permiten imágenes JPG o PNG.',
+        icon: 'error'
+      });
       e.target.value = '';
       return;
     }
 
-    // Validar tamaño (2 MB)
+    // Validar tamano (2 MB)
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('La imagen no puede exceder 2 MB.');
+      await alertDialog({
+        title: 'Archivo demasiado grande',
+        text: 'La imagen no puede exceder 2 MB.',
+        icon: 'warning'
+      });
       e.target.value = '';
       return;
     }
@@ -299,32 +332,21 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
     setUploadTarget(null);
   };
 
-  const handleEliminarImagen = (p) => {
+  const handleEliminarImagen = async (p) => {
     const codigo = p.codigo_producto || `PROD-${String(p.cod_producto).padStart(4, '0')}`;
-    setConfirmModal({
-      open: true,
+    const ok = await confirmDialog({
+      variant: 'delete',
       title: 'Eliminar imagen',
-      message: `¿Está seguro de eliminar la imagen del producto ${codigo}?`,
-      confirmText: 'Eliminar imagen',
-      action: () => onEliminarImagen && onEliminarImagen(p.cod_producto)
+      text: `¿Eliminar la imagen del producto ${codigo}?`,
+      confirmText: 'Sí, eliminar'
     });
-  };
-
-  const cerrarConfirmModal = () => {
-    setConfirmModal({ open: false, title: '', message: '', confirmText: 'Confirmar', action: null });
-  };
-
-  const confirmarAccion = async () => {
-    const action = confirmModal.action;
-    cerrarConfirmModal();
-    if (typeof action === 'function') {
-      await action();
-    }
+    if (!ok) return;
+    if (onEliminarImagen) onEliminarImagen(p.cod_producto);
   };
 
   return (
     <div className="jyr-card">
-      {/* HEADER: título + contadores */}
+      {/* HEADER: titulo + contadores */}
       <div className="jyr-card-header" style={{ flexWrap: 'wrap', gap: 8 }}>
         <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><FiPackage size={16} /> Listado de Productos</h3>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -335,7 +357,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
         </div>
       </div>
 
-      {/* BARRA DE BÚSQUEDA Y FILTROS */}
+      {/* BARRA DE BUSQUEDA Y FILTROS */}
       <div style={{
         padding: '12px 16px',
         borderBottom: '1px solid var(--jyr-gray-200)',
@@ -356,7 +378,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
           />
         </div>
 
-        {/* Filtro categoría */}
+        {/* Filtro categoria */}
         <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 4 }}>
           <FiFilter size={13} style={{ color: 'var(--jyr-gray-400)' }} />
           <select
@@ -719,7 +741,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
         </table>
       </div>
 
-      {/* PAGINACIÓN + INFO */}
+      {/* PAGINACION + INFO */}
       {productosFiltrados.length > 0 && (
         <div style={{
           padding: '10px 16px',
@@ -728,7 +750,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
           flexWrap: 'wrap', gap: 8
         }}>
           <span style={{ fontSize: 12, color: 'var(--jyr-gray-500)' }}>
-            Mostrando {((pagina - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(pagina * ITEMS_PER_PAGE, productosFiltrados.length)} de {productosFiltrados.length}
+            Mostrando {((pagina - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(pagina * ITEMS_PER_PAGE, productosFiltrados.length)} de {productosFiltrados.length}
           </span>
           <Pagination
             pagina={pagina}

@@ -3,8 +3,25 @@ import { clienteService } from '../../services/serviceIndex.js';
 import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX } from 'react-icons/fi';
+import { confirmDialog } from '../../utils/notifications.js';
 
 const camposIniciales = { nombre: '', apellido: '', dni: '', empresa: '', telefono: '', correo: '', direccion: '' };
+const REGEX_TEXTO_CON_PUNTO = /^[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ.\s]+$/;
+const REGEX_CORREO_PERMITIDO = /^[A-Za-z0-9@.]+$/;
+
+const sanitizarTextoConPunto = (valor = '', maximo = 100) => (
+  valor
+    .replace(/[^A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ.\s]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .slice(0, maximo)
+);
+
+const sanitizarCorreo = (valor = '', maximo = 30) => (
+  valor
+    .replace(/[^A-Za-z0-9@.]/g, '')
+    .toLowerCase()
+    .slice(0, maximo)
+);
 
 const Clientes = () => {
   const confirm = useConfirm();
@@ -62,11 +79,15 @@ const Clientes = () => {
     if (!/^\d{13}$/.test(form.dni.trim())) return toast.warn('El DNI debe tener exactamente 13 dígitos numéricos');
     if (!form.empresa.trim()) return toast.warn('La empresa es obligatoria');
     if (form.empresa.trim().length > 15) return toast.warn('La empresa no puede exceder 15 caracteres');
+    if (!REGEX_TEXTO_CON_PUNTO.test(form.empresa.trim())) return toast.warn('La empresa solo permite letras, números, espacios y punto');
     if (!form.telefono.trim()) return toast.warn('El teléfono es obligatorio');
     if (!/^\d{8}$/.test(form.telefono.trim())) return toast.warn('El teléfono debe tener exactamente 8 dígitos numéricos');
     if (!form.correo.trim()) return toast.warn('El correo es obligatorio');
+    if (!REGEX_CORREO_PERMITIDO.test(form.correo.trim())) return toast.warn('El correo solo permite letras, números, @ y punto');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())) return toast.warn('El correo no tiene un formato válido');
     if (!form.direccion.trim()) return toast.warn('La dirección es obligatoria');
-    if (form.direccion.trim().length > 40) return toast.warn('La dirección no puede exceder 40 caracteres');
+    if (form.direccion.trim().length > 60) return toast.warn('La dirección no puede exceder 60 caracteres');
+    if (!REGEX_TEXTO_CON_PUNTO.test(form.direccion.trim())) return toast.warn('La dirección solo permite letras, números, espacios y punto');
 
     setGuardando(true);
     try {
@@ -87,11 +108,11 @@ const Clientes = () => {
   };
 
   const eliminar = async (id) => {
-    const ok = await confirm({
+    const ok = await confirmDialog({
+      variant: 'delete',
       title: 'Eliminar cliente',
-      message: '¿Está seguro de eliminar este cliente?',
-      confirmText: 'Eliminar',
-      tone: 'danger'
+      text: '¿Eliminar este cliente?',
+      confirmText: 'Sí, eliminar'
     });
     if (!ok) return;
     try {
@@ -207,7 +228,7 @@ const Clientes = () => {
                     <div className="col-md-4">
                       <label className="form-label">Empresa *</label>
                       <input type="text" className="form-control" value={form.empresa}
-                        onChange={(e) => setForm({...form, empresa: e.target.value})} required maxLength={15} />
+                        onChange={(e) => setForm({...form, empresa: sanitizarTextoConPunto(e.target.value, 15)})} required maxLength={15} />
                       <small className="text-muted">{form.empresa.length}/15</small>
                     </div>
                     <div className="col-md-4">
@@ -220,13 +241,13 @@ const Clientes = () => {
                     <div className="col-md-6">
                       <label className="form-label">Correo *</label>
                       <input type="email" className="form-control" value={form.correo}
-                        onChange={(e) => setForm({...form, correo: e.target.value})} required />
+                        onChange={(e) => setForm({...form, correo: sanitizarCorreo(e.target.value, 30)})} required maxLength={30} />
                     </div>
                     <div className="col-md-6">
                       <label className="form-label">Dirección *</label>
                       <input type="text" className="form-control" value={form.direccion}
-                        onChange={(e) => setForm({...form, direccion: e.target.value})} required maxLength={40} />
-                      <small className="text-muted">{form.direccion.length}/40</small>
+                        onChange={(e) => setForm({...form, direccion: sanitizarTextoConPunto(e.target.value, 60)})} required maxLength={60} />
+                      <small className="text-muted">{form.direccion.length}/60</small>
                     </div>
                   </div>
                 </div>

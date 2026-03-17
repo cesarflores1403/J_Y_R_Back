@@ -8,13 +8,23 @@ const Reportes = () => {
   const [tab, setTab] = useState('ventas');
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(false);
+  const [periodoVentas, setPeriodoVentas] = useState('mensual');
 
-  const cargar = async (tipo) => {
+  const periodosDisponibles = [
+    { value: 'diaria', label: 'Diaria' },
+    { value: 'semanal', label: 'Semanal' },
+    { value: 'quincenal', label: 'Quincenal' },
+    { value: 'mensual', label: 'Mensual' },
+    { value: 'trimestral', label: 'Trimestral' },
+    { value: 'anual', label: 'Anual' }
+  ];
+
+  const cargar = async (tipo, periodo) => {
     setCargando(true);
     setDatos(null);
     try {
       let response;
-      if (tipo === 'ventas') response = await reporteService.ventas();
+      if (tipo === 'ventas') response = await reporteService.ventas({ periodo });
       else if (tipo === 'productos') response = await reporteService.productosVendidos();
       else if (tipo === 'inventario') response = await reporteService.inventario();
 
@@ -26,7 +36,13 @@ const Reportes = () => {
     }
   };
 
-  useEffect(() => { cargar(tab); }, [tab]);
+  useEffect(() => {
+    if (tab === 'ventas') {
+      cargar(tab, periodoVentas);
+      return;
+    }
+    cargar(tab);
+  }, [tab, periodoVentas]);
 
   const tabs = [
     { key: 'ventas', label: 'Ventas', icon: <FiDollarSign /> },
@@ -57,6 +73,28 @@ const Reportes = () => {
           {/* VENTAS */}
           {tab === 'ventas' && datos && (
             <div>
+              <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <div>
+                  <label className="form-label mb-1">Período</label>
+                  <select
+                    className="form-select"
+                    style={{ minWidth: 220 }}
+                    value={periodoVentas}
+                    onChange={(e) => setPeriodoVentas(e.target.value)}
+                  >
+                    {periodosDisponibles.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="text-muted" style={{ fontSize: 13 }}>
+                  <strong>{datos.periodoDescripcion || 'Período'}</strong>
+                  {datos.rango?.fecha_inicio && datos.rango?.fecha_fin
+                    ? ` (${datos.rango.fecha_inicio} a ${datos.rango.fecha_fin})`
+                    : ''}
+                </div>
+              </div>
+
               <div className="row g-3 mb-4">
                 <div className="col-md-3"><div className="jyr-stat-card">
                   <div className="stat-label">Total Facturas</div>

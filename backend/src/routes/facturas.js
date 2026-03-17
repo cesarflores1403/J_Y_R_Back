@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { autenticar, autorizar } from '../middlewares/auth.js';
 import { validarCampos } from '../middlewares/validar.js';
-import { listar, obtener, crear, anular, eliminar, productosDisponibles, clientesDisponibles } from '../controllers/facturaController.js';
+import { listar, obtener, crear, anular, productosDisponibles, clientesDisponibles } from '../controllers/facturaController.js';
 
 const router = Router();
 
@@ -39,8 +39,5 @@ const validarAnularFactura = [
   validarCampos
 ];
 router.patch('/:id/anular', autorizar('Administrador'), validarAnularFactura, anular);
-
-// Solo Administrador puede eliminar permanentemente
-router.delete('/:id', autorizar('Administrador'), eliminar);
 
 export default router;

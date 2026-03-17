@@ -73,8 +73,8 @@ const AuditoriaFacturacion = () => {
 
   useEffect(() => { cargar(1); }, [cargar]);
 
-  // Exportar CSV
-  const exportarCSV = async () => {
+  // Exportar Excel
+  const exportarExcel = async () => {
     setExportando(true);
     try {
       const params = {};
@@ -84,15 +84,18 @@ const AuditoriaFacturacion = () => {
       if (filtroFechaHasta) params.fecha_hasta = filtroFechaHasta;
       if (filtroBuscar) params.buscar = filtroBuscar;
 
-      const resp = await auditoriaFacturacionService.exportarCSV(params);
-      const blob = new Blob([resp.data], { type: 'text/csv;charset=utf-8;' });
+      const resp = await auditoriaFacturacionService.exportarExcel(params);
+      const blob = new Blob(
+        [resp.data],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+      );
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `auditoria_facturacion_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `auditoria_facturacion_${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       window.URL.revokeObjectURL(url);
-      toast.success('CSV exportado correctamente');
+      toast.success('Excel exportado correctamente');
     } catch (err) {
       toast.error('Error al exportar: ' + (err.response?.data?.mensaje || err.message));
     } finally {
@@ -122,11 +125,11 @@ const AuditoriaFacturacion = () => {
   const renderDetalle = (detalle) => {
     if (!detalle) return <span className="text-muted">Sin detalle</span>;
     return (
-      <div style={{ fontSize: '0.78rem', maxHeight: 200, overflow: 'auto' }}>
+      <div style={{ fontSize: '0.82rem', maxHeight: 220, overflow: 'auto' }}>
         {Object.entries(detalle).map(([key, val]) => (
           <div key={key} className="mb-1">
-            <strong style={{ color: '#aaa' }}>{key}:</strong>{' '}
-            <span style={{ color: '#e0e0e0' }}>
+            <strong className="text-muted" style={{ fontSize: '0.75rem' }}>{key}:</strong>{' '}
+            <span className="text-dark">
               {typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val)}
             </span>
           </div>
@@ -149,16 +152,16 @@ const AuditoriaFacturacion = () => {
           <button className="btn btn-outline-info btn-sm" onClick={() => setMostrarFiltros(!mostrarFiltros)}>
             <FiFilter className="me-1" />{mostrarFiltros ? 'Ocultar' : 'Filtros'}
           </button>
-          <button className="btn btn-outline-success btn-sm" onClick={exportarCSV} disabled={exportando || total === 0}>
+          <button className="btn btn-outline-success btn-sm" onClick={exportarExcel} disabled={exportando || total === 0}>
             {exportando ? <span className="spinner-border spinner-border-sm me-1" /> : <FiDownload className="me-1" />}
-            Exportar CSV
+            Exportar Excel
           </button>
         </div>
       </div>
 
       {/* Panel de filtros */}
       {mostrarFiltros && (
-        <div className="jyr-card mb-3" style={{ border: '1px solid #333' }}>
+        <div className="jyr-card mb-3">
           <div className="jyr-card-body">
             <div className="row g-2 align-items-end">
               <div className="col-md-2">
@@ -221,15 +224,15 @@ const AuditoriaFacturacion = () => {
             </div>
           ) : (
             <div className="table-responsive">
-              <table className="table table-dark table-hover mb-0" style={{ fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #444' }}>
+              <table className="table table-hover mb-0" style={{ fontSize: '0.9rem' }}>
+                <thead className="table-light">
+                  <tr>
                     <th style={{ width: 60 }}>#</th>
-                    <th style={{ width: 180 }}>Evento</th>
-                    <th style={{ width: 130 }}>Factura</th>
+                    <th>Evento</th>
+                    <th style={{ width: 140 }}>Factura</th>
                     <th>Usuario</th>
-                    <th style={{ width: 180 }}>Fecha</th>
-                    <th style={{ width: 80 }} className="text-center">Detalle</th>
+                    <th style={{ width: 190 }}>Fecha</th>
+                    <th style={{ width: 95 }} className="text-center">Detalle</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -265,7 +268,7 @@ const AuditoriaFacturacion = () => {
                         </tr>
                         {isExpanded && reg.detalle && (
                           <tr>
-                            <td colSpan={6} style={{ background: '#1a1a2e', borderLeft: `3px solid ${cfg.color}`, padding: '12px 20px' }}>
+                            <td colSpan={6} style={{ background: '#f8f9fa', borderLeft: `3px solid ${cfg.color}`, padding: '12px 20px' }}>
                               {renderDetalle(reg.detalle)}
                             </td>
                           </tr>

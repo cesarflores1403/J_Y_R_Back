@@ -291,6 +291,11 @@ const Existencias = () => {
   };
 
   const guardarMinMax = async (payload) => {
+    if (!seleccionado?.cod_inventario) {
+      setErrorForm('No se encontró la existencia seleccionada para actualizar');
+      return;
+    }
+
     try {
       setSaving(true);
       setErrorForm('');

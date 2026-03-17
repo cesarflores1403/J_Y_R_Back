@@ -46,15 +46,15 @@ const AlertasReposicionTabla = ({ filas, loading }) => {
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Ubicacion</th>
+                <th>Ubicación</th>
                 <th>Stock</th>
                 <th>Reservado</th>
                 <th>Disponible</th>
-                <th>Minimo</th>
-                <th>Maximo</th>
+                <th>Mínimo</th>
+                <th>Máximo</th>
                 <th>Estado</th>
                 <th>Nivel alerta</th>
-                <th>Fecha ult. mov.</th>
+                <th>Fecha últ. mov.</th>
               </tr>
             </thead>
             <tbody>
@@ -63,13 +63,13 @@ const AlertasReposicionTabla = ({ filas, loading }) => {
                   <td colSpan="10" className="text-center py-4">
                     {/* // Indicador de carga de alertas */}
                     <div className="spinner-border spinner-border-sm me-2" />
-                    Cargando alertas de reposicion...
+                    Cargando alertas de reposición...
                   </td>
                 </tr>
               ) : filas.length === 0 ? (
                 <tr>
                   <td colSpan="10" className="text-center text-muted py-4">
-                    No hay alertas de reposicion con los filtros aplicados
+                    No hay alertas de reposición con los filtros aplicados
                   </td>
                 </tr>
               ) : (

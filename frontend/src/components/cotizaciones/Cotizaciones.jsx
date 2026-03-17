@@ -7,6 +7,7 @@ import {
   FiPlus, FiSearch, FiX, FiTrash2, FiEye, FiClipboard, FiArrowLeft,
   FiPrinter, FiAlertTriangle, FiXCircle, FiRefreshCw, FiPackage, FiCheckCircle
 } from 'react-icons/fi';
+import { confirmDialog } from '../../utils/notifications.js';
 import logoClean from '../../assets/img/logo2.jpeg';
 import logoFull from '../../assets/img/logo1.jpeg';
 
@@ -60,11 +61,11 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
   const [modalGestion, setModalGestion] = useState(null);
 
   const anular = async (id) => {
-    const ok = await confirm({
+    const ok = await confirmDialog({
+      variant: 'cancel',
       title: 'Anular cotización',
-      message: '¿Está seguro de anular esta cotización? Esta acción no se puede deshacer.',
-      confirmText: 'Anular',
-      tone: 'danger'
+      text: '¿Anular esta cotización? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, anular'
     });
     if (!ok) return;
     try {
@@ -77,11 +78,11 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
   };
 
   const eliminar = async (id) => {
-    const ok = await confirm({
+    const ok = await confirmDialog({
+      variant: 'delete',
       title: 'Eliminar cotización',
-      message: '¿Está seguro de eliminar permanentemente esta cotización? Esta acción no se puede deshacer.',
-      confirmText: 'Eliminar',
-      tone: 'danger'
+      text: '¿Eliminar permanentemente esta cotización? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, eliminar'
     });
     if (!ok) return;
     try {
@@ -94,10 +95,11 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
   };
 
   const convertir = async (id) => {
-    const ok = await confirm({
-      title: 'Convertir cotización',
-      message: '¿Desea convertir esta cotización en factura? Se descontará del inventario.',
-      confirmText: 'Convertir'
+    const ok = await confirmDialog({
+      variant: 'convert',
+      title: 'Convertir a factura',
+      text: '¿Convertir esta cotización en factura? Se descontará del inventario.',
+      confirmText: 'Sí, convertir'
     });
     if (!ok) return;
     try {
@@ -257,10 +259,11 @@ const DetalleCotizacion = ({ codCotizacion, onVolver, onConvertida }) => {
   const handlePrint = () => window.print();
 
   const handleConvertir = async () => {
-    const ok = await confirm({
-      title: 'Convertir cotización',
-      message: '¿Desea convertir esta cotización en factura? Se descontará del inventario.',
-      confirmText: 'Convertir'
+    const ok = await confirmDialog({
+      variant: 'convert',
+      title: 'Convertir a factura',
+      text: '¿Convertir esta cotización en factura? Se descontará del inventario.',
+      confirmText: 'Sí, convertir'
     });
     if (!ok) return;
     try {
@@ -322,7 +325,7 @@ const DetalleCotizacion = ({ codCotizacion, onVolver, onConvertida }) => {
               </div>
             </div>
             <div className="inv-title-block">
-              <div className="inv-title" style={{ color: '#0d6efd' }}>COTIZACIÓN</div>
+              <div className="inv-title">COTIZACIÓN</div>
               <div className="inv-number">{numCot}</div>
             </div>
           </div>
@@ -412,7 +415,7 @@ const DetalleCotizacion = ({ codCotizacion, onVolver, onConvertida }) => {
                 Cotización válida por {cotizacion.vigencia_dias || 15} días. Los precios pueden variar al momento de la facturación.
               </div>
               {cotizacion.cod_factura && (
-                <div className="inv-summary-note" style={{ color: '#0d6efd', fontWeight: 600 }}>
+                <div className="inv-summary-note" style={{ color: 'var(--jyr-red)', fontWeight: 600 }}>
                   Factura generada: FAC-{String(cotizacion.cod_factura).padStart(6, '0')}
                 </div>
               )}
@@ -441,7 +444,7 @@ const DetalleCotizacion = ({ codCotizacion, onVolver, onConvertida }) => {
 
           {/* Pie */}
           <div className="inv-footer">
-            <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, marginBottom: 8, color: '#0d6efd' }}>
+            <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, marginBottom: 8, color: 'var(--jyr-red)' }}>
               DOCUMENTO NO FISCAL — COTIZACIÓN
             </div>
             <div className="inv-footer-top">
@@ -857,6 +860,7 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
               <hr />
               <div className="d-flex justify-content-between mb-3">
                 <span className="fs-5 fw-bold">Total:</span>
+              
                 <span className="fs-5 fw-bold text-success">{formatMoney(totalFinal)}</span>
               </div>
 

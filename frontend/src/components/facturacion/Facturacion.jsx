@@ -10,6 +10,7 @@ import {
   FiCreditCard, FiCheckCircle, FiPrinter
 } from 'react-icons/fi';
 import ComprobanteFactura from './ComprobanteFactura.jsx';
+import { confirmDialog } from '../../utils/notifications.js';
 
 const formatMoney = (v) => {
   const n = parseFloat(v) || 0;
@@ -314,11 +315,11 @@ const Facturacion = () => {
 
   // ========== ANULAR FACTURA ==========
   const anularFactura = async (id) => {
-    const ok = await confirm({
+    const ok = await confirmDialog({
+      variant: 'cancel',
       title: 'Anular factura',
-      message: '¿Está seguro de anular esta factura? Se restaurará el inventario.',
-      confirmText: 'Anular',
-      tone: 'danger'
+      text: '¿Está seguro de anular esta factura? Se restaurará el inventario.',
+      confirmText: 'Sí, anular'
     });
     if (!ok) return;
     try {
@@ -380,11 +381,11 @@ const Facturacion = () => {
   };
 
   const anularPago = async (codPago) => {
-    const ok = await confirm({
+    const ok = await confirmDialog({
+      variant: 'cancel',
       title: 'Anular pago',
-      message: '¿Está seguro de anular este pago?',
-      confirmText: 'Anular',
-      tone: 'danger'
+      text: '¿Está seguro de anular este pago?',
+      confirmText: 'Sí, anular'
     });
     if (!ok) return;
     try {

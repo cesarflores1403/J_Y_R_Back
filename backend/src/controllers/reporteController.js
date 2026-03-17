@@ -11,7 +11,7 @@ export const dashboard = async (req, res) => {
 
 export const ventas = async (req, res) => {
   try {
-    const datos = await reporteService.ventas();
+    const datos = await reporteService.ventas(req.query?.periodo);
     res.json({ ok: true, datos });
   } catch (error) {
     res.status(500).json({ ok: false, mensaje: error.message });

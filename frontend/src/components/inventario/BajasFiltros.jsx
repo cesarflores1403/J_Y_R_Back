@@ -41,7 +41,7 @@ const BajasFiltros = ({
     >
       <div className="kdx-filters-topbar mb-3">
         <div className="kdx-filters-topbar-left">
-          <span className="kdx-filters-chip">Filtros de busqueda</span>
+          <span className="kdx-filters-chip">Filtros de búsqueda</span>
         </div>
         <div className="kdx-filters-topbar-actions">
           <button
@@ -116,7 +116,7 @@ const BajasFiltros = ({
         <div className="col-12 col-md-3">
           <label className="form-label mb-1 kdx-label">
             <FiMapPin size={14} />
-            ID Ubicacion
+            ID Ubicación
           </label>
           <select
             className="form-select kdx-control"

@@ -6,6 +6,7 @@ import {
   FiPlus, FiSearch, FiX, FiEye, FiShoppingCart,
   FiChevronLeft, FiChevronRight, FiTrash2, FiCheck, FiEdit2
 } from 'react-icons/fi';
+import { confirmDialog } from '../../utils/notifications.js';
 
 const fmtFecha = (f) => f ? new Date(f).toLocaleDateString('es-HN') : '-';
 const fmtMoneda = (v, m = 'HNL') =>
@@ -481,11 +482,11 @@ const OrdenesCompra = () => {
   };
 
   const cancelarOrden = async (id) => {
-    const ok = await confirm({
+    const ok = await confirmDialog({
+      variant: 'cancel',
       title: 'Cancelar orden',
-      message: '¿Está seguro de cancelar esta orden? Esta acción no se puede deshacer.',
-      confirmText: 'Cancelar',
-      tone: 'danger'
+      text: '¿Estás seguro de que deseas cancelar esta orden? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, cancelar'
     });
     if (!ok) return;
     try {
@@ -498,11 +499,11 @@ const OrdenesCompra = () => {
   };
 
   const eliminarOrden = async (id) => {
-    const ok = await confirm({
+    const ok = await confirmDialog({
+      variant: 'delete',
       title: 'Eliminar orden',
-      message: '¿Está seguro de eliminar esta orden? Esta acción es permanente y no se puede deshacer.',
-      confirmText: 'Eliminar',
-      tone: 'danger'
+      text: '¿Estás seguro de que deseas eliminar esta orden? Esta acción es permanente y no se puede deshacer.',
+      confirmText: 'Sí, eliminar'
     });
     if (!ok) return;
     try {

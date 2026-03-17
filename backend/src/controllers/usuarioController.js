@@ -29,7 +29,10 @@ export const crear = async (req, res) => {
 
 export const actualizar = async (req, res) => {
   try {
-    const usuario = await usuarioService.actualizar(parseInt(req.params.id), req.body);
+    const usuario = await usuarioService.actualizar(parseInt(req.params.id), req.body, {
+      cod_usuario: req.usuario?.cod_usuario,
+      rol: req.usuario?.rol
+    });
     res.json({ ok: true, datos: usuario, mensaje: 'Usuario actualizado correctamente' });
   } catch (error) {
     res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });

@@ -1,8 +1,7 @@
-import React from 'react';
+﻿import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../contexts/AuthContext.jsx';
 import { ConfirmDialogProvider } from '../contexts/ConfirmDialogContext.jsx';
-import { ToastContainer } from 'react-toastify';
 
 import Login from '../components/auth/Login.jsx';
 import Layout from '../components/layout/Layout.jsx';
@@ -79,7 +78,6 @@ const App = () => {
         </Routes>
       </BrowserRouter>
       </ConfirmDialogProvider>
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} theme="dark" />
     </AuthProvider>
   );
 };

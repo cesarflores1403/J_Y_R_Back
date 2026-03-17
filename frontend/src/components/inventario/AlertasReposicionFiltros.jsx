@@ -46,11 +46,11 @@ const AlertasReposicionFiltros = ({
                 name="producto"
                 value={filtros.producto}
                 onChange={handleInput}
-                placeholder="Nombre o codigo"
+                placeholder="Nombre o código"
               />
             </div>
             <div className="col-12 col-md-3">
-              <label className="form-label mb-1">Cod. Ubicacion</label>
+              <label className="form-label mb-1">Cod. Ubicación</label>
               <input
                 // // Filtro exacto por identificador de ubicacion
                 type="number"
@@ -63,7 +63,7 @@ const AlertasReposicionFiltros = ({
               />
             </div>
             <div className="col-12 col-md-3">
-              <label className="form-label mb-1">Ubicacion</label>
+              <label className="form-label mb-1">Ubicación</label>
               <input
                 // // Filtro textual por qr/pasillo/nivel
                 type="text"
@@ -71,14 +71,14 @@ const AlertasReposicionFiltros = ({
                 name="ubicacion"
                 value={filtros.ubicacion}
                 onChange={handleInput}
-                placeholder="Codigo producto, pasillo, nivel"
+                placeholder="Código producto, pasillo, nivel"
               />
             </div>
           </div>
 
           <div className="row g-2 mt-2">
             <div className="col-12 col-md-2">
-              <label className="form-label mb-1">Pagina</label>
+              <label className="form-label mb-1">Página</label>
               <input
                 // // Numero de pagina solicitado
                 type="number"
@@ -90,7 +90,7 @@ const AlertasReposicionFiltros = ({
               />
             </div>
             <div className="col-12 col-md-2">
-              <label className="form-label mb-1">Limite</label>
+              <label className="form-label mb-1">Límite</label>
               <input
                 // // Tamano de pagina para consulta backend
                 type="number"
@@ -126,7 +126,7 @@ const AlertasReposicionFiltros = ({
                   onChange={(event) => onChange('solo_criticos', event.target.checked)}
                 />
                 <label className="form-check-label" htmlFor="alertasSoloCriticos">
-                  Solo criticos
+                  Solo críticos
                 </label>
               </div>
             </div>

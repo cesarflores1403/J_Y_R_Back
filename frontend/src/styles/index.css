@@ -1,0 +1,83 @@
+/* ============================================================
+	 BOTONES PRINCIPALES (CREAR/GUARDAR/CONFIRMAR)
+	 ============================================================ */
+
+:root {
+	--jyr-btn-grad-start: #2a0f16;
+	--jyr-btn-grad-mid: #7f1321;
+	--jyr-btn-grad-end: #e11d2f;
+	--jyr-btn-border: #a61725;
+	--jyr-btn-shadow: 0 10px 22px -10px rgba(185, 28, 28, 0.6);
+}
+
+.btn.btn-primary,
+.btn.jyr-btn-primary,
+.jyr-btn-primary,
+.btn.kdx-btn-primary,
+.kdx-btn-primary,
+.btn.kdx-btn-accent,
+.kdx-btn-accent {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 38px;
+	padding: 8px 16px;
+	border-radius: 14px;
+	border: 1px solid var(--jyr-btn-border) !important;
+	background: linear-gradient(120deg, var(--jyr-btn-grad-start) 0%, var(--jyr-btn-grad-mid) 55%, var(--jyr-btn-grad-end) 100%) !important;
+	color: #ffffff !important;
+	font-weight: 700;
+	text-decoration: none;
+	box-shadow: var(--jyr-btn-shadow);
+	transition: transform 150ms ease, filter 150ms ease, box-shadow 150ms ease;
+}
+
+.btn.btn-primary:hover,
+.btn.jyr-btn-primary:hover,
+.jyr-btn-primary:hover,
+.btn.kdx-btn-primary:hover,
+.kdx-btn-primary:hover,
+.btn.kdx-btn-accent:hover,
+.kdx-btn-accent:hover {
+	transform: translateY(-1px);
+	filter: brightness(1.08);
+	box-shadow: 0 14px 28px -12px rgba(185, 28, 28, 0.72);
+	color: #ffffff !important;
+}
+
+.btn.btn-primary:active,
+.btn.jyr-btn-primary:active,
+.jyr-btn-primary:active,
+.btn.kdx-btn-primary:active,
+.kdx-btn-primary:active,
+.btn.kdx-btn-accent:active,
+.kdx-btn-accent:active {
+	transform: translateY(0);
+	filter: brightness(1);
+}
+
+.btn.btn-primary:focus-visible,
+.btn.jyr-btn-primary:focus-visible,
+.jyr-btn-primary:focus-visible,
+.btn.kdx-btn-primary:focus-visible,
+.kdx-btn-primary:focus-visible,
+.btn.kdx-btn-accent:focus-visible,
+.kdx-btn-accent:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95), 0 0 0 6px rgba(220, 38, 38, 0.4);
+}
+
+.btn.btn-primary:disabled,
+.btn.jyr-btn-primary:disabled,
+.jyr-btn-primary:disabled,
+.btn.kdx-btn-primary:disabled,
+.kdx-btn-primary:disabled,
+.btn.kdx-btn-accent:disabled,
+.kdx-btn-accent:disabled {
+	opacity: 0.56;
+	cursor: not-allowed;
+	transform: none;
+	filter: grayscale(0.18);
+	box-shadow: none;
+}

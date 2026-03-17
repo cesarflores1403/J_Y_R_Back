@@ -5,6 +5,7 @@ export const authService = {
   login: (data) => api.post('/auth/login', data),
   perfil: () => api.get('/auth/perfil'),
   cambiarPassword: (data) => api.put('/auth/cambiar-password', data),
+  solicitarRecuperacion: (data) => api.post('/auth/solicitar-recuperacion', data),
 };
 
 // ==================== CLIENTES ====================
@@ -24,6 +25,7 @@ export const proveedorService = {
   crear: (data) => api.post('/proveedores', data),
   actualizar: (id, data) => api.put(`/proveedores/${id}`, data),
   toggleEstado: (id) => api.patch(`/proveedores/${id}/toggle-estado`),
+  eliminar: (id) => api.delete(`/proveedores/${id}`),
 };
 
 // ==================== UBICACIONES ====================
@@ -44,7 +46,7 @@ export const productoService = {
 // ==================== REPORTES ====================
 export const reporteService = {
   dashboard: () => api.get('/reportes/dashboard'),
-  ventas: () => api.get('/reportes/ventas'),
+  ventas: (params) => api.get('/reportes/ventas', { params }),
   productosVendidos: () => api.get('/reportes/productos-vendidos'),
   inventario: () => api.get('/reportes/inventario'),
 };
@@ -55,7 +57,6 @@ export const facturaService = {
   obtener: (id) => api.get(`/facturas/${id}`),
   crear: (data) => api.post('/facturas', data),
   anular: (id, motivo) => api.patch(`/facturas/${id}/anular`, { motivo }),
-  eliminar: (id) => api.delete(`/facturas/${id}`),
   productosDisponibles: (params) => api.get('/facturas/productos-disponibles', { params }),
   clientesDisponibles: (params) => api.get('/facturas/clientes-disponibles', { params }),
 };
@@ -105,7 +106,7 @@ export const carruselService = {
 export const auditoriaFacturacionService = {
   listar: (params) => api.get('/auditoria-facturacion', { params }),
   tiposEvento: () => api.get('/auditoria-facturacion/tipos-evento'),
-  exportarCSV: (params) => api.get('/auditoria-facturacion/exportar-csv', { params, responseType: 'blob' }),
+  exportarExcel: (params) => api.get('/auditoria-facturacion/exportar-excel', { params, responseType: 'blob' }),
 };
 
 // ==================== NOTAS DE CRÉDITO (HU-FAC-12) ====================
@@ -141,4 +142,17 @@ export const comprasService = {
 export const empresaConfigService = {
   obtener: () => api.get('/empresa-config'),
   actualizar: (data) => api.put('/empresa-config', data),
+  obtenerCorrelativos: () => api.get('/empresa-config/correlativos'),
+  actualizarCorrelativos: (data) => api.put('/empresa-config/correlativos', data),
+  subirLogoFactura: (formData) => api.post('/empresa-config/logo-factura', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  quitarLogoFactura: () => api.delete('/empresa-config/logo-factura'),
+};
+
+// ==================== NOTIFICACIONES SUPER ADMIN ====================
+export const notificacionSuperAdminService = {
+  listar: (params) => api.get('/notificaciones-superadmin', { params }),
+  marcarLeida: (id) => api.patch(`/notificaciones-superadmin/${id}/leida`),
+  marcarTodasLeidas: () => api.patch('/notificaciones-superadmin/marcar-todas/leidas'),
 };

@@ -47,6 +47,10 @@ const EmpresaConfig = sequelize.define('empresa_config', {
     type: DataTypes.STRING(200),
     allowNull: true
   },
+  logo_factura_url: {
+    type: DataTypes.STRING(300),
+    allowNull: true
+  },
   actualizado_en: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW

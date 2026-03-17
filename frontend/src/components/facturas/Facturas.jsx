@@ -9,6 +9,8 @@ import logoFull from '../../assets/img/logo1.jpeg';
 import BuscadorProducto from './BuscadorProducto.jsx';
 import ModalClienteRapido from './ModalClienteRapido.jsx';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const formatMoney = (v) => {
   const n = parseFloat(v) || 0;
   return `L ${n.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -79,25 +81,6 @@ const ListaFacturas = ({ onNueva, onVer }) => {
     }
   };
 
-  const eliminarDefinitivamente = async () => {
-    if (!modalAnular) return;
-    const ok = await confirm({
-      title: 'Eliminar factura',
-      message: `¿Está seguro de eliminar permanentemente ${modalAnular.numero}? Esta acción no se puede deshacer.`,
-      confirmText: 'Eliminar',
-      tone: 'danger'
-    });
-    if (!ok) return;
-    try {
-      await facturaService.eliminar(modalAnular.id);
-      toast.success('Factura eliminada permanentemente');
-      setModalAnular(null);
-      cargar();
-    } catch (err) {
-      toast.error(err.response?.data?.mensaje || 'Error al eliminar');
-    }
-  };
-
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -152,14 +135,8 @@ const ListaFacturas = ({ onNueva, onVer }) => {
                         <FiEye />
                       </button>
                       {f.estado && usuario?.rol === 'Administrador' && (
-                        <button className="btn btn-sm btn-outline-danger me-1" title="Anular / Eliminar" onClick={() => abrirModalAnular(f)}>
+                        <button className="btn btn-sm btn-outline-danger me-1" title="Anular" onClick={() => abrirModalAnular(f)}>
                           <FiXCircle />
-                        </button>
-                      )}
-                      {!f.estado && usuario?.rol === 'Administrador' && (
-                        <button className="btn btn-sm btn-outline-danger" title="Eliminar permanentemente"
-                          onClick={() => { setModalAnular({ id: f.cod_factura, numero: `FAC-${String(f.cod_factura).padStart(6, '0')}`, estado: f.estado }); }}>
-                          <FiTrash2 />
                         </button>
                       )}
                     </td>
@@ -190,7 +167,7 @@ const ListaFacturas = ({ onNueva, onVer }) => {
         </div>
       )}
 
-      {/* ====== MODAL ANULAR / ELIMINAR FACTURA ====== */}
+      {/* ====== MODAL ANULAR FACTURA ====== */}
       {modalAnular && (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={() => setModalAnular(null)}>
           <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
@@ -201,47 +178,29 @@ const ListaFacturas = ({ onNueva, onVer }) => {
               </div>
               <div className="modal-body py-4">
                 <h5 className="text-center mb-3">{modalAnular.numero}</h5>
-                {modalAnular.estado ? (
-                  <>
-                    <p className="text-muted text-center mb-3">
-                      ¿Qué deseas hacer con esta factura?<br />
-                      <strong>Anular:</strong> Se marca como anulada, se restaura el inventario y se reversan los pagos.<br />
-                      <strong>Eliminar:</strong> Se borra permanentemente de la base de datos.
-                    </p>
-                    <div className="mb-2">
-                      <label className="form-label fw-bold">Motivo de anulación <span className="text-danger">*</span></label>
-                      <textarea
-                        className="form-control"
-                        rows="3"
-                        placeholder="Ingrese el motivo de anulación (obligatorio)..."
-                        value={motivoAnulacion}
-                        onChange={(e) => setMotivoAnulacion(e.target.value)}
-                        maxLength={500}
-                      />
-                      <small className="text-muted">{motivoAnulacion.length}/500</small>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-muted text-center mb-0">
-                    Esta factura ya está <span className="badge bg-danger">Anulada</span>.<br />
-                    ¿Desea eliminarla permanentemente de la base de datos?
-                  </p>
-                )}
+                <p className="text-muted text-center mb-3">
+                  Al anular esta factura, se restaurará el inventario de sus productos y se reversarán los pagos.
+                </p>
+                <div className="mb-2">
+                  <label className="form-label fw-bold">Motivo de anulación <span className="text-danger">*</span></label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    placeholder="Ingrese el motivo de anulación (obligatorio)..."
+                    value={motivoAnulacion}
+                    onChange={(e) => setMotivoAnulacion(e.target.value)}
+                    maxLength={500}
+                  />
+                  <small className="text-muted">{motivoAnulacion.length}/500</small>
+                </div>
               </div>
               <div className="modal-footer justify-content-between">
                 <button className="btn btn-secondary" onClick={() => { setModalAnular(null); setMotivoAnulacion(''); }}>
                   Cancelar
                 </button>
-                <div className="d-flex gap-2">
-                  {modalAnular.estado && (
-                    <button className="btn btn-warning" onClick={anular} disabled={!motivoAnulacion.trim()}>
-                      <FiXCircle className="me-1" />Anular
-                    </button>
-                  )}
-                  <button className="btn btn-danger" onClick={eliminarDefinitivamente}>
-                    <FiTrash2 className="me-1" />Eliminar Definitivamente
-                  </button>
-                </div>
+                <button className="btn btn-warning" onClick={anular} disabled={!motivoAnulacion.trim()}>
+                  <FiXCircle className="me-1" />Anular
+                </button>
               </div>
             </div>
           </div>
@@ -297,6 +256,9 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
 
   // Normalizar estado (acepta '1', 'ACTIVA', true, etc.)
   const estadoActivo = normalizeEstado(factura.estado);
+  const logoFacturaUrl = empresa?.logo_factura_url
+    ? (empresa.logo_factura_url.startsWith('http') ? empresa.logo_factura_url : `${API_BASE}${empresa.logo_factura_url}`)
+    : logoFull;
 
   return (
     <div>
@@ -323,7 +285,7 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
           {/* ======= ENCABEZADO ======= */}
           <div className="inv-header">
             <div className="inv-brand">
-              <img src={logoFull} alt="J&R" className="inv-logo" />
+              <img src={logoFacturaUrl} alt="J&R" className="inv-logo" onError={(e) => { e.currentTarget.src = logoFull; }} />
               <div className="inv-brand-text">
                 <h2 className="inv-company">J & R</h2>
                 <span className="inv-tagline">Accesorios & Reparaciones</span>

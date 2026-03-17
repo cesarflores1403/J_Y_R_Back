@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { FiMail, FiArrowLeft } from 'react-icons/fi';
 import logoFull from '../../assets/img/logo1.jpeg';
+import { authService } from '../../services/serviceIndex.js';
 
 const RecuperarPassword = () => {
   const [correo, setCorreo]   = useState('');
@@ -9,15 +11,20 @@ const RecuperarPassword = () => {
   const [enviado, setEnviado]   = useState(false);
   const navigate = useNavigate();
 
-  const handleEnviar = (e) => {
+  const handleEnviar = async (e) => {
     e.preventDefault();
     if (!correo.trim()) return;
     setEnviando(true);
-    // Aquí se conectará el backend
-    setTimeout(() => {
+
+    try {
+      await authService.solicitarRecuperacion({ correo: correo.trim() });
       setEnviando(false);
       setEnviado(true);
-    }, 1200);
+      toast.success('En estos momentos le notificamos al administrador que solicitó el cambio de contraseña');
+    } catch (error) {
+      setEnviando(false);
+      toast.error(error.response?.data?.mensaje || 'No se pudo enviar la solicitud');
+    }
   };
 
   return (
@@ -38,8 +45,8 @@ const RecuperarPassword = () => {
             <h2 className="login-title">Recuperar contraseña</h2>
             <p className="login-subtitle">
               {!enviado
-                ? 'Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña'
-                : 'Revisa tu bandeja de entrada'}
+                ? 'Ingresa tu correo para notificar al administrador sobre tu solicitud de cambio de contraseña'
+                : 'Solicitud enviada al administrador'}
             </p>
           </div>
 
@@ -65,7 +72,7 @@ const RecuperarPassword = () => {
                 {enviando
                   ? <span className="spinner-border spinner-border-sm me-2" />
                   : null}
-                {enviando ? 'Enviando...' : 'Enviar enlace'}
+                {enviando ? 'Enviando...' : 'Enviar solicitud'}
               </button>
 
               <button type="button"
@@ -78,10 +85,10 @@ const RecuperarPassword = () => {
           ) : (
             <div className="text-center">
               <div className="mb-3" style={{ fontSize: '3rem' }}>📧</div>
-              <h5 className="fw-semibold mb-2">¡Correo enviado!</h5>
+              <h5 className="fw-semibold mb-2">¡Solicitud enviada!</h5>
               <p className="text-muted mb-4">
-                Hemos enviado un enlace a <strong>{correo}</strong>.<br />
-                Sigue las instrucciones para restablecer tu contraseña.
+                En estos momentos le notificamos al administrador<br />
+                que solicitaste el cambio de contraseña para <strong>{correo}</strong>.
               </p>
               <button className="btn w-100 login-btn"
                 onClick={() => navigate('/login')}>

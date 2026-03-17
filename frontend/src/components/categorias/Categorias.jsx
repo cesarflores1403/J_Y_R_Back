@@ -3,6 +3,7 @@ import { categoriaService } from '../../services/serviceIndex.js';
 import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight, FiTrash2, FiTag } from 'react-icons/fi';
+import { confirmDialog } from '../../utils/notifications.js';
 
 const camposIniciales = { nombre_categoria: '', descripcion: '' };
 
@@ -77,11 +78,11 @@ const Categorias = () => {
   };
 
   const handleEliminar = async (cat) => {
-    const ok = await confirm({
+    const ok = await confirmDialog({
+      variant: 'delete',
       title: 'Eliminar categoría',
-      message: `¿Está seguro de eliminar la categoría "${cat.nombre_categoria}"? Si tiene productos asociados, no se podrá eliminar.`,
-      confirmText: 'Eliminar',
-      tone: 'danger'
+      text: `¿Eliminar la categoría "${cat.nombre_categoria}"? Si tiene productos asociados, no se podrá eliminar.`,
+      confirmText: 'Sí, eliminar'
     });
     if (!ok) return;
     try {

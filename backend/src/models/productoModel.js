@@ -1,4 +1,4 @@
-﻿import pool from '../config/db-connection.js';
+import pool from '../config/db-connection.js';
 
 // =====================================================
 // MODELO: Producto
@@ -7,7 +7,7 @@
 // =====================================================
 
 // =======================
-// HU-04: Generar cÃ³digo formateado PROD-XXXX
+// HU-04: Generar código formateado PROD-XXXX
 // =======================
 export const formatCodProducto = (cod) => {
   if (!cod) return null;
@@ -15,7 +15,7 @@ export const formatCodProducto = (cod) => {
 };
 
 // =======================
-// GET PRODUCTOS (con detalle ISV del catÃ¡logo)
+// GET PRODUCTOS (con detalle ISV del catálogo)
 // =======================
 export const getProducto = async () => {
   const query = `
@@ -52,7 +52,7 @@ export const createProducto = async (datos) => {
   // // 1. Insertar producto
   await pool.query(queryInsert, [tabla, datosJson]);
 
-  // // 2. Buscar el producto reciÃ©n creado por nombre (mÃ©todo confiable con Supabase pooler)
+  // // 2. Buscar el producto recién creado por nombre (método confiable con Supabase pooler)
   const buscar = `
     SELECT cod_producto, nombre_producto, cod_categoria,
            unidad_medida, precio_venta, cod_isv, estado_producto
@@ -95,9 +95,9 @@ export const updateProducto = async ({ cod_producto, datos }) => {
   const tabla = 'producto'; // // Tabla real
   const id_campo = 'cod_producto'; // // PK real
 
-  // // ValidaciÃ³n mÃ­nima
+  // // Validación mínima
   if (!datos || typeof datos !== 'object' || Array.isArray(datos)) {
-    throw new Error('Datos invÃ¡lidos para actualizar');
+    throw new Error('Datos inválidos para actualizar');
   }
 
   const entries = Object.entries(datos);

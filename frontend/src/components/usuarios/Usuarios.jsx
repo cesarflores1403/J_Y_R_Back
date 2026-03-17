@@ -1,16 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { usuarioService } from '../../services/serviceIndex.js';
-import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
+import { useLocation } from 'react-router-dom';
+import { usuarioService, notificacionSuperAdminService } from '../../services/serviceIndex.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import { toast } from 'react-toastify';
 import {
   FiPlus, FiEdit2, FiSearch, FiX, FiTrash2,
   FiToggleLeft, FiToggleRight, FiUser, FiEye, FiEyeOff
 } from 'react-icons/fi';
+import { confirmDialog } from '../../utils/notifications.js';
 
 const camposIniciales = { nombre_usuario: '', contrasena: '', confirmar: '', cod_rol: '' };
 
 const Usuarios = () => {
-  const confirm = useConfirm();
+  const location = useLocation();
+  const { usuario } = useAuth();
+  const esSuperAdmin = usuario?.rol === 'Super Administrador';
+  const esAdmin = usuario?.rol === 'Administrador';
+  const puedeCambiarContrasena = esSuperAdmin || esAdmin;
+  const mostrarPendientes = new URLSearchParams(location.search).get('solicitudes') === 'pendientes';
+
   const [usuarios, setUsuarios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [buscar, setBuscar] = useState('');
@@ -23,6 +31,8 @@ const Usuarios = () => {
   const [guardando, setGuardando] = useState(false);
   const [verPass, setVerPass] = useState(false);
   const [verConfirm, setVerConfirm] = useState(false);
+  const [solicitudesPendientes, setSolicitudesPendientes] = useState([]);
+  const [cargandoPendientes, setCargandoPendientes] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -42,12 +52,50 @@ const Usuarios = () => {
   useEffect(() => { cargar(); }, [cargar]);
 
   useEffect(() => {
+    if (!esSuperAdmin) return;
     usuarioService.listarRoles()
       .then(r => { if (r.data.ok) setRoles(r.data.datos); })
       .catch(() => {});
-  }, []);
+  }, [esSuperAdmin]);
+
+  const cargarSolicitudesPendientes = useCallback(async () => {
+    if (!puedeCambiarContrasena || !mostrarPendientes) {
+      setSolicitudesPendientes([]);
+      return;
+    }
+
+    setCargandoPendientes(true);
+    try {
+      const { data } = await notificacionSuperAdminService.listar({ limite: 50 });
+      if (data.ok) {
+        const pendientes = (data.datos || []).filter(
+          (n) => n.tipo === 'RECUPERACION_PASSWORD' && !n.leida
+        );
+        setSolicitudesPendientes(pendientes);
+      }
+    } catch {
+      toast.error('No se pudieron cargar las solicitudes pendientes');
+    } finally {
+      setCargandoPendientes(false);
+    }
+  }, [puedeCambiarContrasena, mostrarPendientes]);
+
+  useEffect(() => {
+    cargarSolicitudesPendientes();
+  }, [cargarSolicitudesPendientes]);
+
+  const marcarSolicitudAtendida = async (codNotificacion) => {
+    try {
+      await notificacionSuperAdminService.marcarLeida(codNotificacion);
+      setSolicitudesPendientes((prev) => prev.filter((n) => n.cod_notificacion !== codNotificacion));
+      toast.success('Solicitud marcada como atendida');
+    } catch {
+      toast.error('No se pudo marcar la solicitud');
+    }
+  };
 
   const abrirCrear = () => {
+    if (!esSuperAdmin) return;
     setEditando(null);
     setForm(camposIniciales);
     setVerPass(false);
@@ -56,6 +104,7 @@ const Usuarios = () => {
   };
 
   const abrirEditar = (u) => {
+    if (!puedeCambiarContrasena) return;
     setEditando(u.cod_usuario);
     setForm({
       nombre_usuario: u.nombre_usuario,
@@ -69,21 +118,30 @@ const Usuarios = () => {
   };
 
   const guardar = async () => {
+    if (!puedeCambiarContrasena) return;
     if (!form.nombre_usuario.trim()) return toast.warning('El nombre de usuario es requerido');
     if (!editando && form.contrasena.length < 6) return toast.warning('La contraseña debe tener al menos 6 caracteres');
+    if (editando && form.contrasena && form.contrasena.length < 6) return toast.warning('La contraseña debe tener al menos 6 caracteres');
     if (form.contrasena && form.contrasena !== form.confirmar) return toast.warning('Las contraseñas no coinciden');
+
+    if (esAdmin) {
+      if (!editando) return toast.warning('Administrador no puede crear usuarios');
+      if (!form.contrasena) return toast.warning('Debes ingresar la nueva contraseña');
+    }
 
     setGuardando(true);
     try {
-      const payload = {
-        nombre_usuario: form.nombre_usuario,
-        cod_rol: form.cod_rol || null,
-        ...(form.contrasena ? { contrasena: form.contrasena } : {})
-      };
+      const payload = esAdmin
+        ? { contrasena: form.contrasena }
+        : {
+          nombre_usuario: form.nombre_usuario,
+          cod_rol: form.cod_rol || null,
+          ...(form.contrasena ? { contrasena: form.contrasena } : {})
+        };
 
       if (editando) {
         await usuarioService.actualizar(editando, payload);
-        toast.success('Usuario actualizado correctamente');
+        toast.success(esAdmin ? 'Contraseña actualizada correctamente' : 'Usuario actualizado correctamente');
       } else {
         await usuarioService.crear(payload);
         toast.success('Usuario creado correctamente');
@@ -98,6 +156,7 @@ const Usuarios = () => {
   };
 
   const toggleEstado = async (id) => {
+    if (!esSuperAdmin) return;
     try {
       await usuarioService.toggleEstado(id);
       toast.success('Estado actualizado');
@@ -108,11 +167,12 @@ const Usuarios = () => {
   };
 
   const eliminar = async (id) => {
-    const ok = await confirm({
+    if (!esSuperAdmin) return;
+    const ok = await confirmDialog({
+      variant: 'delete',
       title: 'Eliminar usuario',
-      message: '¿Está seguro de eliminar este usuario? Esta acción no se puede deshacer.',
-      confirmText: 'Eliminar',
-      tone: 'danger'
+      text: '¿Estás seguro de que deseas eliminar este usuario? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, eliminar'
     });
     if (!ok) return;
     try {
@@ -128,10 +188,65 @@ const Usuarios = () => {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h3 className="mb-0">Usuarios</h3>
-        <button className="btn jyr-btn-primary" onClick={abrirCrear}>
-          <FiPlus className="me-2" />Nuevo Usuario
-        </button>
+        {esSuperAdmin && (
+          <button className="btn jyr-btn-primary" onClick={abrirCrear}>
+            <FiPlus className="me-2" />Nuevo Usuario
+          </button>
+        )}
       </div>
+
+      {!esSuperAdmin && (
+        <div className="alert alert-info py-2">
+          {esAdmin
+            ? 'Modo restringido: el rol Administrador puede cambiar contraseñas, pero no crear, eliminar ni cambiar roles.'
+            : 'Modo lectura: tu rol solo puede ver los usuarios del sistema.'}
+        </div>
+      )}
+
+      {puedeCambiarContrasena && mostrarPendientes && (
+        <div className="jyr-card mb-3">
+          <div className="jyr-card-body">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <h6 className="mb-0">Solicitudes pendientes de recuperación</h6>
+              <span className="badge bg-danger">{solicitudesPendientes.length}</span>
+            </div>
+
+            {cargandoPendientes ? (
+              <div className="text-muted">Cargando solicitudes...</div>
+            ) : solicitudesPendientes.length === 0 ? (
+              <div className="text-muted">No hay solicitudes pendientes.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Correo solicitante</th>
+                      <th>Fecha</th>
+                      <th className="text-end">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {solicitudesPendientes.map((n) => (
+                      <tr key={n.cod_notificacion}>
+                        <td>{n.correo_solicitante || '-'}</td>
+                        <td>{n.creado_en ? new Date(n.creado_en).toLocaleString('es-HN') : '-'}</td>
+                        <td className="text-end">
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => marcarSolicitudAtendida(n.cod_notificacion)}
+                          >
+                            Marcar atendida
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Buscador */}
       <div className="jyr-card mb-3">
@@ -161,19 +276,24 @@ const Usuarios = () => {
                   <th>Rol</th>
                   <th>Estado</th>
                   <th>Creado</th>
-                  <th className="text-center">Acciones</th>
+                  {puedeCambiarContrasena && (
+                    <th className="text-center">{esAdmin ? 'Contraseña' : 'Acciones'}</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {cargando ? (
-                  <tr><td colSpan="6" className="text-center py-4">
+                  <tr><td colSpan={puedeCambiarContrasena ? 6 : 5} className="text-center py-4">
                     <div className="spinner-border spinner-border-sm" />
                   </td></tr>
                 ) : usuarios.length === 0 ? (
-                  <tr><td colSpan="6" className="text-center text-muted py-4">
+                  <tr><td colSpan={puedeCambiarContrasena ? 6 : 5} className="text-center text-muted py-4">
                     No se encontraron usuarios
                   </td></tr>
                 ) : usuarios.map((u) => (
+                  (() => {
+                    const esFilaSuperAdmin = (u.roles || []).some((r) => r.nombre_rol === 'Super Administrador');
+                    return (
                   <tr key={u.cod_usuario}>
                     <td className="text-muted">{u.cod_usuario}</td>
                     <td><strong>{u.nombre_usuario}</strong></td>
@@ -191,22 +311,45 @@ const Usuarios = () => {
                     <td className="text-muted small">
                       {u.creado_en ? new Date(u.creado_en).toLocaleDateString('es-HN') : '-'}
                     </td>
-                    <td className="text-center">
-                      <button className="btn btn-sm btn-outline-primary me-1"
-                        onClick={() => abrirEditar(u)} title="Editar">
-                        <FiEdit2 />
-                      </button>
-                      <button className="btn btn-sm btn-outline-warning me-1"
-                        onClick={() => toggleEstado(u.cod_usuario)}
-                        title={u.estado_usuario ? 'Desactivar' : 'Activar'}>
-                        {u.estado_usuario ? <FiToggleRight /> : <FiToggleLeft />}
-                      </button>
-                      <button className="btn btn-sm btn-outline-danger"
-                        onClick={() => eliminar(u.cod_usuario)} title="Eliminar">
-                        <FiTrash2 />
-                      </button>
-                    </td>
+                    {puedeCambiarContrasena && (
+                      <td className="text-center">
+                        {esAdmin ? (
+                          esFilaSuperAdmin ? (
+                            <span className="badge bg-secondary" title="La contraseña del Super Admin solo se cambia en su perfil">
+                              Protegida
+                            </span>
+                          ) : (
+                            <button className="btn btn-sm btn-outline-primary"
+                              onClick={() => abrirEditar(u)} title="Cambiar contraseña">
+                              Cambiar contraseña
+                            </button>
+                          )
+                        ) : (
+                          !esFilaSuperAdmin && (
+                            <button className="btn btn-sm btn-outline-primary me-1"
+                              onClick={() => abrirEditar(u)} title="Editar">
+                              <FiEdit2 />
+                            </button>
+                          )
+                        )}
+                        {esSuperAdmin && !esFilaSuperAdmin && (
+                          <>
+                            <button className="btn btn-sm btn-outline-warning me-1"
+                              onClick={() => toggleEstado(u.cod_usuario)}
+                              title={u.estado_usuario ? 'Desactivar' : 'Activar'}>
+                              {u.estado_usuario ? <FiToggleRight /> : <FiToggleLeft />}
+                            </button>
+                            <button className="btn btn-sm btn-outline-danger"
+                              onClick={() => eliminar(u.cod_usuario)} title="Eliminar">
+                              <FiTrash2 />
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    )}
                   </tr>
+                    );
+                  })()
                 ))}
               </tbody>
             </table>
@@ -236,49 +379,68 @@ const Usuarios = () => {
       )}
 
       {/* Modal */}
-      {modal && (
+      {puedeCambiarContrasena && modal && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-md">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  {editando ? 'Editar Usuario' : 'Nuevo Usuario'}
+                  {editando
+                    ? (esAdmin ? 'Cambiar Contraseña' : 'Editar Usuario')
+                    : 'Nuevo Usuario'}
                 </h5>
                 <button className="btn-close" onClick={() => setModal(false)} />
               </div>
               <div className="modal-body">
                 <div className="row g-3">
                   {/* Nombre */}
-                  <div className="col-12">
-                    <label className="form-label">Nombre de usuario *</label>
-                    <input type="text" className="form-control"
-                      value={form.nombre_usuario}
-                      onChange={(e) => setForm({ ...form, nombre_usuario: e.target.value })}
-                      placeholder="nombre_usuario" />
-                  </div>
+                  {(esSuperAdmin || (esAdmin && editando)) && (
+                    esAdmin ? (
+                      <div className="col-12">
+                        <label className="form-label">Usuario</label>
+                        <div className="form-control bg-light" style={{ pointerEvents: 'none' }}>
+                          {form.nombre_usuario}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="col-12">
+                        <label className="form-label">Nombre de usuario *</label>
+                        <input type="text" className="form-control"
+                          value={form.nombre_usuario}
+                          onChange={(e) => setForm({ ...form, nombre_usuario: e.target.value })}
+                          placeholder="nombre_usuario" />
+                      </div>
+                    )
+                  )}
 
                   {/* Rol */}
-                  <div className="col-12">
-                    <label className="form-label">Rol</label>
-                    <select className="form-select" value={form.cod_rol}
-                      onChange={(e) => setForm({ ...form, cod_rol: e.target.value })}>
-                      <option value="">Sin rol</option>
-                      {roles.map(r => (
-                        <option key={r.cod_rol} value={r.cod_rol}>{r.nombre_rol}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {esSuperAdmin && (
+                    <div className="col-12">
+                      <label className="form-label">Rol</label>
+                      <select className="form-select" value={form.cod_rol}
+                        onChange={(e) => setForm({ ...form, cod_rol: e.target.value })}>
+                        <option value="">Sin rol</option>
+                        {roles.map(r => (
+                          <option key={r.cod_rol} value={r.cod_rol}>{r.nombre_rol}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {/* Contraseña */}
                   <div className="col-12">
                     <label className="form-label">
-                      {editando ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña *'}
+                      {editando
+                        ? (esAdmin ? 'Nueva contraseña *' : 'Nueva contraseña (dejar vacío para no cambiar)')
+                        : 'Contraseña *'}
                     </label>
                     <div className="input-group">
                       <input type={verPass ? 'text' : 'password'} className="form-control"
                         value={form.contrasena}
                         onChange={(e) => setForm({ ...form, contrasena: e.target.value })}
-                        placeholder={editando ? 'Dejar vacío para no cambiar' : 'Mínimo 6 caracteres'} />
+                        placeholder={editando
+                          ? (esAdmin ? 'Ingrese la nueva contraseña' : 'Dejar vacío para no cambiar')
+                          : 'Mínimo 6 caracteres'} />
                       <button className="btn btn-outline-secondary" onClick={() => setVerPass(v => !v)}>
                         {verPass ? <FiEyeOff /> : <FiEye />}
                       </button>

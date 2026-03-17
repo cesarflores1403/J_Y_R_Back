@@ -1,4 +1,7 @@
 import React, { forwardRef } from 'react';
+import logoFull from '../../assets/img/logo1.jpeg';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // =====================================================
 // HU-FAC-06: Comprobante de Factura (Impresión / PDF)
@@ -21,6 +24,9 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
   const wrapper = factura.datos || factura;
   const datosFactura = wrapper.factura || wrapper;
   const empresa = wrapper.empresa || {};
+  const logoFacturaUrl = empresa?.logo_factura_url
+    ? (empresa.logo_factura_url.startsWith('http') ? empresa.logo_factura_url : `${API_BASE}${empresa.logo_factura_url}`)
+    : logoFull;
 
   const fechaEmision = datosFactura.creado_en
     ? new Date(datosFactura.creado_en)
@@ -337,8 +343,8 @@ const ComprobanteFactura = forwardRef(({ factura }, ref) => {
         {/* ========== ENCABEZADO ========== */}
         <div className="comp-header">
           <div className="comp-empresa">
-            <img src="/src/assets/img/logo1.jpeg" alt={empresa.nombre || 'J&R'} className="comp-empresa-logo" 
-              onError={(e) => { e.target.style.display = 'none'; }} />
+            <img src={logoFacturaUrl} alt={empresa.nombre || 'J&R'} className="comp-empresa-logo"
+              onError={(e) => { e.currentTarget.src = logoFull; }} />
             <div className="comp-empresa-info">
               <h1>{empresa.nombre || 'J&R Accesorios y Reparaciones'}</h1>
               <p>{empresa.direccion || ''}</p>

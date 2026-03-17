@@ -47,7 +47,15 @@ export const toggleEstado = async (req, res) => {
 
 export const eliminar = async (req, res) => {
   try {
-    await proveedorService.eliminar(req.params.id);
+    const resultado = await proveedorService.eliminar(req.params.id);
+    if (resultado?.accion === 'desactivado') {
+      return res.json({
+        ok: true,
+        softDelete: true,
+        datos: resultado.proveedor,
+        mensaje: 'El proveedor tiene historial asociado; se desactivó en lugar de eliminarse.'
+      });
+    }
     res.json({ ok: true, mensaje: 'Proveedor eliminado correctamente' });
   } catch (error) {
     res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });

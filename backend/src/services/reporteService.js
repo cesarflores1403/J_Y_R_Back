@@ -5,6 +5,76 @@ import ProductoSeq from '../models/ProductoSeq.js';
 import Factura from '../models/Factura.js';
 
 class ReporteService {
+  constructor() {
+    this.columnaFechaFacturaCache = null;
+  }
+
+  async obtenerColumnaFechaFactura() {
+    if (this.columnaFechaFacturaCache) return this.columnaFechaFacturaCache;
+
+    const [columnas] = await sequelize.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'factura'
+    `);
+
+    const columnasSet = new Set((columnas || []).map((c) => String(c.column_name || '').toLowerCase()));
+    const candidatas = ['creado_en', 'fecha_factura', 'fecha_emision', 'fecha', 'created_at', 'actualizado_en', 'updated_at'];
+    const encontrada = candidatas.find((col) => columnasSet.has(col)) || null;
+
+    this.columnaFechaFacturaCache = encontrada;
+    return encontrada;
+  }
+
+  normalizarPeriodoVentas(periodo) {
+    const periodoNormalizado = String(periodo || '').trim().toLowerCase();
+    const permitidos = ['diaria', 'semanal', 'quincenal', 'mensual', 'trimestral', 'anual'];
+    return permitidos.includes(periodoNormalizado) ? periodoNormalizado : 'mensual';
+  }
+
+  obtenerDefinicionPeriodoVentas(periodo, campoFechaSql) {
+    if (!campoFechaSql) {
+      return {
+        descripcion: 'Sin filtro por fecha',
+        whereSql: '1=1'
+      };
+    }
+
+    switch (periodo) {
+      case 'diaria':
+        return {
+          descripcion: 'Hoy',
+          whereSql: `${campoFechaSql} >= date_trunc('day', CURRENT_DATE) AND ${campoFechaSql} < date_trunc('day', CURRENT_DATE) + interval '1 day'`
+        };
+      case 'semanal':
+        return {
+          descripcion: 'Últimos 7 días',
+          whereSql: `${campoFechaSql} >= date_trunc('day', CURRENT_DATE) - interval '6 days' AND ${campoFechaSql} < date_trunc('day', CURRENT_DATE) + interval '1 day'`
+        };
+      case 'quincenal':
+        return {
+          descripcion: 'Últimos 15 días',
+          whereSql: `${campoFechaSql} >= date_trunc('day', CURRENT_DATE) - interval '14 days' AND ${campoFechaSql} < date_trunc('day', CURRENT_DATE) + interval '1 day'`
+        };
+      case 'trimestral':
+        return {
+          descripcion: 'Trimestre actual',
+          whereSql: `${campoFechaSql} >= date_trunc('quarter', CURRENT_DATE) AND ${campoFechaSql} < date_trunc('day', CURRENT_DATE) + interval '1 day'`
+        };
+      case 'anual':
+        return {
+          descripcion: 'Año actual',
+          whereSql: `${campoFechaSql} >= date_trunc('year', CURRENT_DATE) AND ${campoFechaSql} < date_trunc('day', CURRENT_DATE) + interval '1 day'`
+        };
+      case 'mensual':
+      default:
+        return {
+          descripcion: 'Mes actual',
+          whereSql: `${campoFechaSql} >= date_trunc('month', CURRENT_DATE) AND ${campoFechaSql} < date_trunc('day', CURRENT_DATE) + interval '1 day'`
+        };
+    }
+  }
+
   async dashboard() {
     // Conteos principales del dashboard
     const totalClientes = await Cliente.count();
@@ -68,13 +138,20 @@ class ReporteService {
     };
   }
 
-  async ventas() {
+  async ventas(periodo) {
+    const periodoNormalizado = this.normalizarPeriodoVentas(periodo);
+    const columnaFecha = await this.obtenerColumnaFechaFactura();
+    const campoFechaSql = columnaFecha ? `f.${columnaFecha}` : null;
+    const definicionPeriodo = this.obtenerDefinicionPeriodoVentas(periodoNormalizado, campoFechaSql);
+
     const [resumen] = await sequelize.query(`
       SELECT COUNT(*) as total_facturas,
              COALESCE(SUM(subtotal),0) as subtotal,
              COALESCE(SUM(isv),0) as isv,
              COALESCE(SUM(total),0) as total
-      FROM factura WHERE estado = true
+      FROM factura f
+      WHERE f.estado = true
+        AND ${definicionPeriodo.whereSql}
     `);
 
     const [detalle] = await sequelize.query(`
@@ -85,10 +162,38 @@ class ReporteService {
       JOIN clientes c ON c.cod_cliente = f.cod_cliente
       JOIN usuarios u ON u.cod_usuario = f.cod_usuario
       LEFT JOIN cat_metodo_pago mp ON mp.cod_cat_metodo_pago = f.metodo_pago
+      WHERE f.estado = true
+        AND ${definicionPeriodo.whereSql}
       ORDER BY f.cod_factura DESC
     `);
 
-    return { resumen: resumen[0], detalle };
+    const [rango] = await sequelize.query(`
+          SELECT MIN(${campoFechaSql || 'NULL'})::date as fecha_inicio,
+            MAX(${campoFechaSql || 'NULL'})::date as fecha_fin
+      FROM factura f
+      WHERE f.estado = true
+        AND ${definicionPeriodo.whereSql}
+    `);
+
+    const [ultimasFacturas] = await sequelize.query(`
+      SELECT f.cod_factura, c.nombre, c.apellido, f.total, f.estado,
+             u.nombre_usuario
+      FROM factura f
+      JOIN clientes c ON c.cod_cliente = f.cod_cliente
+      JOIN usuarios u ON u.cod_usuario = f.cod_usuario
+      WHERE ${definicionPeriodo.whereSql}
+      ORDER BY f.cod_factura DESC
+      LIMIT 5
+    `);
+
+    return {
+      periodo: periodoNormalizado,
+      periodoDescripcion: definicionPeriodo.descripcion,
+      rango: rango?.[0] || { fecha_inicio: null, fecha_fin: null },
+      resumen: resumen[0],
+      detalle,
+      ultimasFacturas
+    };
   }
 
   async productosVendidos() {

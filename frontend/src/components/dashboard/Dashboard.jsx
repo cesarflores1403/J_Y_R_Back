@@ -11,6 +11,20 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const [periodoVentas, setPeriodoVentas] = useState('mensual');
+  const [resumenVentas, setResumenVentas] = useState(null);
+  const [cargandoResumenVentas, setCargandoResumenVentas] = useState(false);
+  const [errorResumenVentas, setErrorResumenVentas] = useState(false);
+
+  const periodosDisponibles = [
+    { value: 'diaria', label: 'Diaria' },
+    { value: 'semanal', label: 'Semanal' },
+    { value: 'quincenal', label: 'Quincenal' },
+    { value: 'mensual', label: 'Mensual' },
+    { value: 'trimestral', label: 'Trimestral' },
+    { value: 'anual', label: 'Anual' }
+  ];
+
   const stockBajo = Number(datos?.alertasInventario?.stockBajo ?? datos?.stockBajo ?? 0);
   const stockEnCero = Number(datos?.alertasInventario?.stockEnCero ?? datos?.stockEnCero ?? 0);
   const totalAlertasInventario = Number(
@@ -32,13 +46,45 @@ const Dashboard = () => {
     cargar();
   }, []);
 
+  useEffect(() => {
+    const cargarResumenVentas = async () => {
+      setCargandoResumenVentas(true);
+      try {
+        const { data } = await reporteService.ventas({ periodo: periodoVentas });
+        if (data?.ok) {
+          setErrorResumenVentas(false);
+          setResumenVentas({
+            resumen: data?.datos?.resumen,
+            periodoDescripcion: data?.datos?.periodoDescripcion,
+            rango: data?.datos?.rango,
+            ultimasFacturas: data?.datos?.ultimasFacturas || []
+          });
+        }
+      } catch (err) {
+        setErrorResumenVentas(true);
+        setResumenVentas(null);
+        console.error('Error cargando resumen de ventas:', err);
+      } finally {
+        setCargandoResumenVentas(false);
+      }
+    };
+
+    cargarResumenVentas();
+  }, [periodoVentas]);
+
+  const ventasResumen = resumenVentas?.resumen || (errorResumenVentas ? {} : (datos?.ventasTotales || {}));
+  const ultimasFacturasPeriodo = resumenVentas?.ultimasFacturas?.length
+    ? resumenVentas.ultimasFacturas
+    : (errorResumenVentas ? [] : (datos?.ultimasFacturas || []));
+  const totalFacturasPeriodo = resumenVentas?.resumen?.total_facturas ?? null;
+
   if (cargando) return <div className="jyr-spinner" />;
 
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div className="d-flex align-items-center gap-3">
-          <img src={logoClean} alt="J&R" style={{ height: 48, objectFit: 'contain' }} />
+          <img src={logoClean} alt="J&R" style={{ height: 62, objectFit: 'contain' }} />
           <div>
             <h3 className="mb-1">Dashboard</h3>
             <p className="text-muted mb-0">Bienvenido, <strong>{usuario?.nombre_usuario}</strong> ({usuario?.rol})</p>
@@ -82,22 +128,53 @@ const Dashboard = () => {
       <div className="row g-3 mb-4 align-items-stretch">
         <div className="col-12 col-lg-6">
           <div className="jyr-card animate-in h-100 dash-ventas-card">
-            <div className="jyr-card-header"><h5 className="mb-0">Resumen de Ventas</h5></div>
+            <div className="jyr-card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <h5 className="mb-0">Resumen de Ventas</h5>
+              <select
+                className="form-select form-select-sm"
+                style={{ minWidth: 180, maxWidth: 220 }}
+                value={periodoVentas}
+                onChange={(e) => setPeriodoVentas(e.target.value)}
+              >
+                {periodosDisponibles.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
+            </div>
             <div className="jyr-card-body">
-              <div className="row text-center dash-ventas-grid">
-                <div className="col-4 dash-ventas-item">
-                  <div className="stat-label dash-ventas-label">Subtotal</div>
-                  <div className="stat-value dash-ventas-value">{formatMoney(datos?.ventasTotales?.subtotal)}</div>
+              <div className="dash-ventas-meta">
+                <div className="dash-ventas-meta-item">
+                  <strong>{resumenVentas?.periodoDescripcion || (errorResumenVentas ? 'No se pudo calcular el período' : 'Período actual')}</strong>
+                  {resumenVentas?.rango?.fecha_inicio && resumenVentas?.rango?.fecha_fin
+                    ? ` (${resumenVentas.rango.fecha_inicio} a ${resumenVentas.rango.fecha_fin})`
+                    : ''}
                 </div>
-                <div className="col-4 dash-ventas-item">
-                  <div className="stat-label dash-ventas-label">ISV</div>
-                  <div className="stat-value dash-ventas-value">{formatMoney(datos?.ventasTotales?.isv)}</div>
-                </div>
-                <div className="col-4 dash-ventas-item">
-                  <div className="stat-label dash-ventas-label">Total</div>
-                  <div className="stat-value dash-ventas-value dash-ventas-total">{formatMoney(datos?.ventasTotales?.total)}</div>
+                <div className="dash-ventas-meta-item">
+                  Facturas del período:{' '}
+                  <strong>{totalFacturasPeriodo !== null ? Number(totalFacturasPeriodo).toLocaleString() : '-'}</strong>
                 </div>
               </div>
+
+              <div className="row text-center dash-ventas-grid">
+                <div className="col-12 col-md-4 dash-ventas-item">
+                  <div className="stat-label dash-ventas-label">Subtotal</div>
+                  <div className="stat-value dash-ventas-value">{formatMoney(ventasResumen?.subtotal)}</div>
+                </div>
+                <div className="col-12 col-md-4 dash-ventas-item">
+                  <div className="stat-label dash-ventas-label">ISV</div>
+                  <div className="stat-value dash-ventas-value">{formatMoney(ventasResumen?.isv)}</div>
+                </div>
+                <div className="col-12 col-md-4 dash-ventas-item">
+                  <div className="stat-label dash-ventas-label">Total</div>
+                  <div className="stat-value dash-ventas-value dash-ventas-total">{formatMoney(ventasResumen?.total)}</div>
+                </div>
+              </div>
+
+              {cargandoResumenVentas && (
+                <div className="text-muted mt-2" style={{ fontSize: 12 }}>
+                  Actualizando resumen de ventas...
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -161,10 +238,10 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {datos?.ultimasFacturas?.length > 0 ? datos.ultimasFacturas.map((f) => (
+                {ultimasFacturasPeriodo.length > 0 ? ultimasFacturasPeriodo.map((f) => (
                   <tr key={f.cod_factura}>
                     <td><strong>{f.cod_factura}</strong></td>
-                    <td>{f.nombre} {f.apellido || ''}</td>
+                    <td>{f.cliente || `${f.nombre || ''} ${f.apellido || ''}`.trim()}</td>
                     <td>{f.nombre_usuario}</td>
                     <td>{formatMoney(f.total)}</td>
                     <td>

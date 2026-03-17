@@ -15,13 +15,13 @@ const menuItems = [
   ]},
   { section: 'Comercial', items: [
     { path: '/clientes', label: 'Clientes', icon: <FiUsers />, roles: ['Administrador', 'Cajero'] },
-    { path: '/facturas', label: 'Facturacion', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
+    { path: '/facturas', label: 'Facturación', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
     { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiClipboard />, roles: ['Administrador', 'Cajero'] },
-    { path: '/notas-credito', label: 'Notas de Credito', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
+    { path: '/notas-credito', label: 'Notas de Crédito', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
   ]},
-  { section: 'Catalogo', items: [
+  { section: 'Catálogo', items: [
     { path: '/productos', label: 'Productos', icon: <FiPackage />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
-    { path: '/categorias', label: 'Categorias', icon: <FiTag />, roles: ['Administrador'] },
+    { path: '/categorias', label: 'Categorías', icon: <FiTag />, roles: ['Administrador'] },
   ]},
   { section: 'Inventario', items: [
     { path: '/ubicaciones', label: 'Ubicaciones', icon: <FiMapPin />, roles: ['Administrador', 'Bodeguero'] },
@@ -36,17 +36,17 @@ const menuItems = [
   ]},
   { section: 'Compras', items: [
     { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, roles: ['Administrador', 'Bodeguero'] },
-    { path: '/compras/ordenes', label: 'Ordenes de Compra', icon: <FiShoppingCart />, roles: ['Administrador', 'Bodeguero'] },
+    { path: '/compras/ordenes', label: 'Órdenes de Compra', icon: <FiShoppingCart />, roles: ['Administrador', 'Bodeguero'] },
   ]},
-  { section: 'Gestion', items: [
+  { section: 'Gestión', items: [
     { path: '/reportes', label: 'Reportes', icon: <FiBarChart2 />, roles: ['Administrador'] },
     { path: '/usuarios', label: 'Usuarios', icon: <FiUsers />, roles: ['Administrador'] },
-    { path: '/auditoria-facturacion', label: 'Auditoria Fact.', icon: <FiClock />, roles: ['Administrador'] },
+    { path: '/auditoria-facturacion', label: 'Auditoría Fact.', icon: <FiClock />, roles: ['Administrador'] },
   ]},
   { section: 'Fotos Carrusel', items: [
     { path: '/carrusel', label: 'Carrusel', icon: <FiImage />, roles: ['Administrador'] },
   ]},
-  { section: 'Configuracion', items: [
+  { section: 'Configuración', items: [
     { path: '/config-empresa', label: 'Datos Factura', icon: <FiFileText />, roles: ['Super Administrador'] },
   ]},
 ];
@@ -110,7 +110,7 @@ const Sidebar = () => {
           <div className="jyr-sidebar-user-name">{usuario?.nombre_usuario}</div>
           <div className="jyr-sidebar-user-role">{usuario?.rol}</div>
         </div>
-        <button className="jyr-sidebar-logout" onClick={handleLogout} title="Cerrar sesion">
+        <button className="jyr-sidebar-logout" onClick={handleLogout} title="Cerrar sesión">
           <FiLogOut />
         </button>
       </div>
