@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { Op } from 'sequelize';
 import Usuario from '../models/Usuario.js';
 import Rol from '../models/Rol.js';
 import notificacionSuperAdminService from './notificacionSuperAdminService.js';
@@ -17,8 +18,18 @@ class AuthService {
   }
 
   async login(nombre_usuario, password) {
+    const usuarioNormalizado = String(nombre_usuario || '').trim();
+    const passwordNormalizado = String(password || '');
+
+    if (!usuarioNormalizado || !passwordNormalizado) {
+      throw Object.assign(new Error('Credenciales inválidas'), { statusCode: 401 });
+    }
+
     const usuario = await Usuario.findOne({
-      where: { nombre_usuario, estado_usuario: true },
+      where: {
+        nombre_usuario: { [Op.iLike]: usuarioNormalizado },
+        estado_usuario: true
+      },
       include: [{ model: Rol, as: 'roles', through: { attributes: [] } }]
     });
 
@@ -26,7 +37,7 @@ class AuthService {
       throw Object.assign(new Error('Credenciales inválidas'), { statusCode: 401 });
     }
 
-    const passwordValido = await usuario.validarPassword(password);
+    const passwordValido = await usuario.validarPassword(passwordNormalizado);
     if (!passwordValido) {
       throw Object.assign(new Error('Credenciales inválidas'), { statusCode: 401 });
     }
@@ -65,11 +76,11 @@ class AuthService {
     return { mensaje: 'Contraseña actualizada correctamente' };
   }
 
-  async solicitarRecuperacion(correo) {
-    const correoLimpio = (correo || '').trim();
-    await notificacionSuperAdminService.crearSolicitudRecuperacion(correoLimpio);
+  async solicitarRecuperacion(nombreUsuario) {
+    const nombreUsuarioLimpio = (nombreUsuario || '').trim();
+    await notificacionSuperAdminService.crearSolicitudRecuperacion(nombreUsuarioLimpio);
     return {
-      mensaje: 'En estos momentos le notificamos al administrador que solicitó el cambio de contraseña.'
+      mensaje: 'Ya se ha notificado a los administradores su cambio de contraseña.'
     };
   }
 }

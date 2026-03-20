@@ -345,6 +345,25 @@ a {
   gap: 10px;
 }
 
+.jyr-topbar-menu {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--jyr-gray-300);
+  border-radius: var(--radius-sm);
+  background: var(--jyr-white);
+  color: var(--jyr-black);
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+.jyr-topbar-menu:hover {
+  border-color: var(--jyr-red);
+  color: var(--jyr-red);
+}
+
 .jyr-noti-wrap {
   position: relative;
 }
@@ -2132,20 +2151,80 @@ a {
    RESPONSIVE
    ============================================================ */
 @media (max-width: 992px) {
+  .jyr-topbar-menu {
+    display: inline-flex;
+  }
+
+  .jyr-topbar {
+    padding: 0 14px;
+  }
+
+  .jyr-topbar-user-label {
+    display: none;
+  }
+
+  .jyr-noti-panel {
+    width: min(92vw, 360px);
+    right: 0;
+  }
+
   .jyr-sidebar {
     transform: translateX(-100%);
   }
+
   .jyr-sidebar.open {
     transform: translateX(0);
   }
+
+  .jyr-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 1035;
+  }
+
   .jyr-main {
     margin-left: 0;
   }
 }
 
 @media (max-width: 768px) {
+  .jyr-topbar {
+    height: 56px;
+    padding: 0 10px;
+  }
+
+  .jyr-topbar-title {
+    font-size: 15px;
+    max-width: calc(100vw - 140px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .jyr-topbar-logout {
+    padding: 6px 10px;
+  }
+
+  .jyr-topbar-logout span {
+    display: none;
+  }
+
+  .jyr-topbar-actions {
+    gap: 6px;
+  }
+
   .jyr-content {
-    padding: 16px;
+    padding: 14px;
+  }
+
+  .jyr-card-header,
+  .jyr-card-body {
+    padding: 14px;
+  }
+
+  .table {
+    font-size: 13px;
   }
 }
 
@@ -2811,6 +2890,18 @@ a {
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 600;
+}
+
+/* Inputs compactos para cantidad/descuento en Nueva Factura */
+.compact-number-input {
+  width: 80%;
+  min-width: 64px;
+  margin: 0 auto;
+  text-align: left;
+  padding-left: 8px;
+  padding-right: 18px;
+  color: #111 !important;
+  background-color: #fff !important;
 }
 
 .inv-footer-bottom {

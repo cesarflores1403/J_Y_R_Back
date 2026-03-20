@@ -34,8 +34,8 @@ export const cambiarPassword = async (req, res) => {
 
 export const solicitarRecuperacion = async (req, res) => {
   try {
-    const { correo } = req.body;
-    const resultado = await authService.solicitarRecuperacion(correo);
+    const { nombre_usuario } = req.body;
+    const resultado = await authService.solicitarRecuperacion(nombre_usuario);
     res.json({ ok: true, ...resultado });
   } catch (error) {
     res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });

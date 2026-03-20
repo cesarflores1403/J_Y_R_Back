@@ -3,6 +3,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { carruselService } from '../../services/serviceIndex.js';
 import { toast } from 'react-toastify';
 import { FiPlus, FiTrash2, FiChevronLeft, FiChevronRight, FiImage, FiX } from 'react-icons/fi';
+import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 // Marcas de carros (mismas del Login)
 import marcaToyota from '../../assets/img/marca_toyota.png';
@@ -13,7 +14,7 @@ import marcaHonda from '../../assets/img/marca_honda.png';
 import marcaSuzuki from '../../assets/img/marca_suzuki.png';
 import marcaMitsubishi from '../../assets/img/marca_mitsubishi.svg';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = resolveApiBase();
 
 const marcasDefault = [
   { titulo: 'Toyota', imagen: marcaToyota, color: '#EB0A1E' },

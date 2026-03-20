@@ -4,18 +4,19 @@
 // { ok: true/false, message: string, data: any|null }
 // =====================================================
 
-const API_URL = import.meta.env.VITE_API_URL; // // Base URL del backend
+import { resolveApiBase } from '../utils/runtimeApi.js';
+
+const API_URL = resolveApiBase();
 
 export const apiFetch = async (endpoint, options = {}) => {
-  if (!API_URL) {
-    throw new Error('VITE_API_URL no está configurado');
-  }
-
   // =====================================================
   // Construcción segura de URL (evita doble / o faltante /)
   // =====================================================
-  const url = `${API_URL.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`;
-console.log('FETCH URL =>', url);
+  const endpointLimpio = endpoint.replace(/^\//, '');
+  const url = API_URL
+    ? `${API_URL}/${endpointLimpio}`
+    : `/${endpointLimpio}`;
+
   const response = await fetch(url, {
     ...options,
     headers: {

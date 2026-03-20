@@ -3,9 +3,10 @@ import { empresaConfigService } from '../../services/serviceIndex.js';
 import { toast } from 'react-toastify';
 import { FiSave, FiRefreshCw, FiUpload } from 'react-icons/fi';
 import { confirmDialog } from '../../utils/notifications.js';
+import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 const ConfigEmpresa = () => {
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_BASE = resolveApiBase();
   const inputLogoRef = useRef(null);
   const [form, setForm] = useState({
     nombre: '', rtn: '', direccion: '', telefono: '',

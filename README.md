@@ -23,7 +23,7 @@ npm run install:all
 ## Desarrollo
 
 ```bash
-# Iniciar ambos (backend + frontend)
+# Iniciar backend + frontend + tunnel automatico
 npm run dev
 
 # Solo backend (puerto 5000)
@@ -32,6 +32,29 @@ npm run start:backend
 # Solo frontend (puerto 5173)
 npm run start:frontend
 ```
+
+## URL Publica Fija (Cloudflare)
+
+El script `npm run dev` ya levanta el tunel automaticamente.
+
+- Si no configuras token, usa modo rapido (`trycloudflare`) y la URL cambia en cada arranque.
+- Si configuras token, usa modo fijo y mantiene tu URL estable.
+
+Pasos para URL fija:
+
+```bash
+# 1) Copiar plantilla
+copy .env.tunnel.example .env.tunnel
+
+# 2) Editar .env.tunnel y completar:
+# - TUNNEL_TOKEN
+# - TUNNEL_PUBLIC_URL
+
+# 3) Arrancar todo
+npm run dev
+```
+
+La URL publica activa se guarda en `public-url.txt`.
 
 ## Build
 

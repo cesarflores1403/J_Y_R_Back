@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import Sidebar from './Sidebar.jsx';
-import { FiLogOut, FiBell, FiKey } from 'react-icons/fi';
+import { FiLogOut, FiBell, FiKey, FiMenu } from 'react-icons/fi';
 import { authService, notificacionSuperAdminService } from '../../services/serviceIndex.js';
 import { toast } from 'react-toastify';
 
@@ -44,6 +44,7 @@ const Layout = () => {
   const [notificaciones, setNotificaciones] = useState([]);
   const [noLeidas, setNoLeidas] = useState(0);
   const [mostrarPanelNotis, setMostrarPanelNotis] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const puedeGestionarContrasenas = ['Super Administrador', 'Administrador'].includes(usuario?.rol);
   const esSuperAdmin = usuario?.rol === 'Super Administrador';
   const [modalPasswordAbierto, setModalPasswordAbierto] = useState(false);
@@ -63,6 +64,10 @@ const Layout = () => {
     cerrarSesion();
     navigate('/login');
   };
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   const abrirModalPassword = () => {
     setPasswordForm({ actual: '', nueva: '', confirmar: '' });
@@ -163,10 +168,18 @@ const Layout = () => {
 
   return (
     <div>
-      <Sidebar />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {sidebarOpen && <div className="jyr-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
       <main className="jyr-main">
         <header className="jyr-topbar">
           <div style={{ display: 'flex', alignItems: 'center' }}>
+            <button
+              className="jyr-topbar-menu"
+              onClick={() => setSidebarOpen((v) => !v)}
+              title="Abrir menú"
+            >
+              <FiMenu />
+            </button>
             <span className="jyr-topbar-title">{pageName}</span>
           </div>
           <div className="jyr-topbar-actions">

@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { toast } from 'react-toastify';
-import { FiUser, FiLock, FiLogIn } from 'react-icons/fi';
+import { FiUser, FiLock, FiLogIn, FiEye, FiEyeOff } from 'react-icons/fi';
 import logoFull from '../../assets/img/logo1.jpeg';
 import logoClean from '../../assets/img/logo2.jpeg';
 import axios from 'axios';
+import { resolveApiBase } from '../../utils/runtimeApi.js';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = resolveApiBase();
 
 const Login = () => {
   const [nombreUsuario, setNombreUsuario] = useState('');
   const [password, setPassword]           = useState('');
+  const [mostrarPassword, setMostrarPassword] = useState(false);
   const [cargando, setCargando]           = useState(false);
   const [error, setError]                 = useState('');
   const [currentSlide, setCurrentSlide]   = useState(0);
@@ -51,7 +53,8 @@ const Login = () => {
     setError('');
     setCargando(true);
     try {
-      await iniciarSesion(nombreUsuario, password);
+      const usuarioLimpio = nombreUsuario.trim();
+      await iniciarSesion(usuarioLimpio, password);
       toast.success('¡Bienvenido al sistema JYR!');
       navigate('/');
     } catch (err) {
@@ -118,6 +121,10 @@ const Login = () => {
                   placeholder="Nombre de usuario"
                   value={nombreUsuario}
                   onChange={(e) => setNombreUsuario(e.target.value)}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="username"
                   required autoFocus />
               </div>
             </div>
@@ -126,11 +133,24 @@ const Login = () => {
               <label className="form-label login-label">Contraseña</label>
               <div className="input-group">
                 <span className="input-group-text login-input-icon"><FiLock /></span>
-                <input type="password" className="form-control login-input"
+                <input type={mostrarPassword ? 'text' : 'password'} className="form-control login-input"
                   placeholder="Tu contraseña"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="current-password"
                   required />
+                <button
+                  type="button"
+                  className="input-group-text login-input-icon"
+                  onClick={() => setMostrarPassword((prev) => !prev)}
+                  aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  title={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {mostrarPassword ? <FiEyeOff /> : <FiEye />}
+                </button>
               </div>
             </div>
 

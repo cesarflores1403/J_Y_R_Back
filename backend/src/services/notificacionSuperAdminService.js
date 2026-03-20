@@ -16,19 +16,19 @@ class NotificacionSuperAdminService {
     return codUsuario;
   }
 
-  async crearSolicitudRecuperacion(correo) {
+  async crearSolicitudRecuperacion(nombreUsuario) {
     await this.inicializarTabla();
-    const correoLimpio = (correo || '').trim();
+    const nombreUsuarioLimpio = (nombreUsuario || '').trim();
     const titulo = 'Solicitud de recuperación de contraseña';
-    const mensaje = correoLimpio
-      ? `Se recibió una solicitud de recuperación para el correo: ${correoLimpio}`
-      : 'Se recibió una solicitud de recuperación sin correo especificado';
+    const mensaje = nombreUsuarioLimpio
+      ? `Se recibió una solicitud de recuperación para el usuario: ${nombreUsuarioLimpio}`
+      : 'Se recibió una solicitud de recuperación sin usuario especificado';
 
     return NotificacionSuperAdmin.create({
       tipo: 'RECUPERACION_PASSWORD',
       titulo,
       mensaje,
-      correo_solicitante: correoLimpio || null,
+      correo_solicitante: nombreUsuarioLimpio || null,
       leida: false
     });
   }

@@ -6,12 +6,13 @@
   "scripts": {
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
+    "dev:tunnel": "node scripts/start-tunnel.cjs",
     "start:backend": "npm start --prefix backend",
     "start:frontend": "npm run dev --prefix frontend",
     "install:backend": "npm install --prefix backend",
     "install:frontend": "npm install --prefix frontend",
     "install:all": "npm run install:backend && npm run install:frontend",
-    "dev": "concurrently -n BACK,FRONT -c blue,green \"npm run dev:backend\" \"npx wait-on tcp:5000 && npm run dev:frontend\"",
+    "dev": "concurrently -n BACK,FRONT,TUNNEL -c blue,green,magenta \"npm run dev:backend\" \"npx wait-on tcp:5000 && npm run dev:frontend\" \"npm run dev:tunnel\"",
     "build:frontend": "npm run build --prefix frontend",
     "test": "npm test --prefix backend"
   },

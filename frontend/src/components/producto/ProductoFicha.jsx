@@ -1,11 +1,12 @@
 ﻿import { FiX, FiEdit2, FiPackage, FiCheckCircle, FiAlertTriangle, FiXCircle } from 'react-icons/fi';
+import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 // =====================================================
 // HU-09: Ficha completa del producto (modal)
 // Muestra imagen + datos clave del producto
 // =====================================================
 
-const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+const API_URL = resolveApiBase();
 
 const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
   if (!producto) return null;

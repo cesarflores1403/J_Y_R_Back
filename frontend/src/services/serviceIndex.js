@@ -143,6 +143,7 @@ export const empresaConfigService = {
   obtener: () => api.get('/empresa-config'),
   actualizar: (data) => api.put('/empresa-config', data),
   obtenerCorrelativos: () => api.get('/empresa-config/correlativos'),
+  obtenerUrlSistema: () => api.get('/empresa-config/url-sistema'),
   actualizarCorrelativos: (data) => api.put('/empresa-config/correlativos', data),
   subirLogoFactura: (formData) => api.post('/empresa-config/logo-factura', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }

@@ -25,7 +25,10 @@ router.put('/cambiar-password', autenticar, [
 
 // POST /api/auth/solicitar-recuperacion
 router.post('/solicitar-recuperacion', [
-  body('correo').isEmail().withMessage('Correo inválido'),
+  body('nombre_usuario')
+    .trim()
+    .notEmpty().withMessage('El nombre de usuario es requerido')
+    .isLength({ max: 50 }).withMessage('El nombre de usuario excede el máximo permitido'),
   validarCampos
 ], solicitarRecuperacion);
 

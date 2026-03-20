@@ -11,7 +11,8 @@ import {
 	obtenerCorrelativos,
 	actualizarCorrelativos,
 	subirLogoFactura,
-	quitarLogoFactura
+	quitarLogoFactura,
+	obtenerUrlSistema
 } from '../controllers/empresaConfigController.js';
 import { validarCampos } from '../middlewares/validar.js';
 
@@ -53,6 +54,7 @@ router.get('/', obtener);
 
 // Correlativos (solo Super Administrador)
 router.get('/correlativos', autorizar('Super Administrador'), obtenerCorrelativos);
+router.get('/url-sistema', autorizar('Super Administrador'), obtenerUrlSistema);
 
 router.put('/correlativos',
 	autorizar('Super Administrador'),

@@ -33,9 +33,20 @@ app.use(cors({
   origin: function (origin, callback) {
     // // Permitir requests sin origin (Postman, curl, etc.)
     if (!origin) return callback(null, true);
-    // // Permitir cualquier localhost en desarrollo
-    const allowed = /^http:\/\/localhost:\d+$/;
-    if (allowed.test(origin)) return callback(null, true);
+
+    // // Permitir localhost y dominios temporales de tuneles para compartir entorno local
+    const allowedPatterns = [
+      /^http:\/\/localhost:\d+$/,
+      /^http:\/\/127\.0\.0\.1:\d+$/,
+      /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/,
+      /^https:\/\/[a-z0-9-]+\.loca\.lt$/,
+      /^https:\/\/[a-z0-9-]+\.lhr\.life$/
+    ];
+
+    if (allowedPatterns.some((pattern) => pattern.test(origin))) {
+      return callback(null, true);
+    }
+
     callback(new Error('No permitido por CORS'));
   },
   credentials: true // // Permitir cookies

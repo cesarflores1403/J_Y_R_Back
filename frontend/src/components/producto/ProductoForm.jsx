@@ -3,6 +3,7 @@ import { useIsv } from '../../hooks/useIsv.js'; // // Hook catálogo ISV
 import { useCategorias } from '../../hooks/useCategorias.js'; // // Hook catálogo Categorías (HU-07)
 import { useUbicaciones } from '../../hooks/useUbicaciones.js'; // // HU-10: Hook ubicaciones
 import { FiCamera, FiX, FiEdit2, FiPlusCircle } from 'react-icons/fi';
+import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit, onSubirImagen }) => {
   const { catalogoIsv, loadingIsv } = useIsv(); // // Catálogo ISV desde BD
@@ -45,7 +46,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
 
       // HU-08: Mostrar imagen actual si existe
       if (selected.imagen_url) {
-        const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+        const API_URL = resolveApiBase();
         setImagenPreview(`${API_URL}${selected.imagen_url}`);
       } else {
         setImagenPreview(null);

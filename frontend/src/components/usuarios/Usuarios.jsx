@@ -220,7 +220,7 @@ const Usuarios = () => {
                 <table className="table table-sm align-middle mb-0">
                   <thead>
                     <tr>
-                      <th>Correo solicitante</th>
+                      <th>Usuario solicitante</th>
                       <th>Fecha</th>
                       <th className="text-end">Acción</th>
                     </tr>

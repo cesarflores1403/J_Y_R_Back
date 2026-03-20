@@ -25,7 +25,6 @@ const BuscadorProducto = ({ onAgregar, itemsActuales = [] }) => {
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
   const { usuario } = useAuth();
-  const confirm = useConfirm();
   const esAdmin = usuario?.rol === 'Administrador';
 
   // Cerrar dropdown al hacer click fuera

@@ -1,7 +1,8 @@
 import React, { forwardRef } from 'react';
 import logoFull from '../../assets/img/logo1.jpeg';
+import { resolveApiBase } from '../../utils/runtimeApi.js';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = resolveApiBase();
 
 // =====================================================
 // HU-FAC-06: Comprobante de Factura (Impresión / PDF)

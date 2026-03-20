@@ -8,8 +8,9 @@ import logoClean from '../../assets/img/logo2.jpeg';
 import logoFull from '../../assets/img/logo1.jpeg';
 import BuscadorProducto from './BuscadorProducto.jsx';
 import ModalClienteRapido from './ModalClienteRapido.jsx';
+import { resolveApiBase } from '../../utils/runtimeApi.js';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = resolveApiBase();
 
 const formatMoney = (v) => {
   const n = parseFloat(v) || 0;
@@ -679,12 +680,12 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
                     <th style={{ width: 36 }}>#</th>
                     <th>Producto</th>
                     <th style={{ width: 100 }}>P. Unit.</th>
-                    <th style={{ width: 80 }}>Cant.</th>
-                    <th style={{ width: 80 }}>Desc %</th>
-                    <th style={{ width: 100 }}>Subtotal</th>
+                    <th style={{ width: 96 }}>Cant.</th>
+                    <th style={{ width: 96 }}>Desc %</th>
+                    <th style={{ width: 96 }}>Subtotal</th>
                     <th style={{ width: 60 }}>ISV %</th>
-                    <th style={{ width: 100 }}>ISV (L)</th>
-                    <th style={{ width: 110 }}>Total</th>
+                    <th style={{ width: 92 }}>ISV (L)</th>
+                    <th style={{ width: 100 }}>Total</th>
                     <th style={{ width: 40 }}></th>
                   </tr></thead>
                   <tbody>
@@ -702,12 +703,12 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
                           </td>
                           <td>{formatMoney(item.precio_venta)}</td>
                           <td>
-                            <input type="number" className={`form-control form-control-sm ${stockError ? 'is-invalid' : ''}`}
+                            <input type="number" className={`form-control form-control-sm compact-number-input ${stockError ? 'is-invalid' : ''}`}
                               min="1" max={item.stock} value={item.cantidad}
                               onChange={(e) => cambiarCantidad(index, e.target.value)} />
                           </td>
                           <td>
-                            <input type="number" className="form-control form-control-sm"
+                            <input type="number" className="form-control form-control-sm compact-number-input"
                               min="0" max="100" step="0.5" value={item.descuento || 0}
                               onChange={(e) => cambiarDescuento(index, e.target.value)} />
                           </td>

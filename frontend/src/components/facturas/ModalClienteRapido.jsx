@@ -116,13 +116,23 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
   const validar = () => {
     const errs = {};
     if (!form.nombre.trim()) errs.nombre = 'El nombre es requerido';
-    if (form.empresa && !REGEX_TEXTO_CON_PUNTO.test(form.empresa.trim())) errs.empresa = 'La empresa solo permite letras, números, espacios y punto';
-    if (form.correo && !REGEX_CORREO_PERMITIDO.test(form.correo.trim())) errs.correo = 'El correo solo permite letras, números, @ y punto';
-    if (form.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo)) errs.correo = 'Correo inválido';
-    if (form.dni && form.dni.trim().length < 5) errs.dni = 'El DNI debe tener al menos 5 caracteres';
+    if (form.nombre.trim().length > 10) errs.nombre = 'El nombre no puede exceder 10 caracteres';
+    if (!form.apellido.trim()) errs.apellido = 'El apellido es requerido';
+    if (form.apellido.trim().length > 10) errs.apellido = 'El apellido no puede exceder 10 caracteres';
+    if (!form.dni.trim()) errs.dni = 'El DNI es requerido';
+    if (form.dni.trim() && !/^\d{13}$/.test(form.dni.trim())) errs.dni = 'El DNI debe tener exactamente 13 dígitos numéricos';
     if (form.rtn && !/^\d{14}$/.test(form.rtn.trim())) errs.rtn = 'El RTN debe tener exactamente 14 dígitos numéricos';
-    if (form.direccion && form.direccion.trim().length > 60) errs.direccion = 'La dirección no puede exceder 60 caracteres';
-    if (form.direccion && !REGEX_TEXTO_CON_PUNTO.test(form.direccion.trim())) errs.direccion = 'La dirección solo permite letras, números, espacios y punto';
+    if (!form.empresa.trim()) errs.empresa = 'La empresa es requerida';
+    if (form.empresa.trim().length > 15) errs.empresa = 'La empresa no puede exceder 15 caracteres';
+    if (form.empresa.trim() && !REGEX_TEXTO_CON_PUNTO.test(form.empresa.trim())) errs.empresa = 'La empresa solo permite letras, números, espacios y punto';
+    if (!form.telefono.trim()) errs.telefono = 'El teléfono es requerido';
+    if (form.telefono.trim() && !/^\d{8}$/.test(form.telefono.trim())) errs.telefono = 'El teléfono debe tener exactamente 8 dígitos numéricos';
+    if (!form.correo.trim()) errs.correo = 'El correo es requerido';
+    if (form.correo.trim() && !REGEX_CORREO_PERMITIDO.test(form.correo.trim())) errs.correo = 'El correo solo permite letras, números, @ y punto';
+    if (form.correo.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())) errs.correo = 'El correo no tiene un formato válido';
+    if (!form.direccion.trim()) errs.direccion = 'La dirección es requerida';
+    if (form.direccion.trim().length > 60) errs.direccion = 'La dirección no puede exceder 60 caracteres';
+    if (form.direccion.trim() && !REGEX_TEXTO_CON_PUNTO.test(form.direccion.trim())) errs.direccion = 'La dirección solo permite letras, números, espacios y punto';
     setErrores(errs);
     return Object.keys(errs).length === 0;
   };
@@ -215,27 +225,32 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
           <div className="col-6">
             <label className="form-label small mb-1">Nombre <span className="text-danger">*</span></label>
             <input ref={nombreRef} type="text" className={`form-control form-control-sm ${errores.nombre ? 'is-invalid' : ''}`}
-              value={form.nombre} onChange={e => handleChange('nombre', e.target.value)}
+              value={form.nombre} onChange={e => handleChange('nombre', e.target.value.slice(0, 10))}
+              maxLength={10}
               placeholder="Nombre del cliente"
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }}
               onKeyDown={e => e.key === 'Enter' && guardar()} />
             {errores.nombre && <div className="invalid-feedback">{errores.nombre}</div>}
           </div>
           <div className="col-6">
-            <label className="form-label small mb-1">Apellido</label>
-            <input type="text" className="form-control form-control-sm"
-              value={form.apellido} onChange={e => handleChange('apellido', e.target.value)}
+            <label className="form-label small mb-1">Apellido <span className="text-danger">*</span></label>
+            <input type="text" className={`form-control form-control-sm ${errores.apellido ? 'is-invalid' : ''}`}
+              value={form.apellido} onChange={e => handleChange('apellido', e.target.value.slice(0, 10))}
+              maxLength={10}
               placeholder="Apellido"
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+            {errores.apellido && <div className="invalid-feedback">{errores.apellido}</div>}
           </div>
           <div className="col-4">
             <label className="form-label small mb-1">
-              DNI / Identidad
+              DNI / Identidad <span className="text-danger">*</span>
               {verificando && <span className="spinner-border spinner-border-sm ms-1" style={{ width: 12, height: 12 }} />}
             </label>
             <input type="text" className={`form-control form-control-sm ${errores.dni ? 'is-invalid' : ''}`}
-              value={form.dni} onChange={e => handleChange('dni', e.target.value)}
-              placeholder="0801-1990-12345"
+              value={form.dni}
+              onChange={e => handleChange('dni', e.target.value.replace(/\D/g, '').slice(0, 13))}
+              maxLength={13}
+              placeholder="13 dígitos"
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
             {errores.dni && <div className="invalid-feedback">{errores.dni}</div>}
           </div>
@@ -249,23 +264,26 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
             {errores.rtn && <div className="invalid-feedback">{errores.rtn}</div>}
           </div>
           <div className="col-4">
-            <label className="form-label small mb-1">Empresa</label>
+            <label className="form-label small mb-1">Empresa <span className="text-danger">*</span></label>
             <input type="text" className={`form-control form-control-sm ${errores.empresa ? 'is-invalid' : ''}`}
               value={form.empresa} onChange={e => handleChange('empresa', sanitizarTextoConPunto(e.target.value, 15))}
               maxLength={15}
-              placeholder="Empresa (opcional)"
+              placeholder="Empresa"
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
             {errores.empresa && <div className="invalid-feedback">{errores.empresa}</div>}
           </div>
           <div className="col-6">
-            <label className="form-label small mb-1">Teléfono</label>
-            <input type="text" className="form-control form-control-sm"
-              value={form.telefono} onChange={e => handleChange('telefono', e.target.value)}
-              placeholder="9999-9999"
+            <label className="form-label small mb-1">Teléfono <span className="text-danger">*</span></label>
+            <input type="text" className={`form-control form-control-sm ${errores.telefono ? 'is-invalid' : ''}`}
+              value={form.telefono}
+              onChange={e => handleChange('telefono', e.target.value.replace(/\D/g, '').slice(0, 8))}
+              maxLength={8}
+              placeholder="8 dígitos"
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
+            {errores.telefono && <div className="invalid-feedback">{errores.telefono}</div>}
           </div>
           <div className="col-6">
-            <label className="form-label small mb-1">Correo</label>
+            <label className="form-label small mb-1">Correo <span className="text-danger">*</span></label>
             <input type="email" className={`form-control form-control-sm ${errores.correo ? 'is-invalid' : ''}`}
               value={form.correo} onChange={e => handleChange('correo', sanitizarCorreo(e.target.value, 30))}
               maxLength={30}
@@ -274,11 +292,11 @@ const ModalClienteRapido = ({ visible, onCerrar, onClienteCreado, clienteEditar 
             {errores.correo && <div className="invalid-feedback">{errores.correo}</div>}
           </div>
           <div className="col-12">
-            <label className="form-label small mb-1">Dirección</label>
+            <label className="form-label small mb-1">Dirección <span className="text-danger">*</span></label>
             <input type="text" className={`form-control form-control-sm ${errores.direccion ? 'is-invalid' : ''}`}
               value={form.direccion} onChange={e => handleChange('direccion', sanitizarTextoConPunto(e.target.value, 60))}
               maxLength={60}
-              placeholder="Dirección (opcional)"
+              placeholder="Dirección"
               style={{ background: '#2a2a3d', color: '#e0e0e0', border: '1px solid #555' }} />
             {errores.direccion && <div className="invalid-feedback">{errores.direccion}</div>}
           </div>

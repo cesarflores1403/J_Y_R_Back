@@ -5,7 +5,7 @@ import { getInitials } from '../../utils/helpers.js';
 import {
   FiGrid, FiUsers, FiTruck, FiPackage,
   FiBarChart2, FiLogOut, FiFileText, FiMapPin, FiDatabase, FiList, FiPlusCircle, FiMinusCircle,
-  FiAlertTriangle, FiTag, FiRepeat, FiClipboard, FiLock, FiShoppingCart, FiClock, FiImage
+  FiAlertTriangle, FiTag, FiRepeat, FiClipboard, FiLock, FiShoppingCart, FiClock, FiImage, FiLink2
 } from 'react-icons/fi';
 import logoClean from '../../assets/img/logo2.jpeg';
 
@@ -48,21 +48,28 @@ const menuItems = [
   ]},
   { section: 'Configuración', items: [
     { path: '/config-empresa', label: 'Datos Factura', icon: <FiFileText />, roles: ['Super Administrador'] },
+    { path: '/url-sistema', label: 'URL del Sistema', icon: <FiLink2 />, roles: ['Super Administrador'] },
   ]},
 ];
 
-const Sidebar = () => {
+const Sidebar = ({ open = false, onClose = () => {} }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { usuario, cerrarSesion } = useAuth();
 
   const handleLogout = () => {
+    onClose();
     cerrarSesion();
     navigate('/login');
   };
 
+  const navegar = (path) => {
+    navigate(path);
+    onClose();
+  };
+
   return (
-    <aside className="jyr-sidebar">
+    <aside className={`jyr-sidebar ${open ? 'open' : ''}`}>
       <div className="jyr-sidebar-brand">
         <img src={logoClean} alt="J&R" className="jyr-sidebar-logo" />
         <div>
@@ -90,7 +97,7 @@ const Sidebar = () => {
                   <div
                     key={item.path}
                     className={`jyr-nav-item ${isActive ? 'active' : ''}`}
-                    onClick={() => navigate(item.path)}
+                    onClick={() => navegar(item.path)}
                   >
                     <span className="nav-icon">{item.icon}</span>
                     {item.label}

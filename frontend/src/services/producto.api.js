@@ -1,6 +1,12 @@
 import { apiFetch } from './api.js'; // // Wrapper base
+import { resolveApiBase } from '../utils/runtimeApi.js';
 
-const API_URL = import.meta.env.VITE_API_URL; // // Base URL del backend
+const API_URL = resolveApiBase();
+
+const construirUrlApi = (ruta) => {
+  const limpia = ruta.startsWith('/') ? ruta : `/${ruta}`;
+  return API_URL ? `${API_URL}${limpia}` : limpia;
+};
 
 export const productoApi = {
   getAll: () => apiFetch('/api/producto', { method: 'GET' }), // // GET lista
@@ -67,7 +73,7 @@ export const productoApi = {
     const formData = new FormData();
     formData.append('imagen', file);
 
-    const url = `${API_URL.replace(/\/$/, '')}/api/producto/${cod_producto}/imagen`;
+    const url = construirUrlApi(`/api/producto/${cod_producto}/imagen`);
     const response = await fetch(url, {
       method: 'POST',
       body: formData,
@@ -103,7 +109,7 @@ export const productoApi = {
     const formData = new FormData();
     formData.append('archivo', file);
 
-    const url = `${API_URL.replace(/\/$/, '')}/api/producto/importar`;
+    const url = construirUrlApi('/api/producto/importar');
     const response = await fetch(url, {
       method: 'POST',
       body: formData,
@@ -128,5 +134,5 @@ export const productoApi = {
   },
 
   // HU-12: URL de descarga de plantilla
-  getPlantillaUrl: () => `${API_URL.replace(/\/$/, '')}/api/producto/plantilla`,
+  getPlantillaUrl: () => construirUrlApi('/api/producto/plantilla'),
 };

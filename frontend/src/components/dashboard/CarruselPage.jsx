@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { carruselService } from '../../services/serviceIndex.js';
 import { toast } from 'react-toastify';
 import { FiPlus, FiTrash2, FiImage, FiX, FiEdit2, FiCheck, FiArrowUp, FiArrowDown } from 'react-icons/fi';
+import { resolveApiBase } from '../../utils/runtimeApi.js';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = resolveApiBase();
 
 const CarruselPage = () => {
   const [imagenes, setImagenes] = useState([]);

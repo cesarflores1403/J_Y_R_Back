@@ -29,6 +29,7 @@ import Usuarios from '../components/usuarios/Usuarios.jsx';
 import RecuperarPassword from '../components/auth/RecuperarPassword.jsx';
 import OrdenesCompra from '../components/compras/OrdenesCompra.jsx';
 import ConfigEmpresa from '../components/configuracion/ConfigEmpresa.jsx';
+import UrlSistema from '../components/configuracion/UrlSistema.jsx';
 const PrivateRoute = ({ children, roles }) => {
   const { autenticado, usuario, cargando } = useAuth();
   if (cargando) return <div className="jyr-spinner" style={{ minHeight: '100vh' }} />;
@@ -73,6 +74,7 @@ const App = () => {
             <Route path="usuarios" element={<PrivateRoute roles={['Administrador']}><Usuarios /></PrivateRoute>} />
             <Route path="compras/ordenes" element={<PrivateRoute roles={['Administrador','Bodeguero']}><OrdenesCompra /></PrivateRoute>} />
             <Route path="config-empresa" element={<PrivateRoute roles={['Super Administrador']}><ConfigEmpresa /></PrivateRoute>} />
+            <Route path="url-sistema" element={<PrivateRoute roles={['Super Administrador']}><UrlSistema /></PrivateRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

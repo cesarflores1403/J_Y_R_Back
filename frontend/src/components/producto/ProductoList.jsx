@@ -7,6 +7,7 @@ import { alertDialog, confirmDialog } from '../../utils/notifications.js';
 // =====================================================
 // HU-06: Listado con busqueda, filtros, paginacion y ordenamiento
 // =====================================================
+import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 const ITEMS_PER_PAGE = 6;
 
@@ -293,7 +294,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
   // =====================================================
   // HU-08: Handlers de imagen
   // =====================================================
-  const API_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+  const API_URL = resolveApiBase();
 
   const handleImageClick = (p) => {
     setUploadTarget(p);

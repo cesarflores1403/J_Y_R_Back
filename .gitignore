@@ -18,11 +18,13 @@ frontend/dist/
 .env
 backend/.env
 frontend/.env
+.env.tunnel
 
 # ==============================
 # LOGS
 # ==============================
 *.log
+public-url.txt
 
 # ==============================
 # ARCHIVOS SISTEMA

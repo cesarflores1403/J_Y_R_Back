@@ -1,8 +1,7 @@
 import axios from 'axios';
+import { resolveApiPath } from '../utils/runtimeApi.js';
 
-const API_URL = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : 'http://localhost:5000/api';
+const API_URL = resolveApiPath();
 
 const api = axios.create({
   baseURL: API_URL,
