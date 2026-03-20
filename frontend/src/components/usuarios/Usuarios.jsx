@@ -220,7 +220,7 @@ const Usuarios = () => {
                 <table className="table table-sm align-middle mb-0">
                   <thead>
                     <tr>
-                      <th>Usuario solicitante</th>
+                      <th>Correo solicitante</th>
                       <th>Fecha</th>
                       <th className="text-end">Acción</th>
                     </tr>
@@ -290,13 +290,15 @@ const Usuarios = () => {
                   <tr><td colSpan={puedeCambiarContrasena ? 6 : 5} className="text-center text-muted py-4">
                     No se encontraron usuarios
                   </td></tr>
-                ) : usuarios.map((u) => (
+                ) : usuarios.map((u, index) =>  (
                   (() => {
                     const esFilaSuperAdmin = (u.roles || []).some((r) => r.nombre_rol === 'Super Administrador');
                     return (
                   <tr key={u.cod_usuario}>
-                    <td className="text-muted">{u.cod_usuario}</td>
-                    <td><strong>{u.nombre_usuario}</strong></td>
+                    <td className="text-muted">
+                  {(pagina - 1) * 15 + index + 1}
+                </td>
+                <td>{u.nombre_usuario}</td>
                     <td>
                       {u.roles?.[0]
                         ? <span className="badge bg-primary">{u.roles[0].nombre_rol}</span>
