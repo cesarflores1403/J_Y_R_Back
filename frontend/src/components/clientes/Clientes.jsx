@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { clienteService } from '../../services/serviceIndex.js';
 import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
@@ -34,14 +34,16 @@ const Clientes = () => {
   const [editando, setEditando] = useState(null);
   const [form, setForm] = useState(camposIniciales);
   const [guardando, setGuardando] = useState(false);
+  const [seleccionados, setSeleccionados] = useState([]);
 
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const { data } = await clienteService.listar({ pagina, limite: 15, buscar });
+      const { data } = await clienteService.listar({ pagina, limite: 10, buscar });
       if (data.ok) {
         setClientes(data.datos);
         setTotalPaginas(data.totalPaginas);
+        setSeleccionados(prev => prev.filter(id => data.datos.some(c => c.cod_cliente === id)));
       }
     } catch (err) {
       toast.error('Error al cargar clientes');
@@ -52,7 +54,11 @@ const Clientes = () => {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const abrirCrear = () => { setEditando(null); setForm(camposIniciales); setModal(true); };
+  const abrirCrear = () => {
+    setEditando(null);
+    setForm(camposIniciales);
+    setModal(true);
+  };
 
   const abrirEditar = (cliente) => {
     setEditando(cliente.cod_cliente);
@@ -72,7 +78,6 @@ const Clientes = () => {
   const guardar = async (e) => {
     e.preventDefault();
 
-    // Validaciones
     if (!form.nombre.trim()) return toast.warn('El nombre es obligatorio');
     if (form.nombre.trim().length > 10) return toast.warn('El nombre no puede exceder 10 caracteres');
     if (!form.apellido.trim()) return toast.warn('El apellido es obligatorio');
@@ -122,6 +127,7 @@ const Clientes = () => {
       confirmText: 'Sí, eliminar'
     });
     if (!ok) return;
+
     try {
       await clienteService.eliminar(id);
       toast.success('Cliente eliminado');
@@ -131,48 +137,172 @@ const Clientes = () => {
     }
   };
 
+  const idsPagina = useMemo(
+    () => clientes.map(c => c.cod_cliente),
+    [clientes]
+  );
+
+  const todosSeleccionados =
+    idsPagina.length > 0 && idsPagina.every(id => seleccionados.includes(id));
+
+  const toggleSeleccion = (id) => {
+    setSeleccionados(prev =>
+      prev.includes(id)
+        ? prev.filter(x => x !== id)
+        : [...prev, id]
+    );
+  };
+
+  const toggleSeleccionPagina = () => {
+    if (todosSeleccionados) {
+      setSeleccionados(prev => prev.filter(id => !idsPagina.includes(id)));
+    } else {
+      setSeleccionados(prev => [...new Set([...prev, ...idsPagina])]);
+    }
+  };
+
+  const limpiarSeleccion = () => setSeleccionados([]);
+
+  const eliminarSeleccionados = async () => {
+    if (seleccionados.length === 0) {
+      toast.warning('Selecciona al menos un cliente');
+      return;
+    }
+
+    const ok = await confirmDialog({
+      variant: 'delete',
+      title: `Eliminar ${seleccionados.length} cliente(s)`,
+      text: 'Esta acción no se puede deshacer.',
+      confirmText: 'Sí, eliminar'
+    });
+    if (!ok) return;
+
+    let eliminados = 0;
+
+    for (const id of seleccionados) {
+      try {
+        await clienteService.eliminar(id);
+        eliminados++;
+      } catch {}
+    }
+
+    if (eliminados > 0) {
+      toast.success(`${eliminados} cliente(s) procesado(s)`);
+    }
+
+    setSeleccionados([]);
+    cargar();
+  };
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h3 className="mb-0">Clientes</h3>
-        <button className="btn jyr-btn-primary" onClick={abrirCrear}><FiPlus className="me-2" />Nuevo Cliente</button>
+        <h3 className="mb-0">Clientes ({clientes.length})</h3>
+        <div className="d-flex gap-2">
+          <button className="btn jyr-btn-primary" onClick={abrirCrear}>
+            <FiPlus className="me-2" />Nuevo Cliente
+          </button>
+        </div>
       </div>
 
-      {/* Buscador */}
       <div className="jyr-card mb-3">
         <div className="jyr-card-body py-2">
           <div className="input-group">
             <span className="input-group-text"><FiSearch /></span>
-            <input type="text" className="form-control" placeholder="Buscar por nombre, DNI, empresa, correo..."
-              value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1); }} />
-            {buscar && <button className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}><FiX /></button>}
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Buscar por nombre, DNI, empresa, correo..."
+              value={buscar}
+              onChange={(e) => { setBuscar(e.target.value); setPagina(1); }}
+            />
+            {buscar && (
+              <button className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}>
+                <FiX />
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Tabla */}
+      {seleccionados.length > 0 && (
+        <div style={{
+          padding: '10px 16px',
+          marginBottom: 12,
+          background: '#eff6ff',
+          border: '1px solid #bfdbfe',
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#2563eb' }}>
+            {seleccionados.length} cliente(s) seleccionado(s)
+          </span>
+
+          <button className="btn btn-sm btn-outline-danger" onClick={eliminarSeleccionados}>
+            <FiTrash2 className="me-1" />Eliminar seleccionados
+          </button>
+
+          <button className="btn btn-sm btn-outline-secondary ms-auto" onClick={limpiarSeleccion}>
+            <FiX className="me-1" />Limpiar selección
+          </button>
+        </div>
+      )}
+
       <div className="jyr-card">
         <div className="jyr-card-body p-0">
           <div className="table-responsive">
             <table className="table table-hover mb-0">
-              <thead><tr>
-                <th>Nombre</th><th>DNI</th><th>Empresa</th><th>Teléfono</th><th>Correo</th><th>Acciones</th>
-              </tr></thead>
+              <thead>
+                <tr>
+                  <th style={{ width: 44, textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={todosSeleccionados}
+                      onChange={toggleSeleccionPagina}
+                      disabled={clientes.length === 0}
+                      title="Seleccionar todos en esta página"
+                    />
+                  </th>
+                  <th>#</th>
+                  <th>Nombre</th>
+                  <th>DNI</th>
+                  <th>Empresa</th>
+                  <th>Teléfono</th>
+                  <th>Correo</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
               <tbody>
                 {cargando ? (
-                  <tr><td colSpan="6" className="text-center py-4"><div className="spinner-border spinner-border-sm" /></td></tr>
+                  <tr><td colSpan="8" className="text-center py-4"><div className="spinner-border spinner-border-sm" /></td></tr>
                 ) : clientes.length === 0 ? (
-                  <tr><td colSpan="6" className="text-center text-muted py-4">No se encontraron clientes</td></tr>
-                ) : clientes.map((c) => (
+                  <tr><td colSpan="8" className="text-center text-muted py-4">No se encontraron clientes</td></tr>
+                ) : clientes.map((c, index) => (
                   <tr key={c.cod_cliente}>
-                    <td><strong>{c.nombre}</strong> {c.apellido || ''}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={seleccionados.includes(c.cod_cliente)}
+                        onChange={() => toggleSeleccion(c.cod_cliente)}
+                        title={`Seleccionar ${c.nombre} ${c.apellido || ''}`}
+                      />
+                    </td>
+                    <td className="text-muted">{((pagina - 1) * 10) + index + 1}</td>
+                    <td>{c.nombre} {c.apellido || ''}</td>
                     <td>{c.dni || '-'}</td>
                     <td>{c.empresa || '-'}</td>
                     <td>{c.telefono || '-'}</td>
                     <td>{c.correo || '-'}</td>
                     <td>
-                      <button className="btn btn-sm btn-outline-primary me-1" onClick={() => abrirEditar(c)}><FiEdit2 /></button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => eliminar(c.cod_cliente)}><FiTrash2 /></button>
+                      <button className="btn btn-sm btn-outline-primary me-1" onClick={() => abrirEditar(c)}>
+                        <FiEdit2 />
+                      </button>
+                      <button className="btn btn-sm btn-outline-danger" onClick={() => eliminar(c.cod_cliente)}>
+                        <FiTrash2 />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -182,10 +312,9 @@ const Clientes = () => {
         </div>
       </div>
 
-      {/* Paginación */}
       {totalPaginas > 1 && (
-        <div className="d-flex justify-content-center mt-3">
-          <nav><ul className="pagination pagination-sm">
+        <div className="d-flex justify-content-center mt-3 align-items-center gap-3">
+          <nav><ul className="pagination pagination-sm mb-0">
             <li className={`page-item ${pagina <= 1 ? 'disabled' : ''}`}>
               <button className="page-link" onClick={() => setPagina(p => p - 1)}>Anterior</button>
             </li>
@@ -198,10 +327,10 @@ const Clientes = () => {
               <button className="page-link" onClick={() => setPagina(p => p + 1)}>Siguiente</button>
             </li>
           </ul></nav>
+          <span className="fw-semibold fs-6 text-muted">Página {pagina} de {totalPaginas}</span>
         </div>
       )}
 
-      {/* Modal */}
       {modal && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog modal-lg">
