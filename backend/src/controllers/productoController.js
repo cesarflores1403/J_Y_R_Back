@@ -49,17 +49,20 @@ export const createProducto = async (req, res, next) => {
 // =======================
 export const updateProducto = async (req, res, next) => {
   try {
-    const { cod_producto, datos } = req.body;
+    const { cod_producto, datos = {}, stock_agregar = 0, stock_nuevo = null } = req.body;
 
     // Si se está actualizando cod_isv, validar que exista
     if (datos.cod_isv !== undefined && datos.cod_isv !== null) {
       await isvService.validarIsvExiste(datos.cod_isv);
     }
 
-    await productoService.updateProducto({ cod_producto, datos });
+    await productoService.updateProducto({ cod_producto, datos, stock_agregar, stock_nuevo });
 
     // HU-05: Mensaje detallado con campos actualizados
     const camposActualizados = Object.keys(datos);
+    const stockAgregado = Number(stock_agregar || 0);
+    const stockNuevoDefinido = stock_nuevo !== undefined && stock_nuevo !== null && stock_nuevo !== '';
+    const stockNuevo = stockNuevoDefinido ? Number(stock_nuevo) : null;
     const nombresLegibles = {
       cod_categoria: 'Categoría',
       nombre_producto: 'Nombre',
@@ -70,11 +73,27 @@ export const updateProducto = async (req, res, next) => {
       cod_ubicacion: 'Ubicación'
     };
     const camposTexto = camposActualizados.map(c => nombresLegibles[c] || c).join(', ');
+    const partesMensaje = [];
+
+    if (camposTexto) partesMensaje.push(`Campos modificados: ${camposTexto}.`);
+    if (stockNuevoDefinido && Number.isInteger(stockNuevo) && stockNuevo >= 0) {
+      partesMensaje.push(`Stock total actualizado a: ${stockNuevo}.`);
+    }
+    if (stockAgregado > 0) partesMensaje.push(`Stock agregado: +${stockAgregado}.`);
+
+    const mensajeFinal = partesMensaje.length > 0
+      ? `Producto actualizado correctamente. ${partesMensaje.join(' ')}`
+      : 'Producto actualizado correctamente.';
 
     return sendOk(res, {
       status: 200,
-      message: `Producto actualizado correctamente. Campos modificados: ${camposTexto}.`,
-      data: { cod_producto, campos_actualizados: camposActualizados }
+      message: mensajeFinal,
+      data: {
+        cod_producto,
+        campos_actualizados: camposActualizados,
+        stock_agregado: stockAgregado,
+        stock_nuevo: stockNuevoDefinido ? stockNuevo : null
+      }
     });
   } catch (err) {
     next(err);

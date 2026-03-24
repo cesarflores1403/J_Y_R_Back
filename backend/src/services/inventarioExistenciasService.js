@@ -248,22 +248,7 @@ class InventarioExistenciasService {
     // // Construimos WHERE final con condiciones parametrizadas
     const whereSql = whereParts.join(' AND ');
 
-    // // Query de conteo total para soportar paginacion en frontend
-    const [countRow] = await sequelize.query(`
-      SELECT COUNT(*)::int AS total
-      ${construirFromExistenciasBase()}
-      WHERE ${whereSql}
-    `, {
-      replacements,
-      type: sequelize.QueryTypes.SELECT
-    });
-
-    // // Total de registros encontrados con filtros aplicados
-    const total = Number(countRow?.total || 0);
-    // // Total de paginas (al menos 1 para estabilidad de UI)
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-
-    // // Query principal de listado reutilizando SELECT base de existencias
+    // // Query principal del listado (se consolida por producto en memoria para evitar duplicados visuales por ubicacion)
     const filasCrudas = await sequelize.query(`
       ${construirSelectExistenciasBase()}
       WHERE ${whereSql}
@@ -271,19 +256,65 @@ class InventarioExistenciasService {
         p.nombre_producto ASC,
         COALESCE(i.cod_ubicacion, p.cod_ubicacion) ASC NULLS LAST,
         i.cod_inventario ASC NULLS LAST
-      LIMIT :limite OFFSET :offset
     `, {
-      // // Reutilizamos filtros y agregamos paginacion
-      replacements: {
-        ...replacements,
-        limite: limit,
-        offset
-      },
+      replacements,
       type: sequelize.QueryTypes.SELECT
     });
 
-    // // Agregamos stock_disponible y estado_stock a cada fila para HU2 reestructurada
-    const datos = filasCrudas.map(mapearFilaExistencia);
+    // // Agregamos campos calculados por fila cruda.
+    const filasNormalizadas = filasCrudas.map(mapearFilaExistencia);
+
+    // // Consolidamos por producto para mostrar una sola fila por producto en la vista de existencias.
+    const consolidadoMap = new Map();
+    for (const fila of filasNormalizadas) {
+      const key = Number(fila.cod_producto);
+      const actual = consolidadoMap.get(key);
+
+      if (!actual) {
+        consolidadoMap.set(key, {
+          ...fila,
+          stock: Number(fila.stock || 0),
+          stock_reservado: Number(fila.stock_reservado || 0)
+        });
+        continue;
+      }
+
+      // // Acumular stock total y reservado total de todas las ubicaciones del producto.
+      actual.stock += Number(fila.stock || 0);
+      actual.stock_reservado += Number(fila.stock_reservado || 0);
+
+      const actualStock = Number(actual.stock || 0);
+      const filaStock = Number(fila.stock || 0);
+      const actualFecha = actual.fecha_ult_mov ? new Date(actual.fecha_ult_mov).getTime() : 0;
+      const filaFecha = fila.fecha_ult_mov ? new Date(fila.fecha_ult_mov).getTime() : 0;
+
+      // // Elegimos como representativa la fila con stock positivo y/o mas reciente para mostrar ubicacion/metadata.
+      const reemplazarRepresentativa =
+        (actualStock <= 0 && filaStock > 0)
+        || (filaStock > actualStock)
+        || (filaFecha > actualFecha);
+
+      if (reemplazarRepresentativa) {
+        actual.cod_inventario = fila.cod_inventario;
+        actual.cod_ubicacion = fila.cod_ubicacion;
+        actual.ubicacion = fila.ubicacion;
+        actual.stock_minimo = fila.stock_minimo;
+        actual.stock_maximo = fila.stock_maximo;
+        actual.fecha_ult_mov = fila.fecha_ult_mov;
+      }
+
+      consolidadoMap.set(key, actual);
+    }
+
+    const datosConsolidados = Array.from(consolidadoMap.values())
+      .map((fila) => mapearFilaExistencia(fila))
+      .sort((a, b) => String(a.nombre_producto || '').localeCompare(String(b.nombre_producto || ''), 'es'));
+
+    const total = datosConsolidados.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const inicio = Math.max(0, offset);
+    const fin = inicio + limit;
+    const datos = datosConsolidados.slice(inicio, fin);
 
     // // Estructura nueva (data + meta) con compatibilidad legacy para no romper UI existente
     return {

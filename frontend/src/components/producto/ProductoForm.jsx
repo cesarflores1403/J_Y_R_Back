@@ -15,6 +15,9 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
     nombre_producto: '',
     unidad_medida: 'UND',
     precio_venta: '',
+    stock_inicial: '',
+    stock_nuevo: '',
+    stock_agregar: '',
     cod_isv: '',
     estado_producto: 'Activo',
     cod_ubicacion: '',
@@ -37,6 +40,9 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
         nombre_producto: selected.nombre_producto ?? '',
         unidad_medida: selected.unidad_medida ?? 'UND',
         precio_venta: selected.precio_venta ?? '',
+        stock_inicial: '',
+        stock_nuevo: String(Number(selected.stock_total ?? 0)),
+        stock_agregar: '',
         cod_isv: selected.cod_isv ?? '',
         estado_producto: typeof selected.estado_producto === 'boolean'
           ? (selected.estado_producto ? 'Activo' : 'Inactivo')
@@ -61,6 +67,9 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
         nombre_producto: `(Copia) ${duplicateFrom.nombre_producto ?? ''}`,
         unidad_medida: duplicateFrom.unidad_medida ?? 'UND',
         precio_venta: duplicateFrom.precio_venta ?? '',
+        stock_inicial: '',
+        stock_nuevo: '',
+        stock_agregar: '',
         cod_isv: duplicateFrom.cod_isv ?? '',
         estado_producto: typeof duplicateFrom.estado_producto === 'boolean'
           ? (duplicateFrom.estado_producto ? 'Activo' : 'Inactivo')
@@ -79,6 +88,9 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       nombre_producto: '',
       unidad_medida: 'UND',
       precio_venta: '',
+      stock_inicial: '',
+      stock_nuevo: '',
+      stock_agregar: '',
       cod_isv: '',
       estado_producto: 'Activo',
       cod_ubicacion: '',
@@ -195,6 +207,31 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       errors.estado_producto = 'Estado inválido.';
     }
 
+    // Stock inicial (solo creación)
+    if (!isEdit) {
+      const stockRaw = form.stock_inicial === '' ? '0' : String(form.stock_inicial);
+      const stockInicial = Number(stockRaw);
+
+      if (!Number.isInteger(stockInicial) || stockInicial < 0) {
+        errors.stock_inicial = 'El stock inicial debe ser un entero mayor o igual a 0.';
+      }
+
+      if (stockInicial > 0 && !form.cod_ubicacion) {
+        errors.cod_ubicacion = 'Debe seleccionar una ubicación para asignar stock inicial.';
+      }
+    } else {
+      const stockAgregarRaw = form.stock_agregar === '' ? '0' : String(form.stock_agregar);
+      const stockAgregar = Number(stockAgregarRaw);
+
+      if (!Number.isInteger(stockAgregar) || stockAgregar < 0) {
+        errors.stock_agregar = 'El stock a agregar debe ser un entero mayor o igual a 0.';
+      }
+
+      if (stockAgregar > 0 && !form.cod_ubicacion) {
+        errors.cod_ubicacion = 'Debe seleccionar una ubicación para agregar stock.';
+      }
+    }
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -204,6 +241,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
     nombre_producto: form.nombre_producto.trim(),
     unidad_medida: form.unidad_medida.trim().toUpperCase(),
     precio_venta: Number(form.precio_venta),
+    stock_inicial: form.stock_inicial === '' ? 0 : Number(form.stock_inicial),
     cod_isv: Number(form.cod_isv),
     estado_producto: form.estado_producto,
     cod_ubicacion: form.cod_ubicacion ? Number(form.cod_ubicacion) : null,
@@ -250,13 +288,16 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       }
     }
 
-    if (Object.keys(changedData).length === 0 && !imagenFile) {
+    const stockAgregar = form.stock_agregar === '' ? 0 : Number(form.stock_agregar);
+
+    if (Object.keys(changedData).length === 0 && !imagenFile && stockAgregar <= 0) {
       throw new Error('No hay cambios para actualizar.');
     }
 
     return {
       cod_producto: selected.cod_producto,
       datos: changedData,
+      stock_agregar: stockAgregar,
     };
   };
 
@@ -280,7 +321,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
         }
 
         const payload = buildUpdatePayload(); // // HU-05: PUT múltiples campos
-        if (payload.datos && Object.keys(payload.datos).length > 0) {
+        if ((payload.datos && Object.keys(payload.datos).length > 0) || Number(payload.stock_agregar || 0) > 0) {
           await onSubmit(payload); // // Ejecuta UPDATE solo si hay campos cambiados
         }
       } else {
@@ -298,6 +339,9 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
           nombre_producto: '',
           unidad_medida: 'UND',
           precio_venta: '',
+          stock_inicial: '',
+          stock_nuevo: '',
+          stock_agregar: '',
           cod_isv: '',
           estado_producto: 'Activo',
           cod_ubicacion: '',
@@ -416,6 +460,74 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
             </div>
           </div>
 
+          {!isEdit && (
+            <div className="jyr-form-group">
+              <label className="jyr-form-label">Stock inicial</label>
+              <input
+                className={`jyr-form-control ${fieldErrors.stock_inicial ? 'jyr-input-error' : ''}`}
+                name="stock_inicial"
+                type="number"
+                step="1"
+                min="0"
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault();
+                }}
+                placeholder="0"
+                value={form.stock_inicial}
+                onChange={onChange}
+                disabled={saving}
+              />
+              {fieldErrors.stock_inicial && <span className="jyr-field-error">{fieldErrors.stock_inicial}</span>}
+              <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)' }}>
+                Cantidad con la que iniciará en inventario.
+              </span>
+            </div>
+          )}
+
+          {isEdit && (
+            <div className="jyr-form-group">
+              <label className="jyr-form-label">Stock total actual</label>
+              <div
+                className="jyr-form-control"
+                style={{
+                  background: 'var(--jyr-gray-50, #f9fafb)',
+                  color: 'var(--jyr-gray-700)',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono)'
+                }}
+              >
+                {Number(selected?.stock_total ?? 0)}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)' }}>
+                Cantidad existente antes de actualizar.
+              </span>
+            </div>
+          )}
+
+          {isEdit && (
+            <div className="jyr-form-group">
+              <label className="jyr-form-label">Agregar stock</label>
+              <input
+                className={`jyr-form-control ${fieldErrors.stock_agregar ? 'jyr-input-error' : ''}`}
+                name="stock_agregar"
+                type="number"
+                step="1"
+                min="0"
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault();
+                }}
+                placeholder="0"
+                value={form.stock_agregar}
+                onChange={onChange}
+                disabled={saving}
+              />
+              {fieldErrors.stock_agregar && <span className="jyr-field-error">{fieldErrors.stock_agregar}</span>}
+              <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)' }}>
+                Si deseas sumar rápido sin recalcular, usa este campo.
+              </span>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div className="jyr-form-group">
               <label className="jyr-form-label">ISV (Impuesto)</label>
@@ -462,7 +574,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
           <div className="jyr-form-group">
             <label className="jyr-form-label">Ubicación en bodega</label>
             <select
-              className="jyr-form-control jyr-form-select"
+              className={`jyr-form-control jyr-form-select ${fieldErrors.cod_ubicacion ? 'jyr-input-error' : ''}`}
               name="cod_ubicacion"
               value={form.cod_ubicacion}
               onChange={onChange}
@@ -480,6 +592,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
             <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)' }}>
               Estante/posición donde se almacena el producto
             </span>
+            {fieldErrors.cod_ubicacion && <span className="jyr-field-error">{fieldErrors.cod_ubicacion}</span>}
           </div>
 
           {/* HU-08: Sección de imagen */}

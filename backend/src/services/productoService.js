@@ -113,30 +113,150 @@ export const getProducto = async () => {
 // =======================
 export const createProducto = async (datos) => {
   const datosNorm = normalizar(datos);
+  const stockInicial = Number.isFinite(Number(datosNorm.stock_inicial))
+    ? Number(datosNorm.stock_inicial)
+    : 0;
+
+  if (!Number.isInteger(stockInicial) || stockInicial < 0) {
+    const error = new Error('stock_inicial debe ser un entero mayor o igual a 0.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (stockInicial > 0 && !datosNorm.cod_ubicacion) {
+    const error = new Error('Debe seleccionar una ubicación para asignar stock inicial.');
+    error.status = 400;
+    throw error;
+  }
+
+  const datosProducto = { ...datosNorm };
+  delete datosProducto.stock_inicial;
 
   // HU-04: Si se envió cod_producto manual, verificar unicidad
-  if (datosNorm.cod_producto !== undefined && datosNorm.cod_producto !== null) {
-    await verificarCodProductoExistente(datosNorm.cod_producto);
+  if (datosProducto.cod_producto !== undefined && datosProducto.cod_producto !== null) {
+    await verificarCodProductoExistente(datosProducto.cod_producto);
   }
 
   // Verificar duplicado por nombre
-  await verificarDuplicado(datosNorm.nombre_producto);
+  await verificarDuplicado(datosProducto.nombre_producto);
 
   // HU-10: Validar que la ubicación exista si se envió
-  if (datosNorm.cod_ubicacion) {
-    await verificarUbicacionExistente(datosNorm.cod_ubicacion);
+  if (datosProducto.cod_ubicacion) {
+    await verificarUbicacionExistente(datosProducto.cod_ubicacion);
   }
 
-  // Insertar y retornar el producto creado (con cod_producto asignado)
-  const productoCreado = await productoModel.createProducto(datosNorm);
-  return productoCreado;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Insertar y retornar el producto creado (con cod_producto asignado)
+    const productoCreado = await productoModel.createProducto(datosProducto, client);
+
+    if (!productoCreado?.cod_producto) {
+      throw Object.assign(new Error('No se pudo identificar el producto recién creado.'), { status: 500 });
+    }
+
+    if (stockInicial > 0) {
+      const codProducto = Number(productoCreado.cod_producto);
+      const codUbicacion = Number(datosProducto.cod_ubicacion);
+
+      const inventarioExistente = await client.query(
+        `
+          SELECT cod_inventario
+          FROM inventario
+          WHERE cod_producto = $1 AND cod_ubicacion = $2
+          LIMIT 1
+          FOR UPDATE
+        `,
+        [codProducto, codUbicacion]
+      );
+
+      if (inventarioExistente.rows.length > 0) {
+        await client.query(
+          `
+            UPDATE inventario
+            SET stock = stock + $3,
+                fecha_ult_mov = NOW()
+            WHERE cod_producto = $1 AND cod_ubicacion = $2
+          `,
+          [codProducto, codUbicacion, stockInicial]
+        );
+      } else {
+        try {
+          await client.query(
+            `
+              INSERT INTO inventario (
+                cod_producto,
+                cod_ubicacion,
+                stock,
+                stock_reservado,
+                stock_minimo,
+                stock_maximo,
+                fecha_ult_mov
+              )
+              VALUES ($1, $2, $3, 0, 0, 0, NOW())
+            `,
+            [codProducto, codUbicacion, stockInicial]
+          );
+        } catch (error) {
+          // Compatibilidad con esquemas donde stock_reservado todavía no existe.
+          if (error?.code !== '42703') throw error;
+
+          await client.query(
+            `
+              INSERT INTO inventario (
+                cod_producto,
+                cod_ubicacion,
+                stock,
+                stock_minimo,
+                stock_maximo,
+                fecha_ult_mov
+              )
+              VALUES ($1, $2, $3, 0, 0, NOW())
+            `,
+            [codProducto, codUbicacion, stockInicial]
+          );
+        }
+      }
+
+      productoCreado.stock_total = stockInicial;
+    } else {
+      productoCreado.stock_total = 0;
+    }
+
+    await client.query('COMMIT');
+    return productoCreado;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 // =======================
 // UPDATE PRODUCTO
 // =======================
-export const updateProducto = async ({ cod_producto, datos }) => {
-  const datosNorm = normalizar(datos);
+export const updateProducto = async ({ cod_producto, datos = {}, stock_agregar = 0, stock_nuevo = null }) => {
+  const datosNorm = normalizar(datos || {});
+  const stockAgregar = Number.isFinite(Number(stock_agregar))
+    ? Number(stock_agregar)
+    : 0;
+  const stockNuevoDefinido = stock_nuevo !== undefined && stock_nuevo !== null && stock_nuevo !== '';
+  const stockNuevo = stockNuevoDefinido ? Number(stock_nuevo) : null;
+
+  if (!Number.isInteger(stockAgregar) || stockAgregar < 0) {
+    const error = new Error('stock_agregar debe ser un entero mayor o igual a 0.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (stockNuevoDefinido && (!Number.isInteger(stockNuevo) || stockNuevo < 0)) {
+    const error = new Error('stock_nuevo debe ser un entero mayor o igual a 0.');
+    error.status = 400;
+    throw error;
+  }
 
   // Si se actualiza nombre, verificar duplicado excluyendo el producto actual
   if (datosNorm.nombre_producto) {
@@ -148,17 +268,243 @@ export const updateProducto = async ({ cod_producto, datos }) => {
     await verificarUbicacionExistente(datosNorm.cod_ubicacion);
   }
 
-  return await productoModel.updateProducto({
-    cod_producto,
-    datos: datosNorm
-  });
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    if (Object.keys(datosNorm).length > 0) {
+      await productoModel.updateProducto({
+        cod_producto,
+        datos: datosNorm
+      }, client);
+    }
+
+    if (stockAgregar > 0 || stockNuevoDefinido) {
+      const productoResult = await client.query(
+        `
+          SELECT cod_ubicacion
+          FROM producto
+          WHERE cod_producto = $1
+          LIMIT 1
+          FOR UPDATE
+        `,
+        [cod_producto]
+      );
+
+      if (productoResult.rows.length === 0) {
+        const error = new Error(`Producto con código ${cod_producto} no encontrado.`);
+        error.status = 404;
+        throw error;
+      }
+
+      let codUbicacionFinal = productoResult.rows[0].cod_ubicacion;
+
+      if (!codUbicacionFinal) {
+        // Fallback para datos heredados: si existe inventario previo,
+        // usar esa ubicación para no bloquear la suma de stock.
+        const inventarioBase = await client.query(
+          `
+            SELECT cod_ubicacion
+            FROM inventario
+            WHERE cod_producto = $1
+            ORDER BY stock DESC, fecha_ult_mov DESC NULLS LAST, cod_inventario DESC
+            LIMIT 1
+            FOR UPDATE
+          `,
+          [cod_producto]
+        );
+
+        if (inventarioBase.rows.length > 0 && inventarioBase.rows[0].cod_ubicacion) {
+          codUbicacionFinal = inventarioBase.rows[0].cod_ubicacion;
+
+          await productoModel.updateProducto({
+            cod_producto,
+            datos: { cod_ubicacion: codUbicacionFinal }
+          }, client);
+        } else {
+          const error = new Error('El producto no tiene ubicación asignada. Asigne una ubicación antes de agregar stock.');
+          error.status = 400;
+          throw error;
+        }
+      }
+
+      const inventarioExistente = await client.query(
+        `
+          SELECT cod_inventario, cod_ubicacion
+          FROM inventario
+          WHERE cod_producto = $1 AND cod_ubicacion = $2
+          LIMIT 1
+          FOR UPDATE
+        `,
+        [cod_producto, codUbicacionFinal]
+      );
+
+      const stockObjetivo = stockNuevoDefinido ? (stockNuevo + stockAgregar) : null;
+
+      if (inventarioExistente.rows.length > 0) {
+        if (stockObjetivo !== null) {
+          await client.query(
+            `
+              UPDATE inventario
+              SET stock = $3,
+                  fecha_ult_mov = NOW()
+              WHERE cod_producto = $1 AND cod_ubicacion = $2
+            `,
+            [cod_producto, codUbicacionFinal, stockObjetivo]
+          );
+        } else {
+          await client.query(
+            `
+              UPDATE inventario
+              SET stock = stock + $3,
+                  fecha_ult_mov = NOW()
+              WHERE cod_producto = $1 AND cod_ubicacion = $2
+            `,
+            [cod_producto, codUbicacionFinal, stockAgregar]
+          );
+        }
+      } else {
+        const inventarioAlterno = await client.query(
+          `
+            SELECT cod_inventario, cod_ubicacion
+            FROM inventario
+            WHERE cod_producto = $1
+            ORDER BY stock DESC, fecha_ult_mov DESC NULLS LAST, cod_inventario DESC
+            LIMIT 1
+            FOR UPDATE
+          `,
+          [cod_producto]
+        );
+
+        if (inventarioAlterno.rows.length > 0) {
+          if (stockObjetivo !== null) {
+            await client.query(
+              `
+                UPDATE inventario
+                SET cod_ubicacion = $2,
+                    stock = $3,
+                    fecha_ult_mov = NOW()
+                WHERE cod_inventario = $1
+              `,
+              [inventarioAlterno.rows[0].cod_inventario, codUbicacionFinal, stockObjetivo]
+            );
+          } else {
+            await client.query(
+              `
+                UPDATE inventario
+                SET cod_ubicacion = $2,
+                    stock = stock + $3,
+                    fecha_ult_mov = NOW()
+                WHERE cod_inventario = $1
+              `,
+              [inventarioAlterno.rows[0].cod_inventario, codUbicacionFinal, stockAgregar]
+            );
+          }
+        } else {
+          try {
+            await client.query(
+              `
+                INSERT INTO inventario (
+                  cod_producto,
+                  cod_ubicacion,
+                  stock,
+                  stock_reservado,
+                  stock_minimo,
+                  stock_maximo,
+                  fecha_ult_mov
+                )
+                VALUES ($1, $2, $3, 0, 0, 0, NOW())
+              `,
+              [cod_producto, codUbicacionFinal, stockObjetivo !== null ? stockObjetivo : stockAgregar]
+            );
+          } catch (error) {
+            if (error?.code !== '42703') throw error;
+
+            await client.query(
+              `
+                INSERT INTO inventario (
+                  cod_producto,
+                  cod_ubicacion,
+                  stock,
+                  stock_minimo,
+                  stock_maximo,
+                  fecha_ult_mov
+                )
+                VALUES ($1, $2, $3, 0, 0, NOW())
+              `,
+              [cod_producto, codUbicacionFinal, stockObjetivo !== null ? stockObjetivo : stockAgregar]
+            );
+          }
+        }
+      }
+
+      // Limpia filas huérfanas vacías del mismo producto para evitar duplicados visuales.
+      try {
+        await client.query(
+          `
+            DELETE FROM inventario
+            WHERE cod_producto = $1
+              AND cod_ubicacion <> $2
+              AND stock = 0
+              AND COALESCE(stock_reservado, 0) = 0
+          `,
+          [cod_producto, codUbicacionFinal]
+        );
+      } catch (error) {
+        if (error?.code !== '42703') throw error;
+
+        await client.query(
+          `
+            DELETE FROM inventario
+            WHERE cod_producto = $1
+              AND cod_ubicacion <> $2
+              AND stock = 0
+          `,
+          [cod_producto, codUbicacionFinal]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    return {
+      cod_producto,
+      stock_agregado: stockAgregar,
+      stock_nuevo: stockNuevoDefinido ? stockNuevo : null
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 // =======================
 // DELETE PRODUCTO
 // =======================
 export const deleteProducto = async (cod_producto) => {
-  return await productoModel.deleteProducto(cod_producto);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Intentar limpiar existencias del producto para habilitar eliminación cuando solo hay inventario asociado.
+    await client.query('DELETE FROM inventario WHERE cod_producto = $1', [cod_producto]);
+
+    await productoModel.deleteProducto(cod_producto, client);
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error?.code === '23503') {
+      const err = new Error('No se puede eliminar el producto porque ya tiene historial relacionado (ventas, compras, kardex o documentos). Puede marcarlo como Inactivo o Descontinuado.');
+      err.status = 400;
+      throw err;
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 // =======================

@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
 import { AuthProvider, useAuth } from '../contexts/AuthContext.jsx';
 import { ConfirmDialogProvider } from '../contexts/ConfirmDialogContext.jsx';
 
@@ -79,6 +80,15 @@ const App = () => {
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
+      <ToastContainer
+        position="top-right"
+        autoClose={2500}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        draggable
+      />
       </ConfirmDialogProvider>
     </AuthProvider>
   );

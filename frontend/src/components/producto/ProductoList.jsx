@@ -108,6 +108,10 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
           valA = Number(a.precio_venta);
           valB = Number(b.precio_venta);
           break;
+        case 'stock_total':
+          valA = Number(a.stock_total ?? 0);
+          valB = Number(b.stock_total ?? 0);
+          break;
         case 'estado_producto':
           valA = getEstado(a);
           valB = getEstado(b);
@@ -506,6 +510,9 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
               <span style={{ fontSize: 12, color: 'var(--jyr-gray-500)' }}>
                 <strong>Unidad:</strong> {hoverImg.unidad}
               </span>
+              <span style={{ fontSize: 12, color: 'var(--jyr-gray-500)' }}>
+                <strong>Stock:</strong> {hoverImg.stock}
+              </span>
               {hoverImg.ubicacion && (
                 <span style={{ fontSize: 12, color: 'var(--jyr-gray-500)' }}>
                   <strong>Ubicación:</strong> {hoverImg.ubicacion}
@@ -549,6 +556,9 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
               <th>Unidad</th>
               <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('precio_venta')}>
                 Precio <SortIcon campo="precio_venta" />
+              </th>
+              <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('stock_total')}>
+                Stock <SortIcon campo="stock_total" />
               </th>
               <th>ISV</th>
               <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('estado_producto')}>
@@ -610,6 +620,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
                                   categoria: categoriasMap[p.cod_categoria] || `Cat-${p.cod_categoria}`,
                                   precio: Number(p.precio_venta).toFixed(2),
                                   unidad: p.unidad_medida,
+                                  stock: Number(p.stock_total ?? 0),
                                   estado: getEstado(p),
                                   ubicacion: p.cod_ubicacion
                                     ? `P${p.ubi_pasillo} E${p.ubi_estanteria} N${p.ubi_nivel_1}${p.ubi_nivel_2 ? ` N2:${p.ubi_nivel_2}` : ''}`
@@ -656,6 +667,11 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
                     <td>{p.unidad_medida}</td>
                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                       L. {Number(p.precio_venta).toFixed(2)}
+                    </td>
+                    <td>
+                      <span className={`jyr-badge ${Number(p.stock_total ?? 0) > 0 ? 'jyr-badge-success' : 'jyr-badge-danger'}`}>
+                        {Number(p.stock_total ?? 0)}
+                      </span>
                     </td>
                     <td>
                       <span className="jyr-badge jyr-badge-warning">
@@ -730,7 +746,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
               })
             ) : (
               <tr>
-                <td colSpan="11" style={{ textAlign: 'center', padding: 40, color: 'var(--jyr-gray-400)' }}>
+                <td colSpan="12" style={{ textAlign: 'center', padding: 40, color: 'var(--jyr-gray-400)' }}>
                   {hayFiltros
                     ? 'No se encontraron productos con los filtros aplicados.'
                     : 'No hay productos registrados.'

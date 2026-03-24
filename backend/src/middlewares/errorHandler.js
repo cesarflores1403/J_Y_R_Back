@@ -23,7 +23,7 @@ export const errorHandler = (err, req, res, next) => {
   if (err.code === '23503') {
     return res.status(400).json({
       ok: false,
-      message: 'Error de referencia: el registro relacionado no existe en la base de datos.',
+      message: 'No se pudo completar la operación porque el registro tiene datos relacionados (inventario, movimientos o documentos).',
       data: null
     });
   }
@@ -61,7 +61,7 @@ export const errorHandler = (err, req, res, next) => {
   if (err.name === 'SequelizeForeignKeyConstraintError') {
     return res.status(400).json({
       ok: false,
-      message: 'Error de referencia: el registro relacionado no existe',
+      message: 'No se pudo completar la operación porque el registro tiene datos relacionados (inventario, movimientos o documentos).',
       data: null
     });
   }

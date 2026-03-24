@@ -164,6 +164,16 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
                 </p>
               </div>
 
+              {/* Stock */}
+              <div>
+                <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
+                  Stock actual
+                </span>
+                <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 700, color: Number(producto.stock_total ?? 0) > 0 ? 'var(--jyr-success, #16a34a)' : 'var(--jyr-danger, #dc2626)' }}>
+                  {Number(producto.stock_total ?? 0)}
+                </p>
+              </div>
+
               {/* Estado */}
               <div>
                 <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>

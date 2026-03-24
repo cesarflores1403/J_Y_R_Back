@@ -24,8 +24,14 @@ export const productoApi = {
   // =====================================================
   update: (payload) => {
     const datos = payload?.datos || {};
+    const stockAgregar = Number(payload?.stock_agregar || 0);
+    const stockNuevoDefinido = payload?.stock_nuevo !== undefined && payload?.stock_nuevo !== null && payload?.stock_nuevo !== '';
+    const stockNuevo = stockNuevoDefinido ? Number(payload?.stock_nuevo) : null;
 
-    if (Object.keys(datos).length === 0) {
+    const stockAgregarValido = Number.isInteger(stockAgregar) && stockAgregar > 0;
+    const stockNuevoValido = stockNuevoDefinido && Number.isInteger(stockNuevo) && stockNuevo >= 0;
+
+    if (Object.keys(datos).length === 0 && !stockAgregarValido && !stockNuevoValido) {
       throw new Error('No hay campos para actualizar.');
     }
 

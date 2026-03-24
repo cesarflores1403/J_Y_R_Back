@@ -1,5 +1,4 @@
 import { useState } from 'react'; // // Estado local
-import Alert from '../components/common/Alert.jsx'; // // Alert
 import ProductoForm from '../components/producto/ProductoForm.jsx'; // // Form
 import ProductoList from '../components/producto/ProductoList.jsx'; // // Tabla
 import ProductoFicha from '../components/producto/ProductoFicha.jsx'; // // HU-09: Ficha modal
@@ -15,10 +14,6 @@ const ProductoPage = () => {
     producto,
     loading,
     saving,
-    error,
-    success,
-    setError,
-    setSuccess,
     crear,
     actualizar,
     eliminar,
@@ -74,9 +69,6 @@ const ProductoPage = () => {
 
   return (
     <div>
-      <Alert type="success" message={success} onClose={() => setSuccess('')} />
-      <Alert type="danger" message={error} onClose={() => setError('')} />
-
       {vista === 'listado' ? (
         <>
           <div className="d-flex justify-content-between align-items-center mb-4">

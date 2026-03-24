@@ -53,6 +53,20 @@ export const validarCrearProducto = [
     .optional({ values: 'null' })
     .isInt({ min: 1 }).withMessage('La ubicación debe ser un número entero válido.'),
 
+  body('stock_inicial')
+    .optional()
+    .isInt({ min: 0 }).withMessage('El stock inicial debe ser un número entero mayor o igual a 0.')
+    .custom((val, { req }) => {
+      const stockInicial = Number(val || 0);
+      const codUbicacion = req.body?.cod_ubicacion;
+
+      if (stockInicial > 0 && (codUbicacion === undefined || codUbicacion === null || codUbicacion === '')) {
+        throw new Error('Debe seleccionar una ubicación para asignar stock inicial.');
+      }
+
+      return true;
+    }),
+
   validarCampos, // // Middleware que retorna errores 400
 ];
 
@@ -64,12 +78,22 @@ export const validarActualizarProducto = [
     .notEmpty().withMessage('cod_producto es obligatorio.')
     .isInt({ min: 1 }).withMessage('cod_producto debe ser un entero positivo.'),
 
+  body('stock_agregar')
+    .optional()
+    .isInt({ min: 0 }).withMessage('stock_agregar debe ser un entero mayor o igual a 0.'),
+
+  body('stock_nuevo')
+    .optional({ values: 'null' })
+    .isInt({ min: 0 }).withMessage('stock_nuevo debe ser un entero mayor o igual a 0.'),
+
   body('datos')
-    .notEmpty().withMessage('datos es obligatorio.')
+    .optional()
     .isObject().withMessage('datos debe ser un objeto.')
     .custom(async (datos) => {
+      if (datos === undefined) return true;
+
       const keys = Object.keys(datos);
-      if (keys.length === 0) throw new Error('datos no puede estar vacío.');
+      if (keys.length === 0) return true;
 
       const camposPermitidos = ['cod_categoria', 'nombre_producto', 'unidad_medida', 'precio_venta', 'cod_isv', 'estado_producto', 'cod_ubicacion'];
 
@@ -115,6 +139,23 @@ export const validarActualizarProducto = [
 
       return true;
     }),
+
+  body().custom((_, { req }) => {
+    const datos = req.body?.datos;
+    const tieneCambiosCatalogo = datos && typeof datos === 'object' && !Array.isArray(datos) && Object.keys(datos).length > 0;
+    const stockAgregar = Number(req.body?.stock_agregar || 0);
+    const stockNuevoDefinido = req.body?.stock_nuevo !== undefined && req.body?.stock_nuevo !== null && req.body?.stock_nuevo !== '';
+    const stockNuevo = stockNuevoDefinido ? Number(req.body?.stock_nuevo) : null;
+
+    const stockAgregarValido = Number.isInteger(stockAgregar) && stockAgregar > 0;
+    const stockNuevoValido = stockNuevoDefinido && Number.isInteger(stockNuevo) && stockNuevo >= 0;
+
+    if (!tieneCambiosCatalogo && !stockAgregarValido && !stockNuevoValido) {
+      throw new Error('Debe enviar al menos un campo en datos, un stock_agregar mayor a 0 o un stock_nuevo válido.');
+    }
+
+    return true;
+  }),
 
   validarCampos,
 ];

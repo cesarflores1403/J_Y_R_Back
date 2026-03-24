@@ -24,11 +24,17 @@ export const getProducto = async () => {
            COALESCE(i.porcentaje, 0) AS isv_porcentaje,
            COALESCE(i.descripcion, 'Sin ISV') AS isv_descripcion,
            p.estado_producto, p.imagen_url, p.cod_ubicacion,
+           COALESCE(inv.stock_total, 0) AS stock_total,
            u.pasillo AS ubi_pasillo, u.estanteria AS ubi_estanteria,
            u.nivel_1 AS ubi_nivel_1, u.nivel_2 AS ubi_nivel_2,
            u.codigo_producto AS ubi_codigo_producto
     FROM producto p
     LEFT JOIN catalogo_isv i ON p.cod_isv = i.cod_isv
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(SUM(iv.stock), 0) AS stock_total
+      FROM inventario iv
+      WHERE iv.cod_producto = p.cod_producto
+    ) inv ON TRUE
     LEFT JOIN ubicacion u ON p.cod_ubicacion = u.cod_ubicacion
     ORDER BY p.cod_producto
   `;
@@ -44,13 +50,13 @@ export const getProducto = async () => {
 // =======================
 // INSERT PRODUCTO (HU-04: retorna el producto creado con cod_producto)
 // =======================
-export const createProducto = async (datos) => {
+export const createProducto = async (datos, db = pool) => {
   const tabla = 'producto';
   const datosJson = JSON.stringify(datos);
   const queryInsert = 'CALL public.pa_insert($1, $2::json)';
 
   // // 1. Insertar producto
-  await pool.query(queryInsert, [tabla, datosJson]);
+  await db.query(queryInsert, [tabla, datosJson]);
 
   // // 2. Buscar el producto recién creado por nombre (método confiable con Supabase pooler)
   const buscar = `
@@ -61,7 +67,7 @@ export const createProducto = async (datos) => {
     ORDER BY cod_producto DESC
     LIMIT 1
   `;
-  const result = await pool.query(buscar, [datos.nombre_producto]);
+  const result = await db.query(buscar, [datos.nombre_producto]);
 
   // HU-04: Agregar codigo_producto formateado
   const producto = result.rows[0] || null;
@@ -91,7 +97,7 @@ export const updateImagenProducto = async (cod_producto, imagen_url) => {
 // =======================
 // UPDATE PRODUCTO
 // =======================
-export const updateProducto = async ({ cod_producto, datos }) => {
+export const updateProducto = async ({ cod_producto, datos }, db = pool) => {
   const tabla = 'producto'; // // Tabla real
   const id_campo = 'cod_producto'; // // PK real
 
@@ -112,7 +118,7 @@ export const updateProducto = async ({ cod_producto, datos }) => {
 
     const query = 'CALL public.pa_update($1::text, $2::json, $3::text, $4::text)'; // // Firma real
 
-    await pool.query(query, [
+    await db.query(query, [
       tabla, // // tbl_nombre
       datosJson, // // datos_json
       id_campo, // // col_condicion
@@ -124,12 +130,12 @@ export const updateProducto = async ({ cod_producto, datos }) => {
 // =======================
 // DELETE PRODUCTO
 // =======================
-export const deleteProducto = async (cod_producto) => {
+export const deleteProducto = async (cod_producto, db = pool) => {
   const tabla = 'producto'; // // Tabla real
 
   const query = 'CALL public.pa_delete($1, $2, $3)'; // // (tabla, columna, valor)
 
-  await pool.query(query, [
+  await db.query(query, [
     tabla,
     'cod_producto', // // PK real
     String(cod_producto), // // Valor como texto
