@@ -2962,20 +2962,42 @@ a {
     padding: 0 !important;
   }
 
+  @page {
+    size: letter portrait;
+    margin: 10mm;
+  }
+
+  html,
   body {
-    background: white !important;
+    width: auto !important;
+    height: auto !important;
+    background: #fff !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   .inv {
-    max-width: 100%;
+    width: 100% !important;
+    max-width: calc(8.5in - 20mm) !important;
+    margin: 0 auto !important;
+    box-sizing: border-box;
     box-shadow: none;
     border-radius: 0;
+    background: #fff !important;
+    page-break-inside: auto;
   }
 
   .inv-body {
-    padding: 20px 28px;
+    padding: 14mm 10mm;
+  }
+
+  /* Perfil por documento */
+  .inv.inv-factura .inv-body {
+    padding: 14mm 10mm;
+  }
+
+  .inv.inv-cotizacion .inv-body {
+    padding: 11mm 8mm;
   }
 
   .inv-topbar,
@@ -3027,22 +3049,15 @@ a {
   .inv-void-watermark {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-  }
-
-  @page {
-    margin: 10mm 10mm;
-    size: letter portrait;
-  }
-
-  .inv {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-shadow: none;
-    border-radius: 0;
-  }
-
-  .inv-body {
-    padding: 16px 24px;
+    position: absolute !important;
+    inset: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transform: rotate(-35deg) !important;
+    text-align: center !important;
+    line-height: 1 !important;
+    z-index: 1 !important;
   }
 
   .inv-header {
@@ -3063,6 +3078,54 @@ a {
 
   .inv-table tbody td {
     padding: 5px 8px;
+  }
+}
+
+/* Ajuste específico para Chrome/Edge al imprimir en carta */
+@media print and (-webkit-min-device-pixel-ratio: 0) {
+  @page {
+    size: letter portrait;
+    margin: 6mm;
+  }
+
+  .inv.inv-cotizacion .inv-body {
+    padding: 10mm 8mm;
+  }
+
+  .inv.inv-cotizacion .inv-meta-row {
+    margin-bottom: 8px;
+    padding: 12px 0;
+  }
+
+  .inv.inv-cotizacion .inv-client-box {
+    margin-bottom: 12px;
+    padding: 12px 16px;
+  }
+
+  .inv.inv-cotizacion .inv-table thead th {
+    padding: 5px 7px;
+    font-size: 9px;
+  }
+
+  .inv.inv-cotizacion .inv-table tbody td {
+    padding: 4px 7px;
+    font-size: 11px;
+  }
+
+  .inv.inv-cotizacion .inv-summary {
+    margin-top: 12px;
+  }
+
+  .inv.inv-cotizacion .inv-footer {
+    margin-top: 20px;
+  }
+
+  .inv.inv-cotizacion .inv-footer-top {
+    margin-bottom: 16px;
+  }
+
+  .inv.inv-cotizacion .inv-sign-line {
+    margin-top: 24px;
   }
 }
 

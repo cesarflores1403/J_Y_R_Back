@@ -8,6 +8,16 @@
 	--jyr-btn-grad-end: #e11d2f;
 	--jyr-btn-border: #a61725;
 	--jyr-btn-shadow: 0 10px 22px -10px rgba(185, 28, 28, 0.6);
+	--jyr-btn-radius: 14px;
+}
+
+/* Forma unificada para botones (se preservan los colores de cada variante) */
+.btn,
+.jyr-btn,
+.kdx-btn-primary,
+.kdx-btn-accent,
+.page-link {
+	border-radius: var(--jyr-btn-radius) !important;
 }
 
 .btn.btn-primary,
@@ -23,7 +33,7 @@
 	gap: 8px;
 	min-height: 38px;
 	padding: 8px 16px;
-	border-radius: 14px;
+	border-radius: var(--jyr-btn-radius);
 	border: 1px solid var(--jyr-btn-border) !important;
 	background: linear-gradient(120deg, var(--jyr-btn-grad-start) 0%, var(--jyr-btn-grad-mid) 55%, var(--jyr-btn-grad-end) 100%) !important;
 	color: #ffffff !important;

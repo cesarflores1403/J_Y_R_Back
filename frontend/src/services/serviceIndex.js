@@ -107,6 +107,7 @@ export const auditoriaFacturacionService = {
   listar: (params) => api.get('/auditoria-facturacion', { params }),
   tiposEvento: () => api.get('/auditoria-facturacion/tipos-evento'),
   exportarExcel: (params) => api.get('/auditoria-facturacion/exportar-excel', { params, responseType: 'blob' }),
+  eliminar: (id) => api.delete(`/auditoria-facturacion/${id}`),
 };
 
 // ==================== NOTAS DE CRÉDITO (HU-FAC-12) ====================
@@ -156,4 +157,18 @@ export const notificacionSuperAdminService = {
   listar: (params) => api.get('/notificaciones-superadmin', { params }),
   marcarLeida: (id) => api.patch(`/notificaciones-superadmin/${id}/leida`),
   marcarTodasLeidas: () => api.patch('/notificaciones-superadmin/marcar-todas/leidas'),
+};
+
+// ==================== RESPALDOS DEL SISTEMA ====================
+export const backupSystemService = {
+  listar: () => api.get('/backups'),
+  ejecutar: () => api.post('/backups/run'),
+  restaurar: (backupFolder) => api.post('/backups/restore', { backupFolder }),
+  descargar: (backupFolder) => api.get('/backups/download', {
+    params: { backupFolder },
+    responseType: 'blob'
+  }),
+  restaurarArchivo: (formData) => api.post('/backups/restore-file', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 };

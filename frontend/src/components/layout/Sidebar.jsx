@@ -5,7 +5,7 @@ import { getInitials } from '../../utils/helpers.js';
 import {
   FiGrid, FiUsers, FiTruck, FiPackage,
   FiBarChart2, FiLogOut, FiFileText, FiMapPin, FiDatabase, FiList, FiPlusCircle, FiMinusCircle,
-  FiAlertTriangle, FiTag, FiRepeat, FiClipboard, FiLock, FiShoppingCart, FiClock, FiImage, FiLink2
+  FiAlertTriangle, FiTag, FiRepeat, FiClipboard, FiLock, FiShoppingCart, FiClock, FiImage, FiLink2, FiHardDrive
 } from 'react-icons/fi';
 import logoClean from '../../assets/img/logo2.jpeg';
 
@@ -49,6 +49,7 @@ const menuItems = [
   { section: 'Configuración', items: [
     { path: '/config-empresa', label: 'Datos Factura', icon: <FiFileText />, roles: ['Super Administrador'] },
     { path: '/url-sistema', label: 'URL del Sistema', icon: <FiLink2 />, roles: ['Super Administrador'] },
+    { path: '/respaldos', label: 'Respaldos', icon: <FiHardDrive />, roles: ['Administrador', 'Super Administrador'] },
   ]},
 ];
 

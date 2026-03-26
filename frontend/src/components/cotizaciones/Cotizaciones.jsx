@@ -10,10 +10,19 @@ import {
 import { confirmDialog } from '../../utils/notifications.js';
 import logoClean from '../../assets/img/logo2.jpeg';
 import logoFull from '../../assets/img/logo1.jpeg';
+import { resolveApiBase } from '../../utils/runtimeApi.js';
+
+const API_BASE = resolveApiBase();
 
 const formatMoney = (v) => {
   const n = parseFloat(v) || 0;
   return `L ${n.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const resolveAssetSrc = (url) => {
+  if (!url) return '';
+  if (String(url).startsWith('http')) return url;
+  return `${API_BASE}${url}`;
 };
 
 const estadoBadge = (est) => {
@@ -187,7 +196,7 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
                               <FiXCircle />
                             </button>
                           )}
-                          {['VIGENTE', 'VENCIDA', 'ANULADA'].includes(c.estado_cotizacion) && usuario?.rol === 'Administrador' && (
+                          {['VIGENTE', 'VENCIDA', 'ANULADA', 'CONVERTIDA'].includes(c.estado_cotizacion) && usuario?.rol === 'Administrador' && (
                             <button className="btn btn-sm btn-outline-danger" title="Eliminar" onClick={() => eliminar(c.cod_cotizacion)}>
                               <FiTrash2 />
                             </button>
@@ -308,7 +317,7 @@ const DetalleCotizacion = ({ codCotizacion, onVolver, onConvertida }) => {
       </div>
 
       {/* ======== COTIZACIÓN IMPRIMIBLE ======== */}
-      <div ref={printRef} className="inv">
+      <div ref={printRef} className="inv inv-cotizacion">
         {cotizacion.estado_cotizacion === 'ANULADA' && <div className="inv-void-watermark">ANULADA</div>}
         {cotizacion.estado_cotizacion === 'VENCIDA' && <div className="inv-void-watermark" style={{ color: 'rgba(255,165,0,0.12)' }}>VENCIDA</div>}
 
@@ -371,6 +380,7 @@ const DetalleCotizacion = ({ codCotizacion, onVolver, onConvertida }) => {
               <tr>
                 <th className="inv-th-num">#</th>
                 <th className="inv-th-desc">Descripción del Producto</th>
+                <th className="inv-th-desc">Imagen</th>
                 <th className="inv-th-qty">Cant.</th>
                 <th className="inv-th-price">Precio Unit.</th>
                 <th className="inv-th-price">Desc %</th>
@@ -382,11 +392,26 @@ const DetalleCotizacion = ({ codCotizacion, onVolver, onConvertida }) => {
             <tbody>
               {cotizacion.detalles?.map((d, i) => {
                 const descPct = parseFloat(d.descuento) || 0;
+                const imgSrc = resolveAssetSrc(d.producto?.imagen_url);
                 return (
                   <tr key={d.cod_detalle_cotizacion} className={i % 2 === 0 ? 'inv-row-even' : ''}>
                     <td className="text-center">{String(i + 1).padStart(2, '0')}</td>
                     <td className="inv-td-product">
                       <div className="inv-product-name">{d.producto?.nombre_producto || `Producto #${d.cod_producto}`}</div>
+                    </td>
+                    <td className="text-center">
+                      {imgSrc ? (
+                        <img
+                          src={imgSrc}
+                          alt={d.producto?.nombre_producto || 'Producto'}
+                          style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, border: '1px solid #ddd' }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span className="text-muted" style={{ fontSize: 12 }}>Sin imagen</span>
+                      )}
                     </td>
                     <td className="text-center">{d.cantidad}</td>
                     <td className="text-end">{formatMoney(d.precio_unitario)}</td>
@@ -515,6 +540,7 @@ const BuscadorProductoCot = ({ onAgregar, itemsActuales = [] }) => {
       nombre_producto: p.nombre_producto,
       unidad_medida: p.unidad_medida,
       precio_venta: parseFloat(p.precio_venta),
+      imagen_url: p.imagen_url || null,
       isv_pct: parseFloat(p.isv) || 0,
       stock: p.stock,
       cantidad: 1
@@ -689,8 +715,8 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
       <h3 className="mb-4"><FiClipboard className="me-2" />Nueva Cotización</h3>
 
       <div className="row g-4">
-        {/* Columna izquierda: cliente + productos */}
-        <div className="col-lg-8">
+        {/* Zona principal a ancho completo: cliente + productos */}
+        <div className="col-12">
           {/* Selector de cliente */}
           <div className="jyr-card mb-3" style={{ overflow: 'visible' }}>
             <div className="jyr-card-body" style={{ overflow: 'visible' }}>
@@ -744,6 +770,7 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                   <thead className="table-light"><tr>
                     <th style={{ width: 36 }}>#</th>
                     <th>Producto</th>
+                    <th style={{ width: 80 }}>Imagen</th>
                     <th style={{ width: 100 }}>P. Unit.</th>
                     <th style={{ width: 80 }}>Cant.</th>
                     <th style={{ width: 80 }}>Desc %</th>
@@ -755,15 +782,30 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                   </tr></thead>
                   <tbody>
                     {items.length === 0 ? (
-                      <tr><td colSpan="10" className="text-center text-muted py-4">Agrega productos a la cotización</td></tr>
+                      <tr><td colSpan="11" className="text-center text-muted py-4">Agrega productos a la cotización</td></tr>
                     ) : items.map((item, index) => {
                       const calc = calcularItem(item);
+                      const imgSrc = resolveAssetSrc(item.imagen_url);
                       return (
                         <tr key={item.cod_producto}>
                           <td className="text-muted">{index + 1}</td>
                           <td>
                             <strong>{item.nombre_producto}</strong>
                             <div className="text-muted small">Cód: {item.cod_producto} | Stock: {item.stock} {item.unidad_medida || 'und'}</div>
+                          </td>
+                          <td className="text-center">
+                            {imgSrc ? (
+                              <img
+                                src={imgSrc}
+                                alt={item.nombre_producto || 'Producto'}
+                                style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, border: '1px solid #ddd' }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <span className="text-muted" style={{ fontSize: 12 }}>Sin imagen</span>
+                            )}
                           </td>
                           <td>{formatMoney(item.precio_venta)}</td>
                           <td>
@@ -795,80 +837,87 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
           </div>
         </div>
 
-        {/* Columna derecha: opciones + resumen */}
-        <div className="col-lg-4">
-          {/* Opciones de cotización */}
-          <div className="jyr-card mb-3">
-            <div className="jyr-card-body">
-              <h6 className="mb-3">Opciones de Cotización</h6>
-              <label className="form-label small">Vigencia (días)</label>
-              <input type="number" className="form-control form-control-sm mb-2" min="1" max="90"
-                value={vigenciaDias} onChange={(e) => setVigenciaDias(e.target.value)} />
-              <label className="form-label small">Observaciones</label>
-              <textarea className="form-control form-control-sm mb-2" rows="3" placeholder="Notas adicionales..."
-                value={observaciones} onChange={(e) => setObservaciones(e.target.value)} maxLength={500} />
-              <small className="text-muted">{observaciones.length}/500</small>
-            </div>
-          </div>
-
-          {/* Descuento global */}
-          <div className="jyr-card mb-3">
-            <div className="jyr-card-body">
-              <h6 className="mb-3">Descuento Global</h6>
-              <div className="row g-2">
-                <div className="col-7">
-                  <input type="number" className="form-control form-control-sm" min="0" step="0.5"
-                    placeholder="Monto o %" value={descuentoGlobal}
-                    onChange={(e) => setDescuentoGlobal(e.target.value)} />
-                </div>
-                <div className="col-5">
-                  <select className="form-select form-select-sm" value={tipoDescGlobal} onChange={(e) => setTipoDescGlobal(e.target.value)}>
-                    <option value="PORCENTAJE">%</option>
-                    <option value="MONTO">L</option>
-                  </select>
+        {/* Paneles reubicados debajo de la tabla */}
+        <div className="col-12">
+          <div className="row g-3">
+            {/* Opciones de cotización */}
+            <div className="col-12 col-lg-4">
+              <div className="jyr-card h-100">
+                <div className="jyr-card-body">
+                  <h6 className="mb-3">Opciones de Cotización</h6>
+                  <label className="form-label small">Vigencia (días)</label>
+                  <input type="number" className="form-control form-control-sm mb-2" min="1" max="90"
+                    value={vigenciaDias} onChange={(e) => setVigenciaDias(e.target.value)} />
+                  <label className="form-label small">Observaciones</label>
+                  <textarea className="form-control form-control-sm mb-2" rows="3" placeholder="Notas adicionales..."
+                    value={observaciones} onChange={(e) => setObservaciones(e.target.value)} maxLength={500} />
+                  <small className="text-muted">{observaciones.length}/500</small>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Resumen */}
-          <div className="jyr-card">
-            <div className="jyr-card-body">
-              <h6 className="mb-3">Resumen</h6>
-              <div className="d-flex justify-content-between mb-2">
-                <span>Ítems:</span><strong>{items.length}</strong>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span>Subtotal Bruto:</span><strong>{formatMoney(totalesLineas.subtotalBruto)}</strong>
-              </div>
-              {totalesLineas.descuento > 0 && (
-                <div className="d-flex justify-content-between mb-2 text-danger">
-                  <span>Desc. líneas:</span><strong>- {formatMoney(totalesLineas.descuento)}</strong>
+            {/* Descuento global */}
+            <div className="col-12 col-lg-4">
+              <div className="jyr-card h-100">
+                <div className="jyr-card-body">
+                  <h6 className="mb-3">Descuento Global</h6>
+                  <div className="row g-2">
+                    <div className="col-7">
+                      <input type="number" className="form-control form-control-sm" min="0" step="0.5"
+                        placeholder="Monto o %" value={descuentoGlobal}
+                        onChange={(e) => setDescuentoGlobal(e.target.value)} />
+                    </div>
+                    <div className="col-5">
+                      <select className="form-select form-select-sm" value={tipoDescGlobal} onChange={(e) => setTipoDescGlobal(e.target.value)}>
+                        <option value="PORCENTAJE">%</option>
+                        <option value="MONTO">L</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-              )}
-              {montoDescGlobal > 0 && (
-                <div className="d-flex justify-content-between mb-2 text-danger">
-                  <span>Desc. global:</span><strong>- {formatMoney(montoDescGlobal)}</strong>
-                </div>
-              )}
-              <div className="d-flex justify-content-between mb-2">
-                <span>Subtotal Neto:</span><strong>{formatMoney(subtotalFinal)}</strong>
               </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span>ISV:</span><strong>{formatMoney(isvFinal)}</strong>
-              </div>
-              <hr />
-              <div className="d-flex justify-content-between mb-3">
-                <span className="fs-5 fw-bold">Total:</span>
-              
-                <span className="fs-5 fw-bold text-success">{formatMoney(totalFinal)}</span>
-              </div>
+            </div>
 
-              <button className="btn jyr-btn-primary w-100" disabled={guardando || items.length === 0 || !clienteSeleccionado}
-                onClick={guardar}>
-                {guardando ? <span className="spinner-border spinner-border-sm me-2" /> : <FiClipboard className="me-2" />}
-                Crear Cotización
-              </button>
+            {/* Resumen */}
+            <div className="col-12 col-lg-4">
+              <div className="jyr-card h-100">
+                <div className="jyr-card-body">
+                  <h6 className="mb-3">Resumen</h6>
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Ítems:</span><strong>{items.length}</strong>
+                  </div>
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Subtotal Bruto:</span><strong>{formatMoney(totalesLineas.subtotalBruto)}</strong>
+                  </div>
+                  {totalesLineas.descuento > 0 && (
+                    <div className="d-flex justify-content-between mb-2 text-danger">
+                      <span>Desc. líneas:</span><strong>- {formatMoney(totalesLineas.descuento)}</strong>
+                    </div>
+                  )}
+                  {montoDescGlobal > 0 && (
+                    <div className="d-flex justify-content-between mb-2 text-danger">
+                      <span>Desc. global:</span><strong>- {formatMoney(montoDescGlobal)}</strong>
+                    </div>
+                  )}
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Subtotal Neto:</span><strong>{formatMoney(subtotalFinal)}</strong>
+                  </div>
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>ISV:</span><strong>{formatMoney(isvFinal)}</strong>
+                  </div>
+                  <hr />
+                  <div className="d-flex justify-content-between mb-3">
+                    <span className="fs-5 fw-bold">Total:</span>
+                    <span className="fs-5 fw-bold text-success">{formatMoney(totalFinal)}</span>
+                  </div>
+
+                  <button className="btn jyr-btn-primary w-100" disabled={guardando || items.length === 0 || !clienteSeleccionado}
+                    onClick={guardar}>
+                    {guardando ? <span className="spinner-border spinner-border-sm me-2" /> : <FiClipboard className="me-2" />}
+                    Crear Cotización
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

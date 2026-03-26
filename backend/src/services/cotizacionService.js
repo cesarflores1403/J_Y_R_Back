@@ -68,7 +68,7 @@ class CotizacionService {
         {
           model: DetalleCotizacion,
           as: 'detalles',
-          include: [{ model: ProductoSeq, as: 'producto', attributes: ['cod_producto', 'nombre_producto', 'unidad_medida'] }]
+          include: [{ model: ProductoSeq, as: 'producto', attributes: ['cod_producto', 'nombre_producto', 'unidad_medida', 'imagen_url'] }]
         }
       ]
     });
@@ -439,7 +439,6 @@ class CotizacionService {
   async eliminar(id) {
     const cotizacion = await Cotizacion.findByPk(id);
     if (!cotizacion) throw Object.assign(new Error('Cotización no encontrada'), { statusCode: 404 });
-    if (cotizacion.estado_cotizacion === 'CONVERTIDA') throw Object.assign(new Error('No se puede eliminar una cotización convertida en factura'), { statusCode: 400 });
 
     await DetalleCotizacion.destroy({ where: { cod_cotizacion: id } });
     await cotizacion.destroy();
@@ -465,7 +464,7 @@ class CotizacionService {
 
     const productos = await ProductoSeq.findAll({
       where,
-      attributes: ['cod_producto', 'nombre_producto', 'unidad_medida', 'precio_venta', 'cod_isv'],
+      attributes: ['cod_producto', 'nombre_producto', 'unidad_medida', 'precio_venta', 'cod_isv', 'imagen_url'],
       order: [['nombre_producto', 'ASC']],
       limit: 20
     });

@@ -18,6 +18,7 @@ import usuariosRoutes from './usuarios.js';
 import ordenesCompraRoutes from './ordenesCompra.js';
 import empresaConfigRoutes from './empresaConfig.js';
 import notificacionesSuperAdminRoutes from './notificacionesSuperAdmin.js';
+import backupsRoutes from './backups.js';
 
 const router = express.Router();
 
@@ -40,6 +41,7 @@ router.use('/usuarios', usuariosRoutes);
 router.use('/compras', ordenesCompraRoutes);
 router.use('/empresa-config', empresaConfigRoutes);
 router.use('/notificaciones-superadmin', notificacionesSuperAdminRoutes);
+router.use('/backups', backupsRoutes);
 
 export default router;
 

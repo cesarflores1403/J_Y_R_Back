@@ -1,0 +1,11 @@
+{
+  "createdAt": "2026-03-25T18:04:58.736Z",
+  "backupDir": "C:\\Users\\CESAR FLORES\\Documents\\GitHub\\J_Y_R_Back\\backend\\backups\\2026-03-25T18-04-34-152Z",
+  "database": {
+    "host": "aws-1-us-east-1.pooler.supabase.com",
+    "port": "5432",
+    "name": "postgres",
+    "user": "postgres.eabyyyzucmjehildotvb"
+  },
+  "includesUploads": true
+}

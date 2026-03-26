@@ -274,7 +274,7 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
       </div>
 
       {/* ======== FACTURA IMPRIMIBLE ======== */}
-      <div ref={printRef} className="inv">
+      <div ref={printRef} className="inv inv-factura">
           {/* Marca de agua si anulada */}
           {!estadoActivo && <div className="inv-void-watermark">ANULADA</div>}
 
@@ -552,7 +552,9 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
       const { data } = await facturaService.crear(payload);
       if (data.ok) {
         toast.success('Factura creada exitosamente');
-        onCreada(data.datos?.cod_factura);
+        // El backend retorna { datos: { factura, empresa } } en creación.
+        const codFacturaCreada = data?.datos?.factura?.cod_factura || data?.datos?.cod_factura || null;
+        onCreada(codFacturaCreada);
       }
     } catch (err) {
       const resp = err.response?.data;

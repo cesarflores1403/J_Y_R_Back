@@ -8,6 +8,14 @@ import { confirmDialog } from '../../utils/notifications.js';
 const camposIniciales = { nombre: '', apellido: '', dni: '', rtn: '', empresa: '', telefono: '', correo: '', direccion: '' };
 const REGEX_TEXTO_CON_PUNTO = /^[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ.\s]+$/;
 const REGEX_CORREO_PERMITIDO = /^[A-Za-z0-9@.]+$/;
+const REGEX_SOLO_LETRAS = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s]+$/;
+
+const sanitizarSoloLetras = (valor = '', maximo = 100) => (
+  valor
+    .replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .slice(0, maximo)
+);
 
 const sanitizarTextoConPunto = (valor = '', maximo = 100) => (
   valor
@@ -80,7 +88,10 @@ const Clientes = () => {
 
     if (!form.nombre.trim()) return toast.warn('El nombre es obligatorio');
     if (form.nombre.trim().length > 10) return toast.warn('El nombre no puede exceder 10 caracteres');
+    if (!REGEX_SOLO_LETRAS.test(form.nombre.trim())) return toast.warn('El nombre solo permite letras y espacios');
     if (!form.apellido.trim()) return toast.warn('El apellido es obligatorio');
+    if (form.apellido.trim().length > 10) return toast.warn('El apellido no puede exceder 10 caracteres');
+    if (!REGEX_SOLO_LETRAS.test(form.apellido.trim())) return toast.warn('El apellido solo permite letras y espacios');
     if (!form.dni.trim()) return toast.warn('El DNI es obligatorio');
     if (!/^\d{13}$/.test(form.dni.trim())) return toast.warn('El DNI debe tener exactamente 13 dígitos numéricos');
     if (form.rtn.trim() && !/^\d{14}$/.test(form.rtn.trim())) return toast.warn('El RTN debe tener exactamente 14 dígitos numéricos');
@@ -345,13 +356,13 @@ const Clientes = () => {
                     <div className="col-md-6">
                       <label className="form-label">Nombre *</label>
                       <input type="text" className="form-control" value={form.nombre}
-                        onChange={(e) => setForm({...form, nombre: e.target.value})} required maxLength={10} />
+                        onChange={(e) => setForm({...form, nombre: sanitizarSoloLetras(e.target.value, 10)})} required maxLength={10} />
                       <small className="text-muted">{form.nombre.length}/10</small>
                     </div>
                     <div className="col-md-6">
                       <label className="form-label">Apellido *</label>
                       <input type="text" className="form-control" value={form.apellido}
-                        onChange={(e) => setForm({...form, apellido: e.target.value})} required maxLength={10} />
+                        onChange={(e) => setForm({...form, apellido: sanitizarSoloLetras(e.target.value, 10)})} required maxLength={10} />
                       <small className="text-muted">{form.apellido.length}/10</small>
                     </div>
                     <div className="col-md-3">

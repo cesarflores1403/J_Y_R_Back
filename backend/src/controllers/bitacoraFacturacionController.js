@@ -56,6 +56,15 @@ export const tiposEvento = async (req, res) => {
   }
 };
 
+export const eliminarEvento = async (req, res) => {
+  try {
+    const resultado = await bitacoraService.eliminar(req.params.id);
+    res.json({ ok: true, ...resultado });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });
+  }
+};
+
 export const exportarExcel = async (req, res) => {
   try {
     const registros = await bitacoraService.exportar(req.query);

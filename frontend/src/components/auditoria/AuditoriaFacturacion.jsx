@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { FiSearch, FiDownload, FiFilter, FiX, FiClock, FiUser, FiFileText, FiAlertTriangle, FiTrash2, FiXCircle, FiRefreshCw, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { auditoriaFacturacionService } from '../../services/serviceIndex.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
+import { confirmDialog } from '../../utils/notifications.js';
 
 // ==========================================
 // ICONOS Y COLORES POR TIPO DE EVENTO
@@ -21,6 +23,8 @@ const getEventoConfig = (evento) => EVENTO_CONFIG[evento] || { icon: <FiClock />
 // COMPONENTE PRINCIPAL
 // ==========================================
 const AuditoriaFacturacion = () => {
+  const { usuario } = useAuth();
+  const esSuperAdmin = usuario?.rol === 'Super Administrador';
   const [registros, setRegistros] = useState([]);
   const [total, setTotal] = useState(0);
   const [pagina, setPagina] = useState(1);
@@ -140,6 +144,25 @@ const AuditoriaFacturacion = () => {
 
   const hayFiltrosActivos = filtroEvento || filtroFactura || filtroFechaDesde || filtroFechaHasta || filtroBuscar;
 
+  const eliminarEvento = async (id, eventoLabel) => {
+    const ok = await confirmDialog({
+      variant: 'delete',
+      title: 'Eliminar evento de auditoría',
+      text: `Se eliminará el evento "${eventoLabel}" de forma permanente.`,
+      confirmText: 'Sí, eliminar'
+    });
+    if (!ok) return;
+
+    try {
+      await auditoriaFacturacionService.eliminar(id);
+      toast.success('Evento eliminado correctamente');
+      setExpandido((prev) => (prev === id ? null : prev));
+      await cargar(pagina);
+    } catch (err) {
+      toast.error('Error al eliminar evento: ' + (err.response?.data?.mensaje || err.message));
+    }
+  };
+
   return (
     <div>
       {/* Header */}
@@ -233,6 +256,7 @@ const AuditoriaFacturacion = () => {
                     <th>Usuario</th>
                     <th style={{ width: 190 }}>Fecha</th>
                     <th style={{ width: 95 }} className="text-center">Detalle</th>
+                    {esSuperAdmin && <th style={{ width: 100 }} className="text-center">Eliminar</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -265,10 +289,22 @@ const AuditoriaFacturacion = () => {
                               </span>
                             ) : '—'}
                           </td>
+                          {esSuperAdmin && (
+                            <td className="text-center" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                className="btn btn-outline-danger btn-sm"
+                                onClick={() => eliminarEvento(reg.cod_bitacora, cfg.label)}
+                                title="Eliminar evento"
+                              >
+                                <FiTrash2 />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                         {isExpanded && reg.detalle && (
                           <tr>
-                            <td colSpan={6} style={{ background: '#f8f9fa', borderLeft: `3px solid ${cfg.color}`, padding: '12px 20px' }}>
+                            <td colSpan={esSuperAdmin ? 7 : 6} style={{ background: '#f8f9fa', borderLeft: `3px solid ${cfg.color}`, padding: '12px 20px' }}>
                               {renderDetalle(reg.detalle)}
                             </td>
                           </tr>

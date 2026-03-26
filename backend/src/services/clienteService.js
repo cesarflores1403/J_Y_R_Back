@@ -4,6 +4,21 @@ import Cliente from '../models/Cliente.js';
 class ClienteService {
   normalizarDatos(datos = {}) {
     const normalizado = { ...datos };
+    const camposTexto = ['nombre', 'apellido', 'empresa', 'direccion'];
+    for (const campo of camposTexto) {
+      if (typeof normalizado[campo] === 'string') {
+        normalizado[campo] = normalizado[campo].trim();
+      }
+    }
+    if (typeof normalizado.correo === 'string') {
+      normalizado.correo = normalizado.correo.trim().toLowerCase();
+    }
+    if (typeof normalizado.dni === 'string') {
+      normalizado.dni = normalizado.dni.trim();
+    }
+    if (typeof normalizado.telefono === 'string') {
+      normalizado.telefono = normalizado.telefono.trim();
+    }
     if (typeof normalizado.rtn === 'string') {
       const rtnLimpio = normalizado.rtn.trim();
       normalizado.rtn = rtnLimpio === '' ? null : rtnLimpio;

@@ -51,3 +51,34 @@ npm start
 ```bash
 npm test
 ```
+
+## Backup y Restore
+
+Respalda base de datos y carpeta de archivos subidos (`uploads`) para recuperar el sistema completo.
+
+Requisitos:
+
+- Tener instalado PostgreSQL client tools (`pg_dump` y `pg_restore`) y disponibles en PATH.
+- Tener configuradas variables `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` en `.env`.
+
+Crear backup:
+
+```bash
+npm run backup:system
+```
+
+Se crea una carpeta en `backend/backups/<timestamp>` con:
+
+- `db.backup`
+- `uploads/` (si existe)
+- `metadata.json`
+
+Restaurar backup:
+
+```bash
+npm run restore:system -- "backups/<timestamp>"
+```
+
+Recomendado antes de restaurar:
+
+- Detener el backend para evitar conexiones activas.

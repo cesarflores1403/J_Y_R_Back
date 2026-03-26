@@ -117,6 +117,21 @@ class BitacoraFacturacionService {
     });
     return result.map(r => r.evento);
   }
+
+  async eliminar(codBitacora) {
+    const id = parseInt(codBitacora, 10);
+    if (Number.isNaN(id) || id <= 0) {
+      throw Object.assign(new Error('Código de bitácora inválido'), { statusCode: 400 });
+    }
+
+    const registro = await BitacoraFacturacion.findByPk(id);
+    if (!registro) {
+      throw Object.assign(new Error('Evento de auditoría no encontrado'), { statusCode: 404 });
+    }
+
+    await registro.destroy();
+    return { mensaje: 'Evento de auditoría eliminado correctamente' };
+  }
 }
 
 export default new BitacoraFacturacionService();

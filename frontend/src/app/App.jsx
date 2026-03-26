@@ -31,6 +31,7 @@ import RecuperarPassword from '../components/auth/RecuperarPassword.jsx';
 import OrdenesCompra from '../components/compras/OrdenesCompra.jsx';
 import ConfigEmpresa from '../components/configuracion/ConfigEmpresa.jsx';
 import UrlSistema from '../components/configuracion/UrlSistema.jsx';
+import BackupSistema from '../components/configuracion/BackupSistema.jsx';
 const PrivateRoute = ({ children, roles }) => {
   const { autenticado, usuario, cargando } = useAuth();
   if (cargando) return <div className="jyr-spinner" style={{ minHeight: '100vh' }} />;
@@ -44,7 +45,7 @@ const App = () => {
   return (
     <AuthProvider>
       <ConfirmDialogProvider>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/login" element={<Login />} /> 
           <Route path="/recuperar-password" element={<RecuperarPassword />} />
@@ -76,6 +77,7 @@ const App = () => {
             <Route path="compras/ordenes" element={<PrivateRoute roles={['Administrador','Bodeguero']}><OrdenesCompra /></PrivateRoute>} />
             <Route path="config-empresa" element={<PrivateRoute roles={['Super Administrador']}><ConfigEmpresa /></PrivateRoute>} />
             <Route path="url-sistema" element={<PrivateRoute roles={['Super Administrador']}><UrlSistema /></PrivateRoute>} />
+            <Route path="respaldos" element={<PrivateRoute roles={['Administrador', 'Super Administrador']}><BackupSistema /></PrivateRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
