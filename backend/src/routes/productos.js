@@ -11,8 +11,11 @@ import {
   validarCambiarEstadoMasivo,
   validarEliminarProducto
 } from '../middlewares/productoValidator.js';
+import { autenticarOpcional } from '../middlewares/auth.js';
 
 const router = express.Router();
+
+router.use(autenticarOpcional);
 
 // =======================
 // HU-08: Configuración Multer para imágenes de producto

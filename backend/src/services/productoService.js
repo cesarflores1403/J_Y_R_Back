@@ -44,6 +44,18 @@ const normalizar = (datos) => {
       : Number(resultado.cod_ubicacion);
   }
 
+  if (resultado.stock_minimo !== undefined) {
+    resultado.stock_minimo = resultado.stock_minimo === '' || resultado.stock_minimo === null
+      ? null
+      : Number(resultado.stock_minimo);
+  }
+
+  if (resultado.punto_reorden !== undefined) {
+    resultado.punto_reorden = resultado.punto_reorden === '' || resultado.punto_reorden === null
+      ? null
+      : Number(resultado.punto_reorden);
+  }
+
   return resultado;
 };
 
@@ -108,11 +120,34 @@ export const getProducto = async () => {
   return await productoModel.getProducto();
 };
 
+const quitarAuditoriaProducto = (producto = {}) => {
+  const sinAuditoria = { ...producto };
+  delete sinAuditoria.creado_por;
+  delete sinAuditoria.fecha_creacion;
+  delete sinAuditoria.modificado_por;
+  delete sinAuditoria.fecha_modificacion;
+  delete sinAuditoria.creado_por_nombre;
+  delete sinAuditoria.modificado_por_nombre;
+  delete sinAuditoria.fecha_creacion_texto;
+  delete sinAuditoria.fecha_modificacion_texto;
+  return sinAuditoria;
+};
+
+export const getProductoConAuditoria = async ({ incluirAuditoria = false } = {}) => {
+  const productos = await productoModel.getProducto();
+  if (incluirAuditoria) return productos;
+  return (productos || []).map((p) => quitarAuditoriaProducto(p));
+};
+
 // =======================
 // CREATE PRODUCTO (HU-04: validar unicidad + retornar producto creado)
 // =======================
-export const createProducto = async (datos) => {
+export const createProducto = async (datos, auditoria = {}) => {
   const datosNorm = normalizar(datos);
+  const codUsuario = Number.isInteger(Number(auditoria?.cod_usuario))
+    ? Number(auditoria.cod_usuario)
+    : null;
+  const fechaActual = new Date().toISOString();
   const stockInicial = Number.isFinite(Number(datosNorm.stock_inicial))
     ? Number(datosNorm.stock_inicial)
     : 0;
@@ -129,7 +164,37 @@ export const createProducto = async (datos) => {
     throw error;
   }
 
+  if (datosNorm.stock_minimo !== null && datosNorm.stock_minimo !== undefined) {
+    if (!Number.isInteger(datosNorm.stock_minimo) || datosNorm.stock_minimo < 0) {
+      const error = new Error('stock_minimo debe ser un entero mayor o igual a 0.');
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  if (datosNorm.punto_reorden !== null && datosNorm.punto_reorden !== undefined) {
+    if (!Number.isInteger(datosNorm.punto_reorden) || datosNorm.punto_reorden < 0) {
+      const error = new Error('punto_reorden debe ser un entero mayor o igual a 0.');
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  if (
+    datosNorm.stock_minimo !== null && datosNorm.stock_minimo !== undefined
+    && datosNorm.punto_reorden !== null && datosNorm.punto_reorden !== undefined
+    && datosNorm.punto_reorden < datosNorm.stock_minimo
+  ) {
+    const error = new Error('punto_reorden no puede ser menor que stock_minimo.');
+    error.status = 400;
+    throw error;
+  }
+
   const datosProducto = { ...datosNorm };
+  datosProducto.creado_por = codUsuario;
+  datosProducto.fecha_creacion = fechaActual;
+  datosProducto.modificado_por = codUsuario;
+  datosProducto.fecha_modificacion = fechaActual;
   delete datosProducto.stock_inicial;
 
   // HU-04: Si se envió cod_producto manual, verificar unicidad
@@ -238,8 +303,16 @@ export const createProducto = async (datos) => {
 // =======================
 // UPDATE PRODUCTO
 // =======================
-export const updateProducto = async ({ cod_producto, datos = {}, stock_agregar = 0, stock_nuevo = null }) => {
+export const updateProducto = async ({ cod_producto, datos = {}, stock_agregar = 0, stock_nuevo = null, auditoria = {} }) => {
   const datosNorm = normalizar(datos || {});
+  const codUsuario = Number.isInteger(Number(auditoria?.cod_usuario))
+    ? Number(auditoria.cod_usuario)
+    : null;
+  const datosConAuditoria = {
+    ...datosNorm,
+    modificado_por: codUsuario,
+    fecha_modificacion: new Date().toISOString()
+  };
   const stockAgregar = Number.isFinite(Number(stock_agregar))
     ? Number(stock_agregar)
     : 0;
@@ -258,6 +331,64 @@ export const updateProducto = async ({ cod_producto, datos = {}, stock_agregar =
     throw error;
   }
 
+  if (datosNorm.stock_minimo !== undefined && datosNorm.stock_minimo !== null) {
+    if (!Number.isInteger(datosNorm.stock_minimo) || datosNorm.stock_minimo < 0) {
+      const error = new Error('stock_minimo debe ser un entero mayor o igual a 0.');
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  if (datosNorm.punto_reorden !== undefined && datosNorm.punto_reorden !== null) {
+    if (!Number.isInteger(datosNorm.punto_reorden) || datosNorm.punto_reorden < 0) {
+      const error = new Error('punto_reorden debe ser un entero mayor o igual a 0.');
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  if (
+    datosNorm.stock_minimo !== undefined
+    && datosNorm.stock_minimo !== null
+    && datosNorm.punto_reorden !== undefined
+    && datosNorm.punto_reorden !== null
+    && datosNorm.punto_reorden < datosNorm.stock_minimo
+  ) {
+    const error = new Error('punto_reorden no puede ser menor que stock_minimo.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (datosNorm.stock_minimo !== undefined || datosNorm.punto_reorden !== undefined) {
+    const actual = await pool.query(
+      'SELECT stock_minimo, punto_reorden FROM producto WHERE cod_producto = $1 LIMIT 1',
+      [cod_producto]
+    );
+
+    if (actual.rows.length === 0) {
+      const error = new Error(`Producto con código ${cod_producto} no encontrado.`);
+      error.status = 404;
+      throw error;
+    }
+
+    const stockMinimoFinal = datosNorm.stock_minimo !== undefined
+      ? datosNorm.stock_minimo
+      : actual.rows[0].stock_minimo;
+    const puntoReordenFinal = datosNorm.punto_reorden !== undefined
+      ? datosNorm.punto_reorden
+      : actual.rows[0].punto_reorden;
+
+    if (
+      stockMinimoFinal !== null && stockMinimoFinal !== undefined
+      && puntoReordenFinal !== null && puntoReordenFinal !== undefined
+      && Number(puntoReordenFinal) < Number(stockMinimoFinal)
+    ) {
+      const error = new Error('punto_reorden no puede ser menor que stock_minimo.');
+      error.status = 400;
+      throw error;
+    }
+  }
+
   // Si se actualiza nombre, verificar duplicado excluyendo el producto actual
   if (datosNorm.nombre_producto) {
     await verificarDuplicado(datosNorm.nombre_producto, cod_producto);
@@ -273,10 +404,10 @@ export const updateProducto = async ({ cod_producto, datos = {}, stock_agregar =
   try {
     await client.query('BEGIN');
 
-    if (Object.keys(datosNorm).length > 0) {
+    if (Object.keys(datosConAuditoria).length > 0) {
       await productoModel.updateProducto({
         cod_producto,
-        datos: datosNorm
+        datos: datosConAuditoria
       }, client);
     }
 

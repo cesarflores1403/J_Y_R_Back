@@ -31,6 +31,32 @@ const ProductoSeq = sequelize.define('producto', {
     type: DataTypes.INTEGER,
     allowNull: true,
     defaultValue: null
+  },
+  stock_minimo: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null
+  },
+  punto_reorden: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null
+  },
+  creado_por: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  fecha_creacion: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  modificado_por: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  fecha_modificacion: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 });
 

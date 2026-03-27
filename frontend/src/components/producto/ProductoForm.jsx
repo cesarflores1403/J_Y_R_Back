@@ -21,6 +21,8 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
     cod_isv: '',
     estado_producto: 'Activo',
     cod_ubicacion: '',
+    stock_minimo: '',
+    punto_reorden: '',
   }); // // Estado form
 
   const [fieldErrors, setFieldErrors] = useState({}); // // Errores por campo
@@ -48,6 +50,8 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
           ? (selected.estado_producto ? 'Activo' : 'Inactivo')
           : (selected.estado_producto || 'Activo'),
         cod_ubicacion: selected.cod_ubicacion ?? '',
+        stock_minimo: selected.stock_minimo ?? '',
+        punto_reorden: selected.punto_reorden ?? '',
       });
 
       // HU-08: Mostrar imagen actual si existe
@@ -75,6 +79,8 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
           ? (duplicateFrom.estado_producto ? 'Activo' : 'Inactivo')
           : (duplicateFrom.estado_producto || 'Activo'),
         cod_ubicacion: duplicateFrom.cod_ubicacion ?? '',
+        stock_minimo: duplicateFrom.stock_minimo ?? '',
+        punto_reorden: duplicateFrom.punto_reorden ?? '',
       });
 
       // HU-14: no copiar imagen en duplicado
@@ -94,6 +100,8 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       cod_isv: '',
       estado_producto: 'Activo',
       cod_ubicacion: '',
+      stock_minimo: '',
+      punto_reorden: '',
     });
 
     setImagenFile(null);
@@ -207,6 +215,22 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       errors.estado_producto = 'Estado inválido.';
     }
 
+    if (form.stock_minimo !== '' && (!Number.isInteger(Number(form.stock_minimo)) || Number(form.stock_minimo) < 0)) {
+      errors.stock_minimo = 'El stock mínimo debe ser un entero mayor o igual a 0.';
+    }
+
+    if (form.punto_reorden !== '' && (!Number.isInteger(Number(form.punto_reorden)) || Number(form.punto_reorden) < 0)) {
+      errors.punto_reorden = 'El punto de reorden debe ser un entero mayor o igual a 0.';
+    }
+
+    if (
+      form.stock_minimo !== ''
+      && form.punto_reorden !== ''
+      && Number(form.punto_reorden) < Number(form.stock_minimo)
+    ) {
+      errors.punto_reorden = 'El punto de reorden no puede ser menor que el stock mínimo.';
+    }
+
     // Stock inicial (solo creación)
     if (!isEdit) {
       const stockRaw = form.stock_inicial === '' ? '0' : String(form.stock_inicial);
@@ -245,6 +269,8 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
     cod_isv: Number(form.cod_isv),
     estado_producto: form.estado_producto,
     cod_ubicacion: form.cod_ubicacion ? Number(form.cod_ubicacion) : null,
+    stock_minimo: form.stock_minimo === '' ? null : Number(form.stock_minimo),
+    punto_reorden: form.punto_reorden === '' ? null : Number(form.punto_reorden),
   });
 
   // =====================================================
@@ -262,6 +288,8 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       cod_isv: Number(form.cod_isv),
       estado_producto: form.estado_producto,
       cod_ubicacion: form.cod_ubicacion ? Number(form.cod_ubicacion) : null,
+      stock_minimo: form.stock_minimo === '' ? null : Number(form.stock_minimo),
+      punto_reorden: form.punto_reorden === '' ? null : Number(form.punto_reorden),
     };
 
     const fields = [
@@ -272,6 +300,8 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       'cod_isv',
       'estado_producto',
       'cod_ubicacion',
+      'stock_minimo',
+      'punto_reorden',
     ];
 
     // // Detecta TODOS los campos que cambiaron
@@ -345,6 +375,8 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
           cod_isv: '',
           estado_producto: 'Activo',
           cod_ubicacion: '',
+          stock_minimo: '',
+          punto_reorden: '',
         });
         handleRemoveImagen();
       }
@@ -567,6 +599,46 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
                 <option value="Inactivo">Inactivo</option>
                 <option value="Descontinuado">Descontinuado</option>
               </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="jyr-form-group">
+              <label className="jyr-form-label">Stock mínimo (opcional)</label>
+              <input
+                className={`jyr-form-control ${fieldErrors.stock_minimo ? 'jyr-input-error' : ''}`}
+                name="stock_minimo"
+                type="number"
+                step="1"
+                min="0"
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault();
+                }}
+                placeholder="Ej: 10"
+                value={form.stock_minimo}
+                onChange={onChange}
+                disabled={saving}
+              />
+              {fieldErrors.stock_minimo && <span className="jyr-field-error">{fieldErrors.stock_minimo}</span>}
+            </div>
+
+            <div className="jyr-form-group">
+              <label className="jyr-form-label">Punto de reorden (opcional)</label>
+              <input
+                className={`jyr-form-control ${fieldErrors.punto_reorden ? 'jyr-input-error' : ''}`}
+                name="punto_reorden"
+                type="number"
+                step="1"
+                min="0"
+                onKeyDown={(e) => {
+                  if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault();
+                }}
+                placeholder="Ej: 15"
+                value={form.punto_reorden}
+                onChange={onChange}
+                disabled={saving}
+              />
+              {fieldErrors.punto_reorden && <span className="jyr-field-error">{fieldErrors.punto_reorden}</span>}
             </div>
           </div>
 

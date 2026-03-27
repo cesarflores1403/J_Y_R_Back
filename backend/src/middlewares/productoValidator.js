@@ -53,6 +53,23 @@ export const validarCrearProducto = [
     .optional({ values: 'null' })
     .isInt({ min: 1 }).withMessage('La ubicación debe ser un número entero válido.'),
 
+  body('stock_minimo')
+    .optional({ values: 'null' })
+    .isInt({ min: 0 }).withMessage('stock_minimo debe ser un entero mayor o igual a 0.'),
+
+  body('punto_reorden')
+    .optional({ values: 'null' })
+    .isInt({ min: 0 }).withMessage('punto_reorden debe ser un entero mayor o igual a 0.')
+    .custom((val, { req }) => {
+      if (val === undefined || val === null || val === '') return true;
+      const stockMinimo = req.body?.stock_minimo;
+      if (stockMinimo === undefined || stockMinimo === null || stockMinimo === '') return true;
+      if (Number(val) < Number(stockMinimo)) {
+        throw new Error('punto_reorden no puede ser menor que stock_minimo.');
+      }
+      return true;
+    }),
+
   body('stock_inicial')
     .optional()
     .isInt({ min: 0 }).withMessage('El stock inicial debe ser un número entero mayor o igual a 0.')
@@ -95,7 +112,7 @@ export const validarActualizarProducto = [
       const keys = Object.keys(datos);
       if (keys.length === 0) return true;
 
-      const camposPermitidos = ['cod_categoria', 'nombre_producto', 'unidad_medida', 'precio_venta', 'cod_isv', 'estado_producto', 'cod_ubicacion'];
+      const camposPermitidos = ['cod_categoria', 'nombre_producto', 'unidad_medida', 'precio_venta', 'cod_isv', 'estado_producto', 'cod_ubicacion', 'stock_minimo', 'punto_reorden'];
 
       // Validar cada campo enviado
       for (const campo of keys) {
@@ -133,6 +150,15 @@ export const validarActualizarProducto = [
             break;
           case 'cod_ubicacion':
             if (valor !== null && (!Number.isInteger(Number(valor)) || Number(valor) < 1)) throw new Error('cod_ubicacion debe ser un entero positivo o null.');
+            break;
+          case 'stock_minimo':
+            if (valor !== null && (!Number.isInteger(Number(valor)) || Number(valor) < 0)) throw new Error('stock_minimo debe ser un entero mayor o igual a 0 o null.');
+            break;
+          case 'punto_reorden':
+            if (valor !== null && (!Number.isInteger(Number(valor)) || Number(valor) < 0)) throw new Error('punto_reorden debe ser un entero mayor o igual a 0 o null.');
+            if (datos.stock_minimo !== undefined && datos.stock_minimo !== null && Number(valor) < Number(datos.stock_minimo)) {
+              throw new Error('punto_reorden no puede ser menor que stock_minimo.');
+            }
             break;
         }
       }

@@ -106,8 +106,49 @@ class ReporteService {
       WHERE p.cod_producto IS NULL OR p.estado_producto = 'Activo'
     `);
 
-    const stockBajo = Number(alertasInventarioResult?.[0]?.stock_bajo || 0);
-    const stockEnCero = Number(alertasInventarioResult?.[0]?.sin_existencia || 0);
+    const [productosBajoMinimo] = await sequelize.query(`
+      SELECT
+        p.cod_producto,
+        p.nombre_producto,
+        COALESCE(SUM(i.stock), 0)::int AS stock_total,
+        COALESCE(p.stock_minimo, MAX(COALESCE(i.stock_minimo, 0)), 0)::int AS stock_minimo,
+        p.punto_reorden,
+        CASE
+          WHEN COALESCE(p.stock_minimo, MAX(COALESCE(i.stock_minimo, 0)), 0) > 0
+            THEN COALESCE(p.stock_minimo, MAX(COALESCE(i.stock_minimo, 0)), 0)
+          WHEN COALESCE(p.punto_reorden, 0) > 0
+            THEN COALESCE(p.punto_reorden, 0)
+          ELSE 1
+        END::int AS umbral_stock,
+        (
+          CASE
+            WHEN COALESCE(p.stock_minimo, MAX(COALESCE(i.stock_minimo, 0)), 0) > 0
+              THEN COALESCE(p.stock_minimo, MAX(COALESCE(i.stock_minimo, 0)), 0)
+            WHEN COALESCE(p.punto_reorden, 0) > 0
+              THEN COALESCE(p.punto_reorden, 0)
+            ELSE 1
+          END
+          - COALESCE(SUM(i.stock), 0)
+        )::int AS faltante
+      FROM producto p
+      LEFT JOIN inventario i ON i.cod_producto = p.cod_producto
+      WHERE p.estado_producto = 'Activo'
+      GROUP BY p.cod_producto, p.nombre_producto, p.stock_minimo, p.punto_reorden
+      HAVING COALESCE(SUM(i.stock), 0) < (
+        CASE
+          WHEN COALESCE(p.stock_minimo, MAX(COALESCE(i.stock_minimo, 0)), 0) > 0
+            THEN COALESCE(p.stock_minimo, MAX(COALESCE(i.stock_minimo, 0)), 0)
+          WHEN COALESCE(p.punto_reorden, 0) > 0
+            THEN COALESCE(p.punto_reorden, 0)
+          ELSE 1
+        END
+      )
+      ORDER BY faltante DESC, p.nombre_producto ASC
+      LIMIT 10
+    `);
+
+    const stockEnCero = Number((productosBajoMinimo || []).filter((p) => Number(p.stock_total || 0) <= 0).length || 0);
+    const stockBajo = Number((productosBajoMinimo || []).length || 0) - stockEnCero;
 
     const [ultimasFacturas] = await sequelize.query(`
       SELECT f.cod_factura, c.nombre, c.apellido, f.total, f.estado,
@@ -134,6 +175,7 @@ class ReporteService {
         stockEnCero,
         total: stockBajo + stockEnCero
       },
+      productosBajoMinimo: productosBajoMinimo || [],
       ultimasFacturas
     };
   }

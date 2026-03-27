@@ -7,7 +7,9 @@ import { sendOk } from '../utils/response.js'; // // Respuesta estándar (ok/mes
 // =======================
 export const getProducto = async (req, res, next) => {
   try {
-    const data = await productoService.getProducto(); // // Obtener productos desde service
+    const rolUsuario = req.usuario?.rol || '';
+    const incluirAuditoria = rolUsuario === 'Administrador' || rolUsuario === 'Super Administrador';
+    const data = await productoService.getProductoConAuditoria({ incluirAuditoria }); // // Obtener productos desde service
 
     return sendOk(res, {
       status: 200, // // OK
@@ -30,7 +32,9 @@ export const createProducto = async (req, res, next) => {
     }
 
     // HU-04: createProducto retorna el producto insertado con cod_producto
-    const productoCreado = await productoService.createProducto(req.body);
+    const productoCreado = await productoService.createProducto(req.body, {
+      cod_usuario: req.usuario?.cod_usuario || null
+    });
 
     return sendOk(res, {
       status: 201,
@@ -56,7 +60,15 @@ export const updateProducto = async (req, res, next) => {
       await isvService.validarIsvExiste(datos.cod_isv);
     }
 
-    await productoService.updateProducto({ cod_producto, datos, stock_agregar, stock_nuevo });
+    await productoService.updateProducto({
+      cod_producto,
+      datos,
+      stock_agregar,
+      stock_nuevo,
+      auditoria: {
+        cod_usuario: req.usuario?.cod_usuario || null
+      }
+    });
 
     // HU-05: Mensaje detallado con campos actualizados
     const camposActualizados = Object.keys(datos);
@@ -70,7 +82,9 @@ export const updateProducto = async (req, res, next) => {
       precio_venta: 'Precio de venta',
       cod_isv: 'ISV',
       estado_producto: 'Estado',
-      cod_ubicacion: 'Ubicación'
+      cod_ubicacion: 'Ubicación',
+      stock_minimo: 'Stock mínimo',
+      punto_reorden: 'Punto de reorden'
     };
     const camposTexto = camposActualizados.map(c => nombresLegibles[c] || c).join(', ');
     const partesMensaje = [];

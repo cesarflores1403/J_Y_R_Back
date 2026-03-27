@@ -9,7 +9,7 @@ import { alertDialog, confirmDialog } from '../../utils/notifications.js';
 // =====================================================
 import { resolveApiBase } from '../../utils/runtimeApi.js';
 
-const ITEMS_PER_PAGE = 6;
+const ITEMS_PER_PAGE = 10;
 
 // Mapa de badges por estado
 const estadoBadge = {
@@ -38,6 +38,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
   const [busqueda, setBusqueda] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
+  const [filtroBajoStock, setFiltroBajoStock] = useState(false);
   const [ordenarPor, setOrdenarPor] = useState('cod_producto');
   const [ordenDir, setOrdenDir] = useState('asc');
   const [pagina, setPagina] = useState(1);
@@ -55,6 +56,18 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
   const getEstado = (p) => {
     if (typeof p.estado_producto === 'boolean') return p.estado_producto ? 'Activo' : 'Inactivo';
     return p.estado_producto || 'Activo';
+  };
+
+  const esBajoStock = (p) => {
+    const stockTotal = Number(p.stock_total ?? 0);
+    const stockMinimo = Number(p.stock_minimo ?? 0);
+    const puntoReorden = Number(p.punto_reorden ?? 0);
+
+    if (stockMinimo > 0) return stockTotal < stockMinimo;
+    if (puntoReorden > 0) return stockTotal < puntoReorden;
+
+    // Si no hay umbral definido, considerar bajo stock cuando está en cero.
+    return stockTotal <= 0;
   };
 
   // =====================================================
@@ -84,9 +97,13 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
         return false;
       }
 
+      if (filtroBajoStock && !esBajoStock(p)) {
+        return false;
+      }
+
       return true;
     });
-  }, [productos, busqueda, filtroCategoria, filtroEstado]);
+  }, [productos, busqueda, filtroCategoria, filtroEstado, filtroBajoStock]);
 
   // =====================================================
   // 2. ORDENAR
@@ -236,6 +253,10 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
     setFiltroEstado(val);
     setPagina(1);
   };
+  const handleFiltroBajoStock = (val) => {
+    setFiltroBajoStock(val);
+    setPagina(1);
+  };
 
   // =====================================================
   // ORDENAMIENTO: clic en cabecera de columna
@@ -258,11 +279,12 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
   };
 
   // Limpiar filtros
-  const hayFiltros = busqueda || filtroCategoria || filtroEstado;
+  const hayFiltros = busqueda || filtroCategoria || filtroEstado || filtroBajoStock;
   const limpiarFiltros = () => {
     setBusqueda('');
     setFiltroCategoria('');
     setFiltroEstado('');
+    setFiltroBajoStock(false);
     setPagina(1);
   };
 
@@ -411,6 +433,16 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
           <option value="Inactivo">Inactivo</option>
           <option value="Descontinuado">Descontinuado</option>
         </select>
+
+        <button
+          type="button"
+          className={`jyr-btn jyr-btn-sm ${filtroBajoStock ? 'jyr-btn-danger' : 'jyr-btn-outline'}`}
+          onClick={() => handleFiltroBajoStock(!filtroBajoStock)}
+          style={{ fontSize: 12 }}
+          title="Mostrar solo productos con bajo stock"
+        >
+          Bajo stock
+        </button>
 
         {/* Limpiar filtros */}
         {hayFiltros && (
@@ -573,6 +605,11 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
             {productosPagina.length > 0 ? (
               productosPagina.map((p) => {
                 const estado = getEstado(p);
+                const bajoStock = esBajoStock(p);
+                const stockActual = Number(p.stock_total ?? 0);
+                const stockMinimo = Number(p.stock_minimo ?? 0);
+                const puntoReorden = Number(p.punto_reorden ?? 0);
+                const umbral = stockMinimo > 0 ? stockMinimo : (puntoReorden > 0 ? puntoReorden : 1);
 
                 return (
                   <tr key={p.cod_producto} style={estado !== 'Activo' ? { opacity: 0.7 } : {}}>
@@ -669,8 +706,11 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
                       L. {Number(p.precio_venta).toFixed(2)}
                     </td>
                     <td>
-                      <span className={`jyr-badge ${Number(p.stock_total ?? 0) > 0 ? 'jyr-badge-success' : 'jyr-badge-danger'}`}>
-                        {Number(p.stock_total ?? 0)}
+                      <span
+                        className={`jyr-badge ${bajoStock ? 'jyr-badge-danger' : (stockActual > 0 ? 'jyr-badge-success' : 'jyr-badge-danger')}`}
+                        title={bajoStock ? `Bajo stock: actual ${stockActual}, maximo ${umbral}` : 'Stock actual'}
+                      >
+                        {stockActual}{bajoStock ? ` / maximo ${umbral}` : ''}
                       </span>
                     </td>
                     <td>

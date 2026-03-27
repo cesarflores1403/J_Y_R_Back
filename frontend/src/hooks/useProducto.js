@@ -73,7 +73,9 @@ export const useProducto = () => {
         unidad_medida: 'Unidad',
         precio_venta: 'Precio',
         cod_isv: 'ISV',
-        estado_producto: 'Estado'
+        estado_producto: 'Estado',
+        stock_minimo: 'Stock mínimo',
+        punto_reorden: 'Punto de reorden'
       };
       const cambiosCatalogo = Object.keys(payload.datos || {});
       const camposTexto = cambiosCatalogo.map(c => camposLegibles[c] || c).join(', ');

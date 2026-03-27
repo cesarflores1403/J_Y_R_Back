@@ -27,6 +27,7 @@ const Dashboard = () => {
 
   const stockBajo = Number(datos?.alertasInventario?.stockBajo ?? datos?.stockBajo ?? 0);
   const stockEnCero = Number(datos?.alertasInventario?.stockEnCero ?? datos?.stockEnCero ?? 0);
+  const productosBajoMinimo = Array.isArray(datos?.productosBajoMinimo) ? datos.productosBajoMinimo : [];
   const totalAlertasInventario = Number(
     datos?.alertasInventario?.total ?? (stockBajo + stockEnCero)
   );
@@ -219,6 +220,49 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="jyr-card animate-in mb-4">
+        <div className="jyr-card-header d-flex align-items-center justify-content-between">
+          <h5 className="mb-0">Productos por debajo del mínimo</h5>
+          <span className={`badge ${productosBajoMinimo.length > 0 ? 'bg-danger' : 'bg-success'}`}>
+            {productosBajoMinimo.length}
+          </span>
+        </div>
+        <div className="jyr-card-body p-0">
+          {productosBajoMinimo.length === 0 ? (
+            <div className="text-center text-muted py-4">
+              No hay productos por debajo del stock mínimo.
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Producto</th>
+                    <th>Stock actual</th>
+                    <th>Máximo</th>
+                    <th>Faltante</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productosBajoMinimo.map((p) => (
+                    <tr key={p.cod_producto}>
+                      <td><strong>{`PROD-${String(p.cod_producto).padStart(4, '0')}`}</strong></td>
+                      <td>{p.nombre_producto}</td>
+                      <td>{Number(p.stock_total ?? 0)}</td>
+                      <td>{Number(p.umbral_stock ?? p.stock_minimo ?? 0)}</td>
+                      <td>
+                        <span className="badge bg-danger">{Number(p.faltante ?? 0)}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 

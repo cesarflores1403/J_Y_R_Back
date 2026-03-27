@@ -23,15 +23,26 @@ export const getProducto = async () => {
            p.unidad_medida, p.precio_venta, p.cod_isv,
            COALESCE(i.porcentaje, 0) AS isv_porcentaje,
            COALESCE(i.descripcion, 'Sin ISV') AS isv_descripcion,
-           p.estado_producto, p.imagen_url, p.cod_ubicacion,
+          p.estado_producto, p.imagen_url, p.cod_ubicacion,
+          COALESCE(p.stock_minimo, inv.stock_minimo_inventario, 0) AS stock_minimo,
+          p.punto_reorden,
+           p.creado_por, p.fecha_creacion, p.modificado_por, p.fecha_modificacion,
+           uc.nombre_usuario AS creado_por_nombre,
+           um.nombre_usuario AS modificado_por_nombre,
+           TO_CHAR((p.fecha_creacion AT TIME ZONE 'UTC') AT TIME ZONE 'America/Tegucigalpa', 'DD/MM/YYYY, HH12:MI AM') AS fecha_creacion_texto,
+           TO_CHAR((p.fecha_modificacion AT TIME ZONE 'UTC') AT TIME ZONE 'America/Tegucigalpa', 'DD/MM/YYYY, HH12:MI AM') AS fecha_modificacion_texto,
            COALESCE(inv.stock_total, 0) AS stock_total,
            u.pasillo AS ubi_pasillo, u.estanteria AS ubi_estanteria,
            u.nivel_1 AS ubi_nivel_1, u.nivel_2 AS ubi_nivel_2,
            u.codigo_producto AS ubi_codigo_producto
     FROM producto p
     LEFT JOIN catalogo_isv i ON p.cod_isv = i.cod_isv
+    LEFT JOIN usuarios uc ON p.creado_por = uc.cod_usuario
+    LEFT JOIN usuarios um ON p.modificado_por = um.cod_usuario
     LEFT JOIN LATERAL (
-      SELECT COALESCE(SUM(iv.stock), 0) AS stock_total
+      SELECT
+        COALESCE(SUM(iv.stock), 0) AS stock_total,
+        MAX(COALESCE(iv.stock_minimo, 0)) AS stock_minimo_inventario
       FROM inventario iv
       WHERE iv.cod_producto = p.cod_producto
     ) inv ON TRUE
@@ -61,7 +72,9 @@ export const createProducto = async (datos, db = pool) => {
   // // 2. Buscar el producto recién creado por nombre (método confiable con Supabase pooler)
   const buscar = `
     SELECT cod_producto, nombre_producto, cod_categoria,
-           unidad_medida, precio_venta, cod_isv, estado_producto
+           unidad_medida, precio_venta, cod_isv, estado_producto,
+        stock_minimo, punto_reorden,
+           creado_por, fecha_creacion, modificado_por, fecha_modificacion
     FROM producto
     WHERE LOWER(TRIM(nombre_producto)) = LOWER(TRIM($1))
     ORDER BY cod_producto DESC

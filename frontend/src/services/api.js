@@ -17,10 +17,13 @@ export const apiFetch = async (endpoint, options = {}) => {
     ? `${API_URL}/${endpointLimpio}`
     : `/${endpointLimpio}`;
 
+  const token = localStorage.getItem('jyr_token');
+
   const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json', // // JSON por defecto
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
     credentials: 'include', // // Preparado para cookies/JWT si se usan

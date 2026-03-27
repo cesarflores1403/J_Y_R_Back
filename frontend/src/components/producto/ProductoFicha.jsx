@@ -8,7 +8,7 @@ import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 const API_URL = resolveApiBase();
 
-const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
+const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {}, mostrarAuditoria = false }) => {
   if (!producto) return null;
 
   const codigo = producto.codigo_producto || `PROD-${String(producto.cod_producto).padStart(4, '0')}`;
@@ -27,6 +27,21 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
       : FiXCircle;
 
   const categoria = categoriasMap[producto.cod_categoria] || `Categoría ${producto.cod_categoria}`;
+  const creadoPorTexto = producto.creado_por_nombre || producto.creado_por || 'N/D';
+  const modificadoPorTexto = producto.modificado_por_nombre || producto.modificado_por || 'N/D';
+
+  const formatearFecha = (valor) => {
+    if (!valor) return 'N/D';
+    const fecha = new Date(valor);
+    if (Number.isNaN(fecha.getTime())) return 'N/D';
+    return fecha.toLocaleString('es-HN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   return (
     // Overlay
@@ -245,6 +260,46 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {} }) => {
                   </p>
                 )}
               </div>
+
+              {mostrarAuditoria && (
+                <>
+                  <div>
+                    <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
+                      Creado por
+                    </span>
+                    <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 600, color: 'var(--jyr-gray-700)', fontFamily: 'var(--font-mono)' }}>
+                      {creadoPorTexto}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
+                      Fecha de creación
+                    </span>
+                    <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 600, color: 'var(--jyr-gray-700)' }}>
+                      {producto.fecha_creacion_texto || formatearFecha(producto.fecha_creacion)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
+                      Modificado por
+                    </span>
+                    <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 600, color: 'var(--jyr-gray-700)', fontFamily: 'var(--font-mono)' }}>
+                      {modificadoPorTexto}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
+                      Fecha de modificación
+                    </span>
+                    <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 600, color: 'var(--jyr-gray-700)' }}>
+                      {producto.fecha_modificacion_texto || formatearFecha(producto.fecha_modificacion)}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

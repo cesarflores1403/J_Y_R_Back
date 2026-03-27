@@ -84,6 +84,34 @@ export const autorizar = (...rolesPermitidos) => {
   };
 };
 
+export const autenticarOpcional = async (req, _res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const usuario = await Usuario.findByPk(decoded.id, {
+      include: [{ model: Rol, as: 'roles', through: { attributes: [] } }]
+    });
+
+    if (usuario && usuario.estado_usuario) {
+      req.usuario = usuario;
+      req.usuario.rol = usuario.roles && usuario.roles.length > 0
+        ? usuario.roles[0].nombre_rol
+        : 'Sin rol';
+    }
+  } catch (_error) {
+    // Si el token es invalido/expirado en modo opcional, continuamos sin usuario.
+  }
+
+  return next();
+};
+
 // =============================================
 // AUTH COOKIE (para modulo producto original)
 // =============================================

@@ -23,6 +23,15 @@ app.listen(PORT, async () => {
     // // Compatibilidad de esquema para clientes: agregar RTN si no existe
     await sequelize.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rtn VARCHAR(14)');
     console.log('✅ Esquema clientes verificado (rtn)');
+
+    // HU-16: Compatibilidad de esquema para auditoria en producto
+    await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS creado_por INTEGER');
+    await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMP');
+    await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS modificado_por INTEGER');
+    await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS fecha_modificacion TIMESTAMP');
+    await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS stock_minimo INTEGER');
+    await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS punto_reorden INTEGER');
+    console.log('✅ Esquema producto verificado (auditoria)');
   } catch (err) {
     console.error('❌ Error al conectar Sequelize:', err.message);
   }

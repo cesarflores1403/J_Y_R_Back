@@ -34,6 +34,7 @@ const ProductoPage = () => {
 
   // HU-09: Determinar si el usuario puede editar
   const puedeEditar = ['Administrador', 'Bodeguero', 'Cajero'].includes(usuario?.rol);
+  const puedeVerAuditoriaProducto = ['Administrador', 'Super Administrador'].includes(usuario?.rol);
 
   const handleEdit = (p) => {
     setSelected(p);
@@ -153,6 +154,7 @@ const ProductoPage = () => {
           producto={fichaProducto}
           onClose={() => setFichaProducto(null)}
           onEdit={puedeEditar ? (p) => { setFichaProducto(null); handleEdit(p); } : undefined}
+          mostrarAuditoria={puedeVerAuditoriaProducto}
           categoriasMap={categoriasMap}
         />
       )}
