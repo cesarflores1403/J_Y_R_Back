@@ -17,6 +17,9 @@ const formatMoney = (v) => {
   return `L ${n.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+const SOLO_LETRAS_ESPACIOS_REGEX = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/;
+const limpiarSoloLetrasYEspacios = (valor) => String(valor || '').replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]/g, '');
+
 const normalizeEstado = (v) => {
   if (v === true) return true;
   if (v === false) return false;
@@ -31,7 +34,7 @@ const normalizeEstado = (v) => {
 // ==========================================
 // VISTA LISTA DE FACTURAS
 // ==========================================
-const ListaFacturas = ({ onNueva, onVer }) => {
+const ListaFacturas = ({ onNuevaProductos, onNuevaReparacion, onVer }) => {
   const confirm = useConfirm();
   const [facturas, setFacturas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -87,9 +90,14 @@ const ListaFacturas = ({ onNueva, onVer }) => {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h3 className="mb-0"><FiFileText className="me-2" />Facturación</h3>
         {['Administrador', 'Cajero'].includes(usuario?.rol) && (
-          <button className="btn jyr-btn-primary" onClick={onNueva}>
-            <FiPlus className="me-2" />Nueva Factura
-          </button>
+          <div className="d-flex gap-2 flex-wrap justify-content-end">
+            <button className="btn jyr-btn-primary" onClick={onNuevaProductos}>
+              <FiPlus className="me-2" />Nueva Factura Productos
+            </button>
+            <button className="btn jyr-btn-primary" onClick={onNuevaReparacion}>
+              <FiPlus className="me-2" />Nueva Factura Reparación
+            </button>
+          </div>
         )}
       </div>
 
@@ -220,6 +228,54 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
   const [cargando, setCargando] = useState(true);
   const printRef = useRef(null);
 
+  const limpiarModoImpresion = useCallback(() => {
+    const nodo = printRef.current;
+    if (!nodo) return;
+    nodo.classList.remove('inv-print-fit-one', 'inv-print-compact', 'inv-print-multipage');
+    nodo.style.removeProperty('--inv-print-scale');
+  }, []);
+
+  const prepararModoImpresion = useCallback(() => {
+    const nodo = printRef.current;
+    if (!nodo) return;
+
+    limpiarModoImpresion();
+
+    // Aproximación de área útil de una carta en px para navegador (11in - márgenes)
+    const altoObjetivoUnaPagina = 980;
+    const altoContenido = nodo.scrollHeight;
+    if (!altoContenido || altoContenido <= altoObjetivoUnaPagina) return;
+
+    const escalaNecesaria = altoObjetivoUnaPagina / altoContenido;
+    const escalaMinimaLegible = 0.74;
+
+    if (escalaNecesaria >= escalaMinimaLegible) {
+      nodo.classList.add('inv-print-fit-one');
+      nodo.style.setProperty('--inv-print-scale', String(Math.max(escalaMinimaLegible, Math.min(1, escalaNecesaria.toFixed(3)))));
+      return;
+    }
+
+    // Intentar versión compacta antes de pasar a multipágina.
+    nodo.classList.add('inv-print-compact');
+    const altoCompacto = nodo.scrollHeight;
+
+    if (altoCompacto && altoCompacto <= altoObjetivoUnaPagina) {
+      return;
+    }
+
+    if (altoCompacto) {
+      const escalaCompacta = altoObjetivoUnaPagina / altoCompacto;
+      if (escalaCompacta >= escalaMinimaLegible) {
+        nodo.classList.add('inv-print-fit-one');
+        nodo.style.setProperty('--inv-print-scale', String(Math.max(escalaMinimaLegible, Math.min(1, escalaCompacta.toFixed(3)))));
+        return;
+      }
+    }
+
+    // Si ya no es legible en una sola página, pasar a multipágina estilizada.
+    nodo.classList.add('inv-print-multipage');
+  }, [limpiarModoImpresion]);
+
   useEffect(() => {
     const cargar = async () => {
       setCargando(true);
@@ -241,7 +297,22 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
     cargar();
   }, [codFactura]);
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    prepararModoImpresion();
+    setTimeout(() => window.print(), 60);
+  };
+
+  useEffect(() => {
+    const onBeforePrint = () => prepararModoImpresion();
+    const onAfterPrint = () => limpiarModoImpresion();
+
+    window.addEventListener('beforeprint', onBeforePrint);
+    window.addEventListener('afterprint', onAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', onBeforePrint);
+      window.removeEventListener('afterprint', onAfterPrint);
+    };
+  }, [prepararModoImpresion, limpiarModoImpresion]);
 
   if (cargando) return <div className="text-center py-5"><div className="spinner-border" /></div>;
   if (!factura) return <div className="text-center py-5 text-muted">Factura no encontrada</div>;
@@ -359,7 +430,11 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
                   <tr key={d.cod_detalle_factura} className={i % 2 === 0 ? 'inv-row-even' : ''}>
                     <td className="text-center">{String(i + 1).padStart(2, '0')}</td>
                     <td className="inv-td-product">
-                      <div className="inv-product-name">{d.producto?.nombre_producto || `Producto #${d.cod_producto}`}</div>
+                      <div className="inv-product-name">
+                        {['REPARACION', 'SERVICIO'].includes(String(d.tipo_item || '').toUpperCase())
+                          ? (d.descripcion_item || 'Servicio de reparación')
+                          : (d.producto?.nombre_producto || `Producto #${d.cod_producto}`)}
+                      </div>
                     </td>
                     <td className="text-center">{d.cantidad}</td>
                     <td className="text-end">{formatMoney(d.precio_unitario)}</td>
@@ -445,11 +520,13 @@ const DetalleFactura = ({ codFactura, onVolver }) => {
 // ==========================================
 // FORMULARIO NUEVA FACTURA
 // ==========================================
-const NuevaFactura = ({ onVolver, onCreada }) => {
+const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
+  const esFacturaReparacion = tipoFactura === 'REPARACION';
   const [clientes, setClientes] = useState([]);
   const [buscarCliente, setBuscarCliente] = useState('');
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [items, setItems] = useState([]);
+  const [reparacion, setReparacion] = useState({ descripcion_item: '', precio_unitario: '', cantidad: 1, isv_pct: 15, descuento: 0 });
   const [refPago, setRefPago] = useState('');
   const [metodoPago, setMetodoPago] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -482,7 +559,51 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
 
   const agregarProducto = (producto) => {
     // HU-FAC-03: añadir campo descuento por línea (porcentaje 0-100)
-    setItems(prev => [...prev, { ...producto, descuento: 0 }]);
+    setItems(prev => [...prev, { ...producto, tipo_item: 'PRODUCTO', descuento: 0 }]);
+  };
+
+  const agregarReparacionManual = () => {
+    const descripcion = String(reparacion.descripcion_item || '').trim().replace(/\s+/g, ' ');
+    const precio = parseFloat(reparacion.precio_unitario);
+    const cantidad = parseInt(reparacion.cantidad, 10) || 0;
+    const isvPct = parseFloat(reparacion.isv_pct) || 0;
+    const descuento = Math.min(100, Math.max(0, parseFloat(reparacion.descuento) || 0));
+
+    if (!descripcion) {
+      toast.warn('Ingresa la descripción de la reparación');
+      return;
+    }
+    if (!SOLO_LETRAS_ESPACIOS_REGEX.test(descripcion)) {
+      toast.warn('La descripción solo permite letras y espacios (sin comillas ni símbolos)');
+      return;
+    }
+    if (!Number.isFinite(precio) || precio <= 0) {
+      toast.warn('El precio unitario de la reparación debe ser mayor a 0');
+      return;
+    }
+    if (cantidad <= 0) {
+      toast.warn('La cantidad de la reparación debe ser mayor a 0');
+      return;
+    }
+    if (isvPct < 0 || isvPct > 100) {
+      toast.warn('El ISV de la reparación debe estar entre 0 y 100');
+      return;
+    }
+
+    setItems((prev) => [
+      ...prev,
+      {
+        manual_id: `REP-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        tipo_item: 'REPARACION',
+        descripcion_item: descripcion,
+        cantidad,
+        precio_unitario: precio,
+        isv_pct: isvPct,
+        descuento,
+      }
+    ]);
+
+    setReparacion({ descripcion_item: '', precio_unitario: '', cantidad: 1, isv_pct: 15, descuento: 0 });
   };
 
   const cambiarCantidad = (index, cantidad) => {
@@ -508,12 +629,13 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
 
   // HU-FAC-03: Cálculo ISV y totales por línea con redondeo
   const calcularItem = (item) => {
-    const precio = round2(item.precio_venta);
+    const precioBase = item.tipo_item === 'REPARACION' ? item.precio_unitario : item.precio_venta;
+    const precio = round2(precioBase);
     const descuento = round2(item.descuento || 0);
     const subtotalBruto = round2(precio * item.cantidad);
     const montoDescuento = round2((descuento / 100) * subtotalBruto);
     const subtotal = round2(subtotalBruto - montoDescuento);
-    const isv = round2((item.isv_pct / 100) * subtotal);
+    const isv = round2(((parseFloat(item.isv_pct) || 0) / 100) * subtotal);
     const total = round2(subtotal + isv);
     return { subtotalBruto, montoDescuento, subtotal, isv, total };
   };
@@ -533,6 +655,22 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
   const validarItems = () => {
     for (const item of items) {
       if (item.cantidad <= 0) return 'La cantidad de cada producto debe ser mayor a 0';
+      if (!esFacturaReparacion && item.tipo_item === 'REPARACION') {
+        return 'La factura de productos no permite líneas de reparación';
+      }
+      if (esFacturaReparacion && item.tipo_item !== 'REPARACION') {
+        return 'La factura de reparación solo permite líneas manuales de reparación';
+      }
+      if (item.tipo_item === 'REPARACION') {
+        const descripcionItem = String(item.descripcion_item || '').trim();
+        if (!descripcionItem) return 'Las líneas de reparación requieren descripción';
+        if (!SOLO_LETRAS_ESPACIOS_REGEX.test(descripcionItem)) {
+          return 'La descripción de reparación solo permite letras y espacios';
+        }
+        if (!Number.isFinite(parseFloat(item.precio_unitario)) || parseFloat(item.precio_unitario) <= 0) {
+          return 'Las líneas de reparación requieren precio unitario mayor a 0';
+        }
+      }
     }
     return null;
   };
@@ -543,9 +681,29 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
     try {
       const payload = {
         cod_cliente: clienteSeleccionado.cod_cliente,
+        tipo_factura: esFacturaReparacion ? 'REPARACION' : 'PRODUCTOS',
         metodo_pago: metodoPago ? parseInt(metodoPago) : null,
         ref_pago: refPago || null,
-        items: items.map(i => ({ cod_producto: i.cod_producto, cantidad: i.cantidad, descuento: i.descuento || 0 })),
+        items: items.map((i) => {
+          if (i.tipo_item === 'REPARACION') {
+            return {
+              tipo_item: 'REPARACION',
+              descripcion_item: i.descripcion_item,
+              precio_unitario: i.precio_unitario,
+              cantidad: i.cantidad,
+              isv_pct: i.isv_pct || 0,
+              descuento: i.descuento || 0,
+              tipo_descuento: 'PORCENTAJE'
+            };
+          }
+          return {
+            tipo_item: 'PRODUCTO',
+            cod_producto: i.cod_producto,
+            cantidad: i.cantidad,
+            descuento: i.descuento || 0,
+            tipo_descuento: 'PORCENTAJE'
+          };
+        }),
         forzar_sin_stock: forzar,
         justificacion_stock: justificacion
       };
@@ -590,7 +748,10 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
 
   const guardar = async () => {
     if (!clienteSeleccionado) { toast.error('Selecciona un cliente'); return; }
-    if (items.length === 0) { toast.error('Agrega al menos un producto'); return; }
+    if (items.length === 0) {
+      toast.error(esFacturaReparacion ? 'Agrega al menos una línea de reparación' : 'Agrega al menos un producto');
+      return;
+    }
     const errorItems = validarItems();
     if (errorItems) { toast.error(errorItems); return; }
     await enviarFactura(false, '');
@@ -610,11 +771,16 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
     <>
     <div>
       <button className="btn btn-outline-secondary mb-3" onClick={onVolver}><FiArrowLeft className="me-2" />Volver</button>
-      <h3 className="mb-4"><FiFileText className="me-2" />Nueva Factura</h3>
+      <div className="d-flex align-items-center gap-2 mb-4">
+        <h3 className="mb-0"><FiFileText className="me-2" />Nueva Factura</h3>
+        <span className={`badge ${esFacturaReparacion ? 'bg-info' : 'bg-secondary'}`}>
+          {esFacturaReparacion ? 'Reparación' : 'Productos'}
+        </span>
+      </div>
 
       <div className="row g-4">
-        {/* Columna izquierda: cliente + productos */}
-        <div className="col-lg-8">
+        {/* Zona principal a ancho completo: cliente + items */}
+        <div className="col-12">
           {/* Selector de cliente */}
           <div className="jyr-card mb-3" style={{ overflow: 'visible' }}>
             <div className="jyr-card-body" style={{ overflow: 'visible' }}>
@@ -666,12 +832,85 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
             </div>
           </div>
 
-          {/* Agregar productos — HU-FAC-02: Buscador rápido por código/nombre */}
-          <div className="jyr-card mb-3" style={{ overflow: 'visible' }}>
-            <div className="jyr-card-body" style={{ overflow: 'visible' }}>
-              <BuscadorProducto onAgregar={agregarProducto} itemsActuales={items} />
+          {!esFacturaReparacion && (
+            <div className="jyr-card mb-3" style={{ overflow: 'visible' }}>
+              <div className="jyr-card-body" style={{ overflow: 'visible' }}>
+                <BuscadorProducto onAgregar={agregarProducto} itemsActuales={items} />
+              </div>
             </div>
-          </div>
+          )}
+
+          {esFacturaReparacion && (
+            <div className="jyr-card mb-3" style={{ overflow: 'visible' }}>
+              <div className="jyr-card-body">
+                <h6 className="mb-3">Agregar reparación manual</h6>
+                <div className="row g-2 align-items-end">
+                  <div className="col-md-5">
+                    <label className="form-label small">Descripción</label>
+                    <input
+                      type="text"
+                      className="form-control form-control-sm"
+                      placeholder="Ej: Cambio de buje delantero"
+                      value={reparacion.descripcion_item}
+                      maxLength={140}
+                      onChange={(e) => setReparacion((prev) => ({ ...prev, descripcion_item: limpiarSoloLetrasYEspacios(e.target.value) }))}
+                    />
+                    <small className="text-muted">Solo letras y espacios.</small>
+                  </div>
+                  <div className="col-md-2">
+                    <label className="form-label small">Precio</label>
+                    <input
+                      type="number"
+                      className="form-control form-control-sm compact-number-input"
+                      min="0.01"
+                      step="0.01"
+                      value={reparacion.precio_unitario}
+                      onChange={(e) => setReparacion((prev) => ({ ...prev, precio_unitario: e.target.value }))}
+                    />
+                  </div>
+                  <div className="col-md-1">
+                    <label className="form-label small">Cant.</label>
+                    <input
+                      type="number"
+                      className="form-control form-control-sm compact-number-input"
+                      min="1"
+                      value={reparacion.cantidad}
+                      onChange={(e) => setReparacion((prev) => ({ ...prev, cantidad: e.target.value }))}
+                    />
+                  </div>
+                  <div className="col-md-1">
+                    <label className="form-label small">ISV %</label>
+                    <input
+                      type="number"
+                      className="form-control form-control-sm compact-number-input"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={reparacion.isv_pct}
+                      onChange={(e) => setReparacion((prev) => ({ ...prev, isv_pct: e.target.value }))}
+                    />
+                  </div>
+                  <div className="col-md-1">
+                    <label className="form-label small">Desc %</label>
+                    <input
+                      type="number"
+                      className="form-control form-control-sm compact-number-input"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={reparacion.descuento}
+                      onChange={(e) => setReparacion((prev) => ({ ...prev, descuento: e.target.value }))}
+                    />
+                  </div>
+                  <div className="col-md-2">
+                    <button type="button" className="btn btn-outline-primary btn-sm w-100" onClick={agregarReparacionManual}>
+                      <FiPlus className="me-1" />Agregar reparación
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Tabla de ítems — HU-FAC-03: ISV monto, descuento, totales por línea */}
           <div className="jyr-card">
@@ -680,7 +919,7 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
                 <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.88rem' }}>
                   <thead className="table-light"><tr>
                     <th style={{ width: 36 }}>#</th>
-                    <th>Producto</th>
+                    <th>{esFacturaReparacion ? 'Servicio / Reparación' : 'Producto'}</th>
                     <th style={{ width: 100 }}>P. Unit.</th>
                     <th style={{ width: 96 }}>Cant.</th>
                     <th style={{ width: 96 }}>Desc %</th>
@@ -692,21 +931,32 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
                   </tr></thead>
                   <tbody>
                     {items.length === 0 ? (
-                      <tr><td colSpan="10" className="text-center text-muted py-4">Agrega productos a la factura</td></tr>
+                      <tr><td colSpan="10" className="text-center text-muted py-4">{esFacturaReparacion ? 'Agrega reparaciones a la factura' : 'Agrega productos a la factura'}</td></tr>
                     ) : items.map((item, index) => {
                       const calc = calcularItem(item);
-                      const stockError = item.cantidad > item.stock;
+                      const esProducto = item.tipo_item !== 'REPARACION';
+                      const stockError = esProducto && item.cantidad > item.stock;
+                      const precioBase = esProducto ? item.precio_venta : item.precio_unitario;
                       return (
-                        <tr key={item.cod_producto} className={stockError ? 'table-danger' : ''}>
+                        <tr key={item.manual_id || `${item.cod_producto}-${index}`} className={stockError ? 'table-danger' : ''}>
                           <td className="text-muted">{index + 1}</td>
                           <td>
-                            <strong>{item.nombre_producto}</strong>
-                            <div className="text-muted small">Cód: {item.cod_producto} | Stock: {item.stock} {item.unidad_medida || 'und'}</div>
+                            {esProducto ? (
+                              <>
+                                <strong>{item.nombre_producto}</strong>
+                                <div className="text-muted small">Cód: {item.cod_producto} | Stock: {item.stock} {item.unidad_medida || 'und'}</div>
+                              </>
+                            ) : (
+                              <>
+                                <strong>{item.descripcion_item}</strong>
+                                <div className="text-muted small">Servicio de reparación (manual)</div>
+                              </>
+                            )}
                           </td>
-                          <td>{formatMoney(item.precio_venta)}</td>
+                          <td>{formatMoney(precioBase)}</td>
                           <td>
                             <input type="number" className={`form-control form-control-sm compact-number-input ${stockError ? 'is-invalid' : ''}`}
-                              min="1" max={item.stock} value={item.cantidad}
+                              min="1" max={esProducto ? item.stock : undefined} value={item.cantidad}
                               onChange={(e) => cambiarCantidad(index, e.target.value)} />
                           </td>
                           <td>
@@ -715,7 +965,7 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
                               onChange={(e) => cambiarDescuento(index, e.target.value)} />
                           </td>
                           <td>{formatMoney(calc.subtotal)}</td>
-                          <td className="text-center">{item.isv_pct}%</td>
+                          <td className="text-center">{parseFloat(item.isv_pct) || 0}%</td>
                           <td>{formatMoney(calc.isv)}</td>
                           <td><strong>{formatMoney(calc.total)}</strong></td>
                           <td>
@@ -733,54 +983,80 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
           </div>
         </div>
 
-        {/* Columna derecha: resumen + pago */}
-        <div className="col-lg-4">
-          <div className="jyr-card mb-3">
-            <div className="jyr-card-body">
-              <h6 className="mb-3">Método de Pago</h6>
-              <select className="form-select mb-2" value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
-                <option value="">Sin especificar</option>
-                <option value="1">Efectivo</option>
-                <option value="2">Tarjeta</option>
-                <option value="3">Transferencia</option>
-              </select>
-              <label className="form-label small">Referencia de pago</label>
-              <input type="text" className="form-control form-control-sm" placeholder="Nro. transacción, recibo..."
-                value={refPago} onChange={(e) => setRefPago(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="jyr-card">
-            <div className="jyr-card-body">
-              <h6 className="mb-3">Resumen</h6>
-              <div className="d-flex justify-content-between mb-2">
-                <span>Ítems:</span><strong>{items.length}</strong>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span>Subtotal Bruto:</span><strong>{formatMoney(totales.subtotalBruto)}</strong>
-              </div>
-              {totales.descuento > 0 && (
-                <div className="d-flex justify-content-between mb-2 text-danger">
-                  <span>Descuento:</span><strong>- {formatMoney(totales.descuento)}</strong>
+        {/* Paneles debajo, mismo patrón visual de cotizaciones */}
+        <div className="col-12">
+          <div className="row g-3">
+            <div className="col-12 col-lg-4">
+              <div className="jyr-card h-100">
+                <div className="jyr-card-body">
+                  <h6 className="mb-3">Opciones de Factura</h6>
+                  <label className="form-label small">Método de pago</label>
+                  <select className="form-select mb-2" value={metodoPago} onChange={(e) => setMetodoPago(e.target.value)}>
+                    <option value="">Sin especificar</option>
+                    <option value="1">Efectivo</option>
+                    <option value="2">Tarjeta</option>
+                    <option value="3">Transferencia</option>
+                  </select>
+                  <label className="form-label small">Referencia</label>
+                  <input type="text" className="form-control form-control-sm" placeholder="Nro. transacción, recibo..."
+                    value={refPago} onChange={(e) => setRefPago(e.target.value)} />
                 </div>
-              )}
-              <div className="d-flex justify-content-between mb-2">
-                <span>Subtotal Neto:</span><strong>{formatMoney(totales.subtotal)}</strong>
               </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span>ISV:</span><strong>{formatMoney(totales.isv)}</strong>
-              </div>
-              <hr />
-              <div className="d-flex justify-content-between mb-3">
-                <span className="fs-5 fw-bold">Total:</span>
-                <span className="fs-5 fw-bold text-success">{formatMoney(totales.total)}</span>
-              </div>
+            </div>
 
-              <button className="btn jyr-btn-primary w-100" disabled={guardando || items.length === 0 || !clienteSeleccionado}
-                onClick={guardar}>
-                {guardando ? <span className="spinner-border spinner-border-sm me-2" /> : <FiFileText className="me-2" />}
-                Emitir Factura
-              </button>
+            <div className="col-12 col-lg-4">
+              <div className="jyr-card h-100">
+                <div className="jyr-card-body">
+                  <h6 className="mb-3">Detalle de Factura</h6>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="text-muted">Tipo:</span>
+                    <span className={`badge ${esFacturaReparacion ? 'bg-info' : 'bg-secondary'}`}>
+                      {esFacturaReparacion ? 'Reparación' : 'Productos'}
+                    </span>
+                  </div>
+                  <small className="text-muted d-block">
+                    {esFacturaReparacion
+                      ? 'En este modo solo puedes agregar líneas manuales de reparación.'
+                      : 'En este modo solo puedes agregar productos del inventario.'}
+                  </small>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-12 col-lg-4">
+              <div className="jyr-card h-100">
+                <div className="jyr-card-body">
+                  <h6 className="mb-3">Resumen</h6>
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Ítems:</span><strong>{items.length}</strong>
+                  </div>
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Subtotal Bruto:</span><strong>{formatMoney(totales.subtotalBruto)}</strong>
+                  </div>
+                  {totales.descuento > 0 && (
+                    <div className="d-flex justify-content-between mb-2 text-danger">
+                      <span>Descuento:</span><strong>- {formatMoney(totales.descuento)}</strong>
+                    </div>
+                  )}
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>Subtotal Neto:</span><strong>{formatMoney(totales.subtotal)}</strong>
+                  </div>
+                  <div className="d-flex justify-content-between mb-2">
+                    <span>ISV:</span><strong>{formatMoney(totales.isv)}</strong>
+                  </div>
+                  <hr />
+                  <div className="d-flex justify-content-between mb-3">
+                    <span className="fs-5 fw-bold">Total:</span>
+                    <span className="fs-5 fw-bold text-success">{formatMoney(totales.total)}</span>
+                  </div>
+
+                  <button className="btn jyr-btn-primary w-100" disabled={guardando || items.length === 0 || !clienteSeleccionado}
+                    onClick={guardar}>
+                    {guardando ? <span className="spinner-border spinner-border-sm me-2" /> : <FiFileText className="me-2" />}
+                    Crear Factura
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -881,20 +1157,23 @@ const NuevaFactura = ({ onVolver, onCreada }) => {
 // COMPONENTE PRINCIPAL
 // ==========================================
 const Facturas = () => {
-  const [vista, setVista] = useState('lista'); // lista | nueva | detalle
+  const [vista, setVista] = useState('lista'); // lista | nueva-productos | nueva-reparacion | detalle
   const [facturaDetalle, setFacturaDetalle] = useState(null);
 
-  const irANueva = () => setVista('nueva');
+  const irANuevaProductos = () => setVista('nueva-productos');
+  const irANuevaReparacion = () => setVista('nueva-reparacion');
   const irALista = () => { setVista('lista'); setFacturaDetalle(null); };
   const verDetalle = (id) => { setFacturaDetalle(id); setVista('detalle'); };
 
   switch (vista) {
-    case 'nueva':
-      return <NuevaFactura onVolver={irALista} onCreada={(id) => { if (id) verDetalle(id); else irALista(); }} />;
+    case 'nueva-productos':
+      return <NuevaFactura tipoFactura="PRODUCTOS" onVolver={irALista} onCreada={(id) => { if (id) verDetalle(id); else irALista(); }} />;
+    case 'nueva-reparacion':
+      return <NuevaFactura tipoFactura="REPARACION" onVolver={irALista} onCreada={(id) => { if (id) verDetalle(id); else irALista(); }} />;
     case 'detalle':
       return <DetalleFactura codFactura={facturaDetalle} onVolver={irALista} />;
     default:
-      return <ListaFacturas onNueva={irANueva} onVer={verDetalle} />;
+      return <ListaFacturas onNuevaProductos={irANuevaProductos} onNuevaReparacion={irANuevaReparacion} onVer={verDetalle} />;
   }
 };
 

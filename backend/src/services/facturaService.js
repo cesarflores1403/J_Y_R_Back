@@ -11,7 +11,56 @@ import bitacoraFacturacionService from './bitacoraFacturacionService.js';
 import empresaConfigService from './empresaConfigService.js';
 import { Op } from 'sequelize';
 
+const SOLO_LETRAS_ESPACIOS_REGEX = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/;
+
 class FacturaService {
+
+  async obtenerServicioManualId(transaction) {
+    const NOMBRE_SERVICIO_MANUAL = 'SERVICIO REPARACION MANUAL';
+
+    const [servicioExistente] = await sequelize.query(
+      'SELECT cod_servicio FROM servicios WHERE nombre_servicios = :nombre LIMIT 1',
+      {
+        replacements: { nombre: NOMBRE_SERVICIO_MANUAL },
+        type: sequelize.QueryTypes.SELECT,
+        transaction
+      }
+    );
+
+    if (servicioExistente?.cod_servicio) {
+      return parseInt(servicioExistente.cod_servicio, 10);
+    }
+
+    const [servicioCreado] = await sequelize.query(
+      `INSERT INTO servicios (nombre_servicios, precio, tiempo_minutos, isv, estado_servicios)
+       VALUES (:nombre, 0, NULL, 0, true)
+       RETURNING cod_servicio`,
+      {
+        replacements: { nombre: NOMBRE_SERVICIO_MANUAL },
+        transaction
+      }
+    );
+    const codServicioCreado = parseInt(servicioCreado?.[0]?.cod_servicio, 10);
+    if (Number.isInteger(codServicioCreado) && codServicioCreado > 0) {
+      return codServicioCreado;
+    }
+
+    const [servicioFallback] = await sequelize.query(
+      'SELECT cod_servicio FROM servicios WHERE nombre_servicios = :nombre LIMIT 1',
+      {
+        replacements: { nombre: NOMBRE_SERVICIO_MANUAL },
+        type: sequelize.QueryTypes.SELECT,
+        transaction
+      }
+    );
+
+    const codServicioFallback = parseInt(servicioFallback?.cod_servicio, 10);
+    if (!Number.isInteger(codServicioFallback) || codServicioFallback <= 0) {
+      throw Object.assign(new Error('No se pudo resolver un servicio válido para facturación de reparación'), { statusCode: 500 });
+    }
+
+    return codServicioFallback;
+  }
 
   // =============================================
   // LISTAR FACTURAS (con paginación y búsqueda)
@@ -86,7 +135,7 @@ class FacturaService {
   // HU-FAC-09: Validación de stock con permiso de excepción para Administrador
   // =============================================
   async crear(datos, codUsuario, opciones = {}) {
-    const { cod_cliente, metodo_pago, ref_pago, items, descuento_global, tipo_descuento_global } = datos;
+    const { cod_cliente, metodo_pago, ref_pago, items, descuento_global, tipo_descuento_global, tipo_factura } = datos;
     const { rol = '', forzar_sin_stock = false, justificacion_stock = '' } = opciones;
 
     // Función de redondeo preciso a 2 decimales
@@ -96,6 +145,25 @@ class FacturaService {
     if (!cod_cliente) throw Object.assign(new Error('El cliente es requerido'), { statusCode: 400 });
     if (!items || !Array.isArray(items) || items.length === 0) {
       throw Object.assign(new Error('Debe incluir al menos 1 ítem'), { statusCode: 400 });
+    }
+
+    const tipoFactura = String(tipo_factura || '').toUpperCase();
+    if (tipoFactura && !['PRODUCTOS', 'REPARACION'].includes(tipoFactura)) {
+      throw Object.assign(new Error('tipo_factura debe ser PRODUCTOS o REPARACION'), { statusCode: 400 });
+    }
+
+    const hayProducto = items.some((item) => String(item?.tipo_item || 'PRODUCTO').toUpperCase() === 'PRODUCTO');
+    const hayReparacion = items.some((item) => String(item?.tipo_item || 'PRODUCTO').toUpperCase() === 'REPARACION');
+
+    if (hayProducto && hayReparacion) {
+      throw Object.assign(new Error('No se permite mezclar ítems PRODUCTO y REPARACION en la misma factura'), { statusCode: 400 });
+    }
+
+    if (tipoFactura === 'PRODUCTOS' && hayReparacion) {
+      throw Object.assign(new Error('La factura de PRODUCTOS no permite ítems de REPARACION'), { statusCode: 400 });
+    }
+    if (tipoFactura === 'REPARACION' && hayProducto) {
+      throw Object.assign(new Error('La factura de REPARACION no permite ítems de PRODUCTO'), { statusCode: 400 });
     }
 
     // Validar descuento global si se envía
@@ -128,9 +196,15 @@ class FacturaService {
       const productosConDeficit = []; // HU-FAC-09: acumular productos sin stock
 
       for (const item of items) {
-        // Validar item
-        if (!item.cod_producto || !item.cantidad || item.cantidad <= 0) {
-          throw Object.assign(new Error('Cada ítem debe tener cod_producto y cantidad > 0'), { statusCode: 400 });
+        const tipoItem = String(item.tipo_item || 'PRODUCTO').toUpperCase();
+        const esReparacion = ['REPARACION', 'SERVICIO'].includes(tipoItem);
+        if (!['PRODUCTO', 'REPARACION', 'SERVICIO'].includes(tipoItem)) {
+          throw Object.assign(new Error('tipo_item debe ser PRODUCTO o REPARACION'), { statusCode: 400 });
+        }
+
+        const cantidadItem = parseInt(item.cantidad, 10);
+        if (!cantidadItem || cantidadItem <= 0) {
+          throw Object.assign(new Error('Cada ítem debe tener cantidad > 0'), { statusCode: 400 });
         }
 
         // Validar tipo de descuento de línea
@@ -144,6 +218,67 @@ class FacturaService {
         }
         if (tipoDescLinea === 'PORCENTAJE' && descLinea > 100) {
           throw Object.assign(new Error('El descuento en porcentaje no puede ser mayor a 100%'), { statusCode: 400 });
+        }
+
+        if (esReparacion) {
+          const descripcionItem = String(item.descripcion_item || '').trim().replace(/\s+/g, ' ');
+          if (!descripcionItem) {
+            throw Object.assign(new Error('descripcion_item es requerida en ítems de reparación'), { statusCode: 400 });
+          }
+          if (!SOLO_LETRAS_ESPACIOS_REGEX.test(descripcionItem)) {
+            throw Object.assign(new Error('descripcion_item solo permite letras y espacios en ítems de reparación'), { statusCode: 400 });
+          }
+
+          const precioUnitarioManual = round2(parseFloat(item.precio_unitario));
+          if (!Number.isFinite(precioUnitarioManual) || precioUnitarioManual <= 0) {
+            throw Object.assign(new Error('precio_unitario debe ser mayor a 0 en ítems de reparación'), { statusCode: 400 });
+          }
+
+          const isvPorcentajeManual = round2(parseFloat(item.isv_pct) || 0);
+          if (isvPorcentajeManual < 0 || isvPorcentajeManual > 100) {
+            throw Object.assign(new Error('isv_pct debe estar entre 0 y 100 en ítems de reparación'), { statusCode: 400 });
+          }
+
+          const subtotalBruto = round2(precioUnitarioManual * cantidadItem);
+          let montoDescuento = 0;
+          if (tipoDescLinea === 'PORCENTAJE') {
+            montoDescuento = round2((descLinea / 100) * subtotalBruto);
+          } else {
+            montoDescuento = round2(Math.min(descLinea, subtotalBruto));
+          }
+
+          const subtotalItem = round2(subtotalBruto - montoDescuento);
+          const isvItem = round2((isvPorcentajeManual / 100) * subtotalItem);
+          const totalItem = round2(subtotalItem + isvItem);
+
+          subtotalBrutoGeneral = round2(subtotalBrutoGeneral + subtotalBruto);
+          descuentoLineasTotal = round2(descuentoLineasTotal + montoDescuento);
+          subtotalGeneral = round2(subtotalGeneral + subtotalItem);
+          isvGeneral = round2(isvGeneral + isvItem);
+
+          const codServicio = await this.obtenerServicioManualId(t);
+
+          detallesCalculados.push({
+            tipo_item: 'SERVICIO',
+            descripcion_item: descripcionItem,
+            cod_producto: null,
+            cod_servicio: codServicio,
+            cantidad: cantidadItem,
+            precio_unitario: precioUnitarioManual,
+            tipo_descuento: tipoDescLinea,
+            descuento: descLinea,
+            monto_descuento: montoDescuento,
+            isv: isvItem,
+            subtotal: subtotalItem,
+            total: totalItem
+          });
+
+          continue;
+        }
+
+        // Validación específica para producto de inventario
+        if (!item.cod_producto) {
+          throw Object.assign(new Error('Cada ítem de producto debe tener cod_producto'), { statusCode: 400 });
         }
 
         // Obtener producto
@@ -199,7 +334,7 @@ class FacturaService {
         }
 
         // --- Cálculo de descuento por línea (HU-FAC-04) ---
-        const subtotalBruto = round2(precioUnitario * item.cantidad);
+        const subtotalBruto = round2(precioUnitario * cantidadItem);
         let montoDescuento = 0;
         if (tipoDescLinea === 'PORCENTAJE') {
           montoDescuento = round2((descLinea / 100) * subtotalBruto);
@@ -219,8 +354,9 @@ class FacturaService {
 
         detallesCalculados.push({
           tipo_item: 'PRODUCTO',
+          descripcion_item: null,
           cod_producto: item.cod_producto,
-          cantidad: item.cantidad,
+          cantidad: cantidadItem,
           precio_unitario: precioUnitario,
           tipo_descuento: tipoDescLinea,
           descuento: descLinea,
@@ -301,6 +437,8 @@ class FacturaService {
 
       // Actualizar inventario (restar stock)
       for (const item of items) {
+        const tipoItem = String(item.tipo_item || 'PRODUCTO').toUpperCase();
+        if (tipoItem !== 'PRODUCTO') continue;
         await sequelize.query(
           'UPDATE inventario SET stock = stock - :cant, fecha_ult_mov = NOW() WHERE cod_producto = :codProd',
           { replacements: { cant: item.cantidad, codProd: item.cod_producto }, transaction: t }
@@ -311,6 +449,8 @@ class FacturaService {
       if (forzar_sin_stock) {
         const excepcionesRegistrar = [];
         for (const item of items) {
+          const tipoItem = String(item.tipo_item || 'PRODUCTO').toUpperCase();
+          if (tipoItem !== 'PRODUCTO') continue;
           if (item._stockActual < item.cantidad) {
             excepcionesRegistrar.push({
               cod_factura: factura.cod_factura,

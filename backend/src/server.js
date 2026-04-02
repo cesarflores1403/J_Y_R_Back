@@ -32,6 +32,10 @@ app.listen(PORT, async () => {
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS stock_minimo INTEGER');
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS punto_reorden INTEGER');
     console.log('✅ Esquema producto verificado (auditoria)');
+
+    // Compatibilidad de esquema para facturación de reparación (descripción manual)
+    await sequelize.query('ALTER TABLE detalle_factura ADD COLUMN IF NOT EXISTS descripcion_item TEXT');
+    console.log('✅ Esquema detalle_factura verificado (descripcion_item)');
   } catch (err) {
     console.error('❌ Error al conectar Sequelize:', err.message);
   }

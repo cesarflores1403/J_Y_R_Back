@@ -3079,6 +3079,94 @@ a {
   .inv-table tbody td {
     padding: 5px 8px;
   }
+
+  /* Intento de ajuste a una sola página (cuando aún es legible) */
+  .inv.inv-factura.inv-print-fit-one {
+    zoom: var(--inv-print-scale, 1);
+  }
+
+  @supports not (zoom: 1) {
+    .inv.inv-factura.inv-print-fit-one {
+      transform: scale(var(--inv-print-scale, 1));
+      transform-origin: top center;
+      width: calc(100% / var(--inv-print-scale, 1));
+    }
+  }
+
+  /* Modo compacto para casos límite que aún pueden caber en 1 hoja */
+  .inv.inv-factura.inv-print-compact .inv-body {
+    padding: 10mm 8mm;
+  }
+
+  .inv.inv-factura.inv-print-compact .inv-header {
+    margin-bottom: 8px;
+  }
+
+  .inv.inv-factura.inv-print-compact .inv-meta-row {
+    margin-bottom: 8px;
+  }
+
+  .inv.inv-factura.inv-print-compact .inv-client-box {
+    margin-bottom: 10px;
+    padding: 8px 10px;
+  }
+
+  .inv.inv-factura.inv-print-compact .inv-table {
+    font-size: 10px;
+  }
+
+  .inv.inv-factura.inv-print-compact .inv-table thead th {
+    padding: 4px 6px;
+  }
+
+  .inv.inv-factura.inv-print-compact .inv-table tbody td {
+    padding: 3px 6px;
+  }
+
+  .inv.inv-factura.inv-print-compact .inv-summary {
+    margin-top: 10px;
+  }
+
+  .inv.inv-factura.inv-print-compact .inv-footer {
+    margin-top: 14px;
+  }
+
+  /* Fallback elegante a multipágina cuando no cabe bien en una sola */
+  .inv.inv-factura.inv-print-multipage .inv-body {
+    padding: 10mm 8mm;
+  }
+
+  .inv.inv-factura.inv-print-multipage .inv-table {
+    font-size: 10px;
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  .inv.inv-factura.inv-print-multipage .inv-table tbody {
+    display: table-row-group;
+  }
+
+  .inv.inv-factura.inv-print-multipage .inv-table thead {
+    display: table-header-group;
+  }
+
+  .inv.inv-factura.inv-print-multipage .inv-table tfoot {
+    display: table-footer-group;
+  }
+
+  .inv.inv-factura.inv-print-multipage .inv-table tr,
+  .inv.inv-factura.inv-print-multipage .inv-summary,
+  .inv.inv-factura.inv-print-multipage .inv-footer,
+  .inv.inv-factura.inv-print-multipage .inv-client-box,
+  .inv.inv-factura.inv-print-multipage .inv-meta-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .inv.inv-factura.inv-print-multipage .inv-footer {
+    margin-top: 20px;
+  }
+
 }
 
 /* Ajuste específico para Chrome/Edge al imprimir en carta */

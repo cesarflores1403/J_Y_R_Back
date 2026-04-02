@@ -9,6 +9,7 @@ const DetalleFactura = sequelize.define('detalle_factura', {
   },
   cod_factura: { type: DataTypes.INTEGER, allowNull: false },
   tipo_item: { type: DataTypes.TEXT, allowNull: false, defaultValue: 'PRODUCTO' },
+  descripcion_item: { type: DataTypes.TEXT, allowNull: true },
   cod_producto: { type: DataTypes.INTEGER, allowNull: true },
   cod_servicio: { type: DataTypes.INTEGER, allowNull: true },
   cantidad: { type: DataTypes.INTEGER, allowNull: false },
