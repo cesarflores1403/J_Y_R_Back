@@ -44,14 +44,21 @@ const Clientes = () => {
   const [guardando, setGuardando] = useState(false);
   const [seleccionados, setSeleccionados] = useState([]);
 
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async (paginaForzada = pagina) => {
     setCargando(true);
     try {
-      const { data } = await clienteService.listar({ pagina, limite: 10, buscar });
+      const { data } = await clienteService.listar({
+        pagina: paginaForzada,
+        limite: 10,
+        buscar
+      });
+
       if (data.ok) {
         setClientes(data.datos);
         setTotalPaginas(data.totalPaginas);
-        setSeleccionados(prev => prev.filter(id => data.datos.some(c => c.cod_cliente === id)));
+        setSeleccionados(prev =>
+          prev.filter(id => data.datos.some(c => c.cod_cliente === id))
+        );
       }
     } catch (err) {
       toast.error('Error al cargar clientes');
@@ -60,7 +67,9 @@ const Clientes = () => {
     }
   }, [pagina, buscar]);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
 
   const abrirCrear = () => {
     setEditando(null);
@@ -108,6 +117,7 @@ const Clientes = () => {
     if (!REGEX_TEXTO_CON_PUNTO.test(form.direccion.trim())) return toast.warn('La dirección solo permite letras, números, espacios y punto');
 
     setGuardando(true);
+
     try {
       const payload = {
         ...form,
@@ -117,12 +127,17 @@ const Clientes = () => {
       if (editando) {
         await clienteService.actualizar(editando, payload);
         toast.success('Cliente actualizado');
+        setModal(false);
+        await cargar(pagina);
       } else {
         await clienteService.crear(payload);
         toast.success('Cliente creado');
+        setModal(false);
+
+        const primeraPagina = 1;
+        setPagina(primeraPagina);
+        await cargar(primeraPagina);
       }
-      setModal(false);
-      cargar();
     } catch (err) {
       toast.error(err.response?.data?.mensaje || 'Error al guardar');
     } finally {
@@ -142,16 +157,13 @@ const Clientes = () => {
     try {
       await clienteService.eliminar(id);
       toast.success('Cliente eliminado');
-      cargar();
+      await cargar(pagina);
     } catch (err) {
       toast.error(err.response?.data?.mensaje || 'Error al eliminar');
     }
   };
 
-  const idsPagina = useMemo(
-    () => clientes.map(c => c.cod_cliente),
-    [clientes]
-  );
+  const idsPagina = useMemo(() => clientes.map(c => c.cod_cliente), [clientes]);
 
   const todosSeleccionados =
     idsPagina.length > 0 && idsPagina.every(id => seleccionados.includes(id));
@@ -202,7 +214,7 @@ const Clientes = () => {
     }
 
     setSeleccionados([]);
-    cargar();
+    await cargar(pagina);
   };
 
   return (
@@ -225,10 +237,19 @@ const Clientes = () => {
               className="form-control"
               placeholder="Buscar por nombre, DNI, empresa, correo..."
               value={buscar}
-              onChange={(e) => { setBuscar(e.target.value); setPagina(1); }}
+              onChange={(e) => {
+                setBuscar(e.target.value);
+                setPagina(1);
+              }}
             />
             {buscar && (
-              <button className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}>
+              <button
+                className="btn btn-outline-secondary"
+                onClick={() => {
+                  setBuscar('');
+                  setPagina(1);
+                }}
+              >
                 <FiX />
               </button>
             )}
@@ -237,17 +258,19 @@ const Clientes = () => {
       </div>
 
       {seleccionados.length > 0 && (
-        <div style={{
-          padding: '10px 16px',
-          marginBottom: 12,
-          background: '#eff6ff',
-          border: '1px solid #bfdbfe',
-          borderRadius: 8,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          flexWrap: 'wrap'
-        }}>
+        <div
+          style={{
+            padding: '10px 16px',
+            marginBottom: 12,
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap'
+          }}
+        >
           <span style={{ fontSize: 13, fontWeight: 600, color: '#2563eb' }}>
             {seleccionados.length} cliente(s) seleccionado(s)
           </span>
@@ -288,35 +311,51 @@ const Clientes = () => {
               </thead>
               <tbody>
                 {cargando ? (
-                  <tr><td colSpan="8" className="text-center py-4"><div className="spinner-border spinner-border-sm" /></td></tr>
-                ) : clientes.length === 0 ? (
-                  <tr><td colSpan="8" className="text-center text-muted py-4">No se encontraron clientes</td></tr>
-                ) : clientes.map((c, index) => (
-                  <tr key={c.cod_cliente}>
-                    <td style={{ textAlign: 'center' }}>
-                      <input
-                        type="checkbox"
-                        checked={seleccionados.includes(c.cod_cliente)}
-                        onChange={() => toggleSeleccion(c.cod_cliente)}
-                        title={`Seleccionar ${c.nombre} ${c.apellido || ''}`}
-                      />
-                    </td>
-                    <td className="text-muted">{((pagina - 1) * 10) + index + 1}</td>
-                    <td>{c.nombre} {c.apellido || ''}</td>
-                    <td>{c.dni || '-'}</td>
-                    <td>{c.empresa || '-'}</td>
-                    <td>{c.telefono || '-'}</td>
-                    <td>{c.correo || '-'}</td>
-                    <td>
-                      <button className="btn btn-sm btn-outline-primary me-1" onClick={() => abrirEditar(c)}>
-                        <FiEdit2 />
-                      </button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => eliminar(c.cod_cliente)}>
-                        <FiTrash2 />
-                      </button>
+                  <tr>
+                    <td colSpan="8" className="text-center py-4">
+                      <div className="spinner-border spinner-border-sm" />
                     </td>
                   </tr>
-                ))}
+                ) : clientes.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="text-center text-muted py-4">
+                      No se encontraron clientes
+                    </td>
+                  </tr>
+                ) : (
+                  clientes.map((c, index) => (
+                    <tr key={c.cod_cliente}>
+                      <td style={{ textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={seleccionados.includes(c.cod_cliente)}
+                          onChange={() => toggleSeleccion(c.cod_cliente)}
+                          title={`Seleccionar ${c.nombre} ${c.apellido || ''}`}
+                        />
+                      </td>
+                      <td className="text-muted">{((pagina - 1) * 10) + index + 1}</td>
+                      <td>{c.nombre} {c.apellido || ''}</td>
+                      <td>{c.dni || '-'}</td>
+                      <td>{c.empresa || '-'}</td>
+                      <td>{c.telefono || '-'}</td>
+                      <td>{c.correo || '-'}</td>
+                      <td>
+                        <button
+                          className="btn btn-sm btn-outline-primary me-1"
+                          onClick={() => abrirEditar(c)}
+                        >
+                          <FiEdit2 />
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={() => eliminar(c.cod_cliente)}
+                        >
+                          <FiTrash2 />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -325,20 +364,33 @@ const Clientes = () => {
 
       {totalPaginas > 1 && (
         <div className="d-flex justify-content-center mt-3 align-items-center gap-3">
-          <nav><ul className="pagination pagination-sm mb-0">
-            <li className={`page-item ${pagina <= 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPagina(p => p - 1)}>Anterior</button>
-            </li>
-            {[...Array(totalPaginas)].map((_, i) => (
-              <li key={i} className={`page-item ${pagina === i + 1 ? 'active' : ''}`}>
-                <button className="page-link" onClick={() => setPagina(i + 1)}>{i + 1}</button>
+          <nav>
+            <ul className="pagination pagination-sm mb-0">
+              <li className={`page-item ${pagina <= 1 ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPagina(p => p - 1)}>
+                  Anterior
+                </button>
               </li>
-            ))}
-            <li className={`page-item ${pagina >= totalPaginas ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => setPagina(p => p + 1)}>Siguiente</button>
-            </li>
-          </ul></nav>
-          <span className="fw-semibold fs-6 text-muted">Página {pagina} de {totalPaginas}</span>
+
+              {[...Array(totalPaginas)].map((_, i) => (
+                <li key={i} className={`page-item ${pagina === i + 1 ? 'active' : ''}`}>
+                  <button className="page-link" onClick={() => setPagina(i + 1)}>
+                    {i + 1}
+                  </button>
+                </li>
+              ))}
+
+              <li className={`page-item ${pagina >= totalPaginas ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPagina(p => p + 1)}>
+                  Siguiente
+                </button>
+              </li>
+            </ul>
+          </nav>
+
+          <span className="fw-semibold fs-6 text-muted">
+            Página {pagina} de {totalPaginas}
+          </span>
         </div>
       )}
 
@@ -350,63 +402,130 @@ const Clientes = () => {
                 <h5 className="modal-title">{editando ? 'Editar Cliente' : 'Nuevo Cliente'}</h5>
                 <button className="btn-close" onClick={() => setModal(false)} />
               </div>
+
               <form onSubmit={guardar}>
                 <div className="modal-body">
                   <div className="row g-3">
                     <div className="col-md-6">
                       <label className="form-label">Nombre *</label>
-                      <input type="text" className="form-control" value={form.nombre}
-                        onChange={(e) => setForm({...form, nombre: sanitizarSoloLetras(e.target.value, 10)})} required maxLength={10} />
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={form.nombre}
+                        onChange={(e) => setForm({ ...form, nombre: sanitizarSoloLetras(e.target.value, 10) })}
+                        required
+                        maxLength={10}
+                      />
                       <small className="text-muted">{form.nombre.length}/10</small>
                     </div>
+
                     <div className="col-md-6">
                       <label className="form-label">Apellido *</label>
-                      <input type="text" className="form-control" value={form.apellido}
-                        onChange={(e) => setForm({...form, apellido: sanitizarSoloLetras(e.target.value, 10)})} required maxLength={10} />
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={form.apellido}
+                        onChange={(e) => setForm({ ...form, apellido: sanitizarSoloLetras(e.target.value, 10) })}
+                        required
+                        maxLength={10}
+                      />
                       <small className="text-muted">{form.apellido.length}/10</small>
                     </div>
+
                     <div className="col-md-3">
                       <label className="form-label">DNI *</label>
-                      <input type="text" className="form-control" value={form.dni}
-                        onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 13) setForm({...form, dni: v}); }}
-                        required maxLength={13} placeholder="13 dígitos" />
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={form.dni}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, '');
+                          if (v.length <= 13) setForm({ ...form, dni: v });
+                        }}
+                        required
+                        maxLength={13}
+                        placeholder="13 dígitos"
+                      />
                       <small className="text-muted">{form.dni.length}/13</small>
                     </div>
+
                     <div className="col-md-3">
                       <label className="form-label">RTN (opcional)</label>
-                      <input type="text" className="form-control" value={form.rtn}
-                        onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 14) setForm({...form, rtn: v}); }}
-                        maxLength={14} placeholder="14 dígitos" />
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={form.rtn}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, '');
+                          if (v.length <= 14) setForm({ ...form, rtn: v });
+                        }}
+                        maxLength={14}
+                        placeholder="14 dígitos"
+                      />
                       <small className="text-muted">{form.rtn.length}/14</small>
                     </div>
+
                     <div className="col-md-3">
                       <label className="form-label">Empresa *</label>
-                      <input type="text" className="form-control" value={form.empresa}
-                        onChange={(e) => setForm({...form, empresa: sanitizarTextoConPunto(e.target.value, 15)})} required maxLength={15} />
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={form.empresa}
+                        onChange={(e) => setForm({ ...form, empresa: sanitizarTextoConPunto(e.target.value, 15) })}
+                        required
+                        maxLength={15}
+                      />
                       <small className="text-muted">{form.empresa.length}/15</small>
                     </div>
+
                     <div className="col-md-3">
                       <label className="form-label">Teléfono *</label>
-                      <input type="text" className="form-control" value={form.telefono}
-                        onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); if (v.length <= 8) setForm({...form, telefono: v}); }}
-                        required maxLength={8} placeholder="8 dígitos" />
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={form.telefono}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, '');
+                          if (v.length <= 8) setForm({ ...form, telefono: v });
+                        }}
+                        required
+                        maxLength={8}
+                        placeholder="8 dígitos"
+                      />
                       <small className="text-muted">{form.telefono.length}/8</small>
                     </div>
+
                     <div className="col-md-6">
                       <label className="form-label">Correo *</label>
-                      <input type="email" className="form-control" value={form.correo}
-                        onChange={(e) => setForm({...form, correo: sanitizarCorreo(e.target.value, 30)})} required maxLength={30} />
+                      <input
+                        type="email"
+                        className="form-control"
+                        value={form.correo}
+                        onChange={(e) => setForm({ ...form, correo: sanitizarCorreo(e.target.value, 30) })}
+                        required
+                        maxLength={30}
+                      />
                     </div>
+
                     <div className="col-md-6">
                       <label className="form-label">Dirección *</label>
-                      <input type="text" className="form-control" value={form.direccion}
-                        onChange={(e) => setForm({...form, direccion: sanitizarTextoConPunto(e.target.value, 60)})} required maxLength={60} />
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={form.direccion}
+                        onChange={(e) => setForm({ ...form, direccion: sanitizarTextoConPunto(e.target.value, 60) })}
+                        required
+                        maxLength={60}
+                      />
                       <small className="text-muted">{form.direccion.length}/60</small>
                     </div>
                   </div>
                 </div>
+
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setModal(false)}>Cancelar</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setModal(false)}>
+                    Cancelar
+                  </button>
                   <button type="submit" className="btn jyr-btn-primary" disabled={guardando}>
                     {guardando ? <span className="spinner-border spinner-border-sm me-2" /> : null}
                     {editando ? 'Actualizar' : 'Crear'}
