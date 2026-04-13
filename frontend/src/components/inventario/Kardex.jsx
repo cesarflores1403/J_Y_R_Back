@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FiChevronLeft, FiChevronRight, FiDatabase, FiList } from 'react-icons/fi';
+import { FiDatabase, FiList } from 'react-icons/fi';
 import KardexFiltros from './KardexFiltros.jsx';
 import KardexTabla from './KardexTabla.jsx';
 import { inventarioMovimientosApi } from './inventarioMovimientos.api.js';
+import BootstrapPagination from '../common/BootstrapPagination.jsx';
 
 // // Estado inicial de filtros del kardex (HU3)
 const filtrosIniciales = {
@@ -70,31 +71,6 @@ const normalizarCodProducto = (valor) => {
   if (!soloDigitos) return '';
   const cod = Number.parseInt(soloDigitos, 10);
   return Number.isNaN(cod) || cod < 1 ? '' : cod;
-};
-
-// // Construye paginas visibles con elipsis para navegacion compacta
-const construirPaginasVisibles = (paginaActual, totalPaginas, maxVisibles = 5) => {
-  if (totalPaginas <= 1) return [1];
-  if (totalPaginas <= maxVisibles) {
-    return Array.from({ length: totalPaginas }, (_, idx) => idx + 1);
-  }
-
-  let inicio = Math.max(1, paginaActual - 2);
-  let fin = Math.min(totalPaginas, inicio + maxVisibles - 1);
-  inicio = Math.max(1, fin - maxVisibles + 1);
-
-  const paginas = [];
-  if (inicio > 1) paginas.push(1);
-  if (inicio > 2) paginas.push('...');
-
-  for (let pagina = inicio; pagina <= fin; pagina += 1) {
-    paginas.push(pagina);
-  }
-
-  if (fin < totalPaginas - 1) paginas.push('...');
-  if (fin < totalPaginas) paginas.push(totalPaginas);
-
-  return paginas;
 };
 
 const Kardex = ({ refreshKey = 0 }) => {
@@ -240,7 +216,6 @@ const Kardex = ({ refreshKey = 0 }) => {
   const finMostrado = meta.total > 0
     ? Math.min(meta.pagina * meta.limite, meta.total)
     : 0;
-  const paginasVisibles = construirPaginasVisibles(meta.pagina, meta.totalPaginas);
   return (
     <section className="kdx-shell mt-4">
       <div className="kdx-hero">
@@ -296,51 +271,12 @@ const Kardex = ({ refreshKey = 0 }) => {
           <KardexTabla filas={filas} loading={loading} />
         </div>
       </div>
-
-      <div className="kdx-pagination-bar">
-        <span className="kdx-pagination-summary">
-          Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
-        </span>
-
-        <div className="kdx-pagination-controls">
-          <button
-            type="button"
-            className="kdx-page-btn kdx-page-btn-nav"
-            onClick={() => cambiarPagina(meta.pagina - 1)}
-            disabled={loading || meta.pagina <= 1}
-            aria-label="Pagina anterior"
-          >
-            <FiChevronLeft size={15} />
-          </button>
-
-          {paginasVisibles.map((pagina, index) => (
-            <button
-              // // Elipsis se renderiza como boton deshabilitado solo visual
-              key={`${pagina}-${index}`}
-              type="button"
-              className={`kdx-page-btn ${pagina === meta.pagina ? 'is-active' : ''} ${pagina === '...' ? 'is-ellipsis' : ''}`}
-              onClick={() => (typeof pagina === 'number' ? cambiarPagina(pagina) : undefined)}
-              disabled={loading || pagina === '...'}
-            >
-              {pagina}
-            </button>
-          ))}
-
-          <button
-            type="button"
-            className="kdx-page-btn kdx-page-btn-nav"
-            onClick={() => cambiarPagina(meta.pagina + 1)}
-            disabled={loading || meta.pagina >= meta.totalPaginas}
-            aria-label="Pagina siguiente"
-          >
-            <FiChevronRight size={15} />
-          </button>
-
-          <span className="kdx-page-state">
-            Página {meta.pagina} de {meta.totalPaginas}
-          </span>
-        </div>
-      </div>
+      <BootstrapPagination
+        pagina={meta.pagina}
+        totalPaginas={meta.totalPaginas}
+        onChange={cambiarPagina}
+        loading={loading}
+      />
     </section>
   );
 };

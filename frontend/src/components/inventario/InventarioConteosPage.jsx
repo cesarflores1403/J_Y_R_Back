@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FiChevronLeft, FiChevronRight, FiClipboard, FiDatabase, FiPlus } from 'react-icons/fi';
+import { FiClipboard, FiDatabase, FiPlus } from 'react-icons/fi';
 import { inventarioConteosApi } from './inventarioConteos.api.js';
 import { inventarioMovimientosApi } from './inventarioMovimientos.api.js';
 import ConteosFiltros from './ConteosFiltros.jsx';
 import ConteosTabla from './ConteosTabla.jsx';
 import ConteosDetallesTabla from './ConteosDetallesTabla.jsx';
 import { useUbicaciones } from '../../hooks/useUbicaciones.js';
+import BootstrapPagination from '../common/BootstrapPagination.jsx';
 
 const LIMITE_PAGINA = 10;
 const LIMITE_DETALLE = 10;
@@ -48,25 +49,6 @@ const normalizarRespuesta = (payload, fallbackLimite = LIMITE_PAGINA) => {
       totalPaginas: Number(payload?.totalPaginas || payload?.totalPages || 1)
     }
   };
-};
-
-const construirPaginasVisibles = (paginaActual, totalPaginas, maxVisibles = 5) => {
-  if (totalPaginas <= 1) return [1];
-  if (totalPaginas <= maxVisibles) {
-    return Array.from({ length: totalPaginas }, (_, idx) => idx + 1);
-  }
-
-  let inicio = Math.max(1, paginaActual - 2);
-  let fin = Math.min(totalPaginas, inicio + maxVisibles - 1);
-  inicio = Math.max(1, fin - maxVisibles + 1);
-
-  const paginas = [];
-  if (inicio > 1) paginas.push(1);
-  if (inicio > 2) paginas.push('...');
-  for (let pagina = inicio; pagina <= fin; pagina += 1) paginas.push(pagina);
-  if (fin < totalPaginas - 1) paginas.push('...');
-  if (fin < totalPaginas) paginas.push(totalPaginas);
-  return paginas;
 };
 
 const limpiarParams = (params = {}) => {
@@ -504,9 +486,6 @@ const InventarioConteosPage = () => {
     }
   };
 
-  const paginasConteos = construirPaginasVisibles(meta.pagina, meta.totalPaginas);
-  const paginasDetalles = construirPaginasVisibles(metaDetalles.pagina, metaDetalles.totalPaginas);
-
   const inicioConteos = meta.total > 0 ? ((meta.pagina - 1) * meta.limite) + 1 : 0;
   const finConteos = meta.total > 0 ? Math.min(meta.pagina * meta.limite, meta.total) : 0;
 
@@ -586,49 +565,12 @@ const InventarioConteosPage = () => {
         </div>
       </div>
 
-      <div className="kdx-pagination-bar">
-        <span className="kdx-pagination-summary">
-          Mostrando {inicioConteos}-{finConteos} de {meta.total}
-        </span>
-
-        <div className="kdx-pagination-controls">
-          <button
-            type="button"
-            className="kdx-page-btn kdx-page-btn-nav"
-            onClick={() => cambiarPaginaConteos(meta.pagina - 1)}
-            disabled={loadingConteos || meta.pagina <= 1}
-            aria-label="Pagina anterior"
-          >
-            <FiChevronLeft size={15} />
-          </button>
-
-          {paginasConteos.map((pagina, index) => (
-            <button
-              key={`c-${pagina}-${index}`}
-              type="button"
-              className={`kdx-page-btn ${pagina === meta.pagina ? 'is-active' : ''} ${pagina === '...' ? 'is-ellipsis' : ''}`}
-              onClick={() => (typeof pagina === 'number' ? cambiarPaginaConteos(pagina) : undefined)}
-              disabled={loadingConteos || pagina === '...'}
-            >
-              {pagina}
-            </button>
-          ))}
-
-          <button
-            type="button"
-            className="kdx-page-btn kdx-page-btn-nav"
-            onClick={() => cambiarPaginaConteos(meta.pagina + 1)}
-            disabled={loadingConteos || meta.pagina >= meta.totalPaginas}
-            aria-label="Pagina siguiente"
-          >
-            <FiChevronRight size={15} />
-          </button>
-
-          <span className="kdx-page-state">
-            Pagina {meta.pagina} de {meta.totalPaginas}
-          </span>
-        </div>
-      </div>
+      <BootstrapPagination
+        pagina={meta.pagina}
+        totalPaginas={meta.totalPaginas}
+        onChange={cambiarPaginaConteos}
+        loading={loadingConteos}
+      />
 
       {conteoActivo?.cod_conteo && (
         <>
@@ -708,49 +650,12 @@ const InventarioConteosPage = () => {
             </div>
           </div>
 
-          <div className="kdx-pagination-bar">
-            <span className="kdx-pagination-summary">
-              Mostrando {inicioDetalles}-{finDetalles} de {metaDetalles.total}
-            </span>
-
-            <div className="kdx-pagination-controls">
-              <button
-                type="button"
-                className="kdx-page-btn kdx-page-btn-nav"
-                onClick={() => cambiarPaginaDetalles(metaDetalles.pagina - 1)}
-                disabled={loadingDetalles || metaDetalles.pagina <= 1}
-                aria-label="Pagina anterior del detalle"
-              >
-                <FiChevronLeft size={15} />
-              </button>
-
-              {paginasDetalles.map((pagina, index) => (
-                <button
-                  key={`d-${pagina}-${index}`}
-                  type="button"
-                  className={`kdx-page-btn ${pagina === metaDetalles.pagina ? 'is-active' : ''} ${pagina === '...' ? 'is-ellipsis' : ''}`}
-                  onClick={() => (typeof pagina === 'number' ? cambiarPaginaDetalles(pagina) : undefined)}
-                  disabled={loadingDetalles || pagina === '...'}
-                >
-                  {pagina}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="kdx-page-btn kdx-page-btn-nav"
-                onClick={() => cambiarPaginaDetalles(metaDetalles.pagina + 1)}
-                disabled={loadingDetalles || metaDetalles.pagina >= metaDetalles.totalPaginas}
-                aria-label="Pagina siguiente del detalle"
-              >
-                <FiChevronRight size={15} />
-              </button>
-
-              <span className="kdx-page-state">
-                Pagina {metaDetalles.pagina} de {metaDetalles.totalPaginas}
-              </span>
-            </div>
-          </div>
+          <BootstrapPagination
+            pagina={metaDetalles.pagina}
+            totalPaginas={metaDetalles.totalPaginas}
+            onChange={cambiarPaginaDetalles}
+            loading={loadingDetalles}
+          />
         </>
       )}
 

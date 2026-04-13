@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  FiChevronLeft,
-  FiChevronRight,
   FiDatabase,
   FiEdit2,
   FiMapPin,
@@ -11,6 +9,7 @@ import {
   FiTrash2
 } from 'react-icons/fi';
 import Alert from '../common/Alert.jsx';
+import BootstrapPagination from '../common/BootstrapPagination.jsx';
 import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { productoService, ubicacionService } from '../../services/serviceIndex.js';
 import { confirmDialog } from '../../utils/notifications.js';
@@ -203,31 +202,6 @@ const Ubicaciones = () => {
   useEffect(() => {
     setPaginaActual((prev) => Math.min(Math.max(prev, 1), totalPaginas || 1));
   }, [totalPaginas]);
-
-  const construirPaginasVisibles = (actual, total, maxVisibles = 5) => {
-    if (total <= 1) return [1];
-    if (total <= maxVisibles) {
-      return Array.from({ length: total }, (_, idx) => idx + 1);
-    }
-
-    let inicio = Math.max(1, actual - 2);
-    let fin = Math.min(total, inicio + maxVisibles - 1);
-    inicio = Math.max(1, fin - maxVisibles + 1);
-
-    const paginas = [];
-    if (inicio > 1) paginas.push(1);
-    if (inicio > 2) paginas.push('...');
-
-    for (let pagina = inicio; pagina <= fin; pagina += 1) {
-      paginas.push(pagina);
-    }
-
-    if (fin < total - 1) paginas.push('...');
-    if (fin < total) paginas.push(total);
-    return paginas;
-  };
-
-  const paginasVisibles = construirPaginasVisibles(meta.page, totalPaginas);
 
   const abrirCrear = () => {
     setEditandoId(null);
@@ -520,95 +494,12 @@ const Ubicaciones = () => {
           </div>
         </div>
       </div>
-
-      <div
-        style={{
-          marginTop: 10,
-          padding: '12px 14px',
-          border: '1px solid var(--jyr-gray-200)',
-          borderRadius: 12,
-          background: 'linear-gradient(180deg, #ffffff 0%, #fafafa 100%)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 10
-        }}
-      >
-        <span style={{ fontSize: 12, color: 'var(--jyr-gray-500)' }}>
-          Mostrando {inicioMostrado}-{finMostrado} de {totalUbicaciones}
-        </span>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => cambiarPagina(paginaActual - 1)}
-            disabled={loading || meta.page <= 1}
-            aria-label="Página anterior"
-            style={{
-              minWidth: 36,
-              height: 36,
-              border: '1px solid var(--jyr-gray-200)',
-              background: '#fff',
-              color: '#0f172a',
-              padding: 0
-            }}
-          >
-            <FiChevronLeft size={15} />
-          </button>
-
-          {paginasVisibles.map((pagina, index) => (
-            <button
-              key={`${pagina}-${index}`}
-              type="button"
-              className="btn btn-sm"
-              onClick={() => (typeof pagina === 'number' ? cambiarPagina(pagina) : undefined)}
-              disabled={loading || pagina === '...'}
-              style={{
-                minWidth: 36,
-                height: 36,
-                border: '1px solid var(--jyr-gray-200)',
-                background: pagina === meta.page ? '#0b0f19' : '#fff',
-                color: pagina === meta.page ? '#fff' : '#111827',
-                fontWeight: pagina === meta.page ? 700 : 500,
-                padding: '0 10px'
-              }}
-            >
-              {pagina}
-            </button>
-          ))}
-
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => cambiarPagina(paginaActual + 1)}
-            disabled={loading || meta.page >= totalPaginas}
-            aria-label="Página siguiente"
-            style={{
-              minWidth: 36,
-              height: 36,
-              border: '1px solid var(--jyr-gray-200)',
-              background: '#fff',
-              color: '#0f172a',
-              padding: 0
-            }}
-          >
-            <FiChevronRight size={15} />
-          </button>
-
-          <span
-            style={{
-              marginLeft: 6,
-              fontSize: 12,
-              color: 'var(--jyr-gray-500)',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Página {meta.page} de {totalPaginas}
-          </span>
-        </div>
-      </div>
+      <BootstrapPagination
+        pagina={meta.page}
+        totalPaginas={totalPaginas}
+        onChange={cambiarPagina}
+        loading={loading}
+      />
 
       {modalAbierto && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
