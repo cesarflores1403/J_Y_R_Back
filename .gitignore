@@ -27,6 +27,11 @@ frontend/.env
 public-url.txt
 
 # ==============================
+# BACKUPS LOCALES
+# ==============================
+backend/backups/*/
+
+# ==============================
 # ARCHIVOS SISTEMA
 # ==============================
 .DS_Store

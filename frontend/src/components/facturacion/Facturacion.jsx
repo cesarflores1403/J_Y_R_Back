@@ -17,6 +17,24 @@ const formatMoney = (v) => {
   return 'L ' + n.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+const limpiarSoloDigitos = (valor) => String(valor ?? '').replace(/\D/g, '');
+const limpiarNumeroDecimal = (valor) => {
+  const raw = String(valor ?? '').replace(/,/g, '.');
+  let resultado = '';
+  let tienePunto = false;
+  for (const ch of raw) {
+    if (/\d/.test(ch)) {
+      resultado += ch;
+      continue;
+    }
+    if (ch === '.' && !tienePunto) {
+      resultado += ch;
+      tienePunto = true;
+    }
+  }
+  return resultado;
+};
+
 const Facturacion = () => {
   const { usuario } = useAuth();
   const confirm = useConfirm();
@@ -155,9 +173,11 @@ const Facturacion = () => {
 
   // ========== CAMBIAR CANTIDAD ==========
   const cambiarCantidad = (codProd, nuevaCant) => {
-    const cant = parseInt(nuevaCant) || 0;
+    const limpio = limpiarSoloDigitos(nuevaCant);
     setItems(items.map(i => {
       if (i.cod_producto !== codProd) return i;
+      if (limpio === '') return { ...i, cantidad: '' };
+      const cant = parseInt(limpio, 10);
       if (cant > i.stock) {
         toast.warn(`Stock máx: ${i.stock}`);
         return { ...i, cantidad: i.stock };
@@ -173,9 +193,11 @@ const Facturacion = () => {
 
   // ========== CAMBIAR DESCUENTO POR LÍNEA (HU-FAC-04) ==========
   const cambiarDescuentoLinea = (codProd, valor) => {
-    const v = parseFloat(valor) || 0;
+    const limpio = limpiarNumeroDecimal(valor);
     setItems(items.map(i => {
       if (i.cod_producto !== codProd) return i;
+      if (limpio === '' || limpio === '.') return { ...i, descuento: '' };
+      const v = parseFloat(limpio) || 0;
       // Validar límites
       if (v < 0) return { ...i, descuento: 0 };
       if (i.tipo_descuento === 'PORCENTAJE' && v > 100) {
@@ -704,8 +726,8 @@ const Facturacion = () => {
                               <tr key={item.cod_producto}>
                                 <td>{item.nombre_producto} <small className="text-muted">({item.unidad_medida || '-'})</small></td>
                                 <td>
-                                  <input type="number" className="form-control form-control-sm text-center"
-                                    min="1" max={item.stock} value={item.cantidad}
+                                  <input type="text" className="form-control form-control-sm text-center"
+                                    inputMode="numeric" pattern="[0-9]*" value={item.cantidad}
                                     onChange={(e) => cambiarCantidad(item.cod_producto, e.target.value)} />
                                 </td>
                                 <td>{formatMoney(item.precio_venta)}</td>
@@ -723,10 +745,9 @@ const Facturacion = () => {
                                       onClick={() => cambiarTipoDescuentoLinea(item.cod_producto, 'MONTO')}>
                                       L
                                     </button>
-                                    <input type="number" className="form-control form-control-sm text-center" style={{ maxWidth: 70 }}
-                                      min="0" step="0.01"
-                                      max={item.tipo_descuento === 'PORCENTAJE' ? 100 : bruto}
-                                      value={item.descuento || ''}
+                                    <input type="text" className="form-control form-control-sm text-center" style={{ maxWidth: 70 }}
+                                      inputMode="decimal"
+                                      value={item.descuento ?? ''}
                                       placeholder="0"
                                       onChange={(e) => cambiarDescuentoLinea(item.cod_producto, e.target.value)} />
                                   </div>

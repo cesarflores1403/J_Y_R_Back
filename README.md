@@ -23,8 +23,11 @@ npm run install:all
 ## Desarrollo
 
 ```bash
-# Iniciar backend + frontend + tunnel automatico
+# Iniciar backend + frontend + URL publica automatica
 npm run dev
+
+# Equivalente explicito (mismo comportamiento)
+npm run dev:public
 
 # Solo backend (puerto 5000)
 npm run start:backend

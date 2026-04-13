@@ -19,6 +19,23 @@ const formatMoney = (v) => {
 
 const SOLO_LETRAS_ESPACIOS_REGEX = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/;
 const limpiarSoloLetrasYEspacios = (valor) => String(valor || '').replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]/g, '');
+const limpiarSoloDigitos = (valor) => String(valor ?? '').replace(/\D/g, '');
+const limpiarNumeroDecimal = (valor) => {
+  const raw = String(valor ?? '').replace(/,/g, '.');
+  let resultado = '';
+  let tienePunto = false;
+  for (const ch of raw) {
+    if (/\d/.test(ch)) {
+      resultado += ch;
+      continue;
+    }
+    if (ch === '.' && !tienePunto) {
+      resultado += ch;
+      tienePunto = true;
+    }
+  }
+  return resultado;
+};
 
 const normalizeEstado = (v) => {
   if (v === true) return true;
@@ -607,16 +624,21 @@ const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
   };
 
   const cambiarCantidad = (index, cantidad) => {
-    const num = parseInt(cantidad) || 0;
+    const limpio = limpiarSoloDigitos(cantidad);
     const nuevo = [...items];
-    nuevo[index].cantidad = num;
+    nuevo[index].cantidad = limpio === '' ? '' : parseInt(limpio, 10);
     setItems(nuevo);
   };
 
   const cambiarDescuento = (index, valor) => {
-    const num = Math.min(100, Math.max(0, parseFloat(valor) || 0));
+    const limpio = limpiarNumeroDecimal(valor);
     const nuevo = [...items];
-    nuevo[index].descuento = num;
+    if (limpio === '' || limpio === '.') {
+      nuevo[index].descuento = '';
+    } else {
+      const num = Math.min(100, parseFloat(limpio));
+      nuevo[index].descuento = num;
+    }
     setItems(nuevo);
   };
 
@@ -631,8 +653,9 @@ const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
   const calcularItem = (item) => {
     const precioBase = item.tipo_item === 'REPARACION' ? item.precio_unitario : item.precio_venta;
     const precio = round2(precioBase);
-    const descuento = round2(item.descuento || 0);
-    const subtotalBruto = round2(precio * item.cantidad);
+    const cantidad = parseInt(item.cantidad, 10) || 0;
+    const descuento = round2(parseFloat(item.descuento) || 0);
+    const subtotalBruto = round2(precio * cantidad);
     const montoDescuento = round2((descuento / 100) * subtotalBruto);
     const subtotal = round2(subtotalBruto - montoDescuento);
     const isv = round2(((parseFloat(item.isv_pct) || 0) / 100) * subtotal);
@@ -871,11 +894,15 @@ const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
                   <div className="col-md-1">
                     <label className="form-label small">Cant.</label>
                     <input
-                      type="number"
+                      type="text"
                       className="form-control form-control-sm compact-number-input"
-                      min="1"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={reparacion.cantidad}
-                      onChange={(e) => setReparacion((prev) => ({ ...prev, cantidad: e.target.value }))}
+                      onChange={(e) => {
+                        const limpio = limpiarSoloDigitos(e.target.value);
+                        setReparacion((prev) => ({ ...prev, cantidad: limpio === '' ? '' : parseInt(limpio, 10) }));
+                      }}
                     />
                   </div>
                   <div className="col-md-1">
@@ -893,13 +920,19 @@ const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
                   <div className="col-md-1">
                     <label className="form-label small">Desc %</label>
                     <input
-                      type="number"
+                      type="text"
                       className="form-control form-control-sm compact-number-input"
-                      min="0"
-                      max="100"
-                      step="0.5"
+                      inputMode="decimal"
                       value={reparacion.descuento}
-                      onChange={(e) => setReparacion((prev) => ({ ...prev, descuento: e.target.value }))}
+                      onChange={(e) => {
+                        const limpio = limpiarNumeroDecimal(e.target.value);
+                        if (limpio === '' || limpio === '.') {
+                          setReparacion((prev) => ({ ...prev, descuento: '' }));
+                          return;
+                        }
+                        const num = Math.min(100, parseFloat(limpio));
+                        setReparacion((prev) => ({ ...prev, descuento: num }));
+                      }}
                     />
                   </div>
                   <div className="col-md-2">
@@ -955,13 +988,13 @@ const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
                           </td>
                           <td>{formatMoney(precioBase)}</td>
                           <td>
-                            <input type="number" className={`form-control form-control-sm compact-number-input ${stockError ? 'is-invalid' : ''}`}
-                              min="1" max={esProducto ? item.stock : undefined} value={item.cantidad}
+                            <input type="text" className={`form-control form-control-sm compact-number-input ${stockError ? 'is-invalid' : ''}`}
+                              inputMode="numeric" pattern="[0-9]*" value={item.cantidad}
                               onChange={(e) => cambiarCantidad(index, e.target.value)} />
                           </td>
                           <td>
-                            <input type="number" className="form-control form-control-sm compact-number-input"
-                              min="0" max="100" step="0.5" value={item.descuento || 0}
+                            <input type="text" className="form-control form-control-sm compact-number-input"
+                              inputMode="decimal" value={item.descuento ?? ''}
                               onChange={(e) => cambiarDescuento(index, e.target.value)} />
                           </td>
                           <td>{formatMoney(calc.subtotal)}</td>
