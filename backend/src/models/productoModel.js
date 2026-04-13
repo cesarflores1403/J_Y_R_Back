@@ -19,8 +19,8 @@ export const formatCodProducto = (cod) => {
 // =======================
 export const getProducto = async () => {
   const query = `
-    SELECT p.cod_producto, p.cod_categoria, p.nombre_producto,
-           p.unidad_medida, p.precio_venta, p.cod_isv,
+    SELECT p.cod_producto, p.cod_categoria, p.nombre_producto, p.descripcion, p.especificaciones,
+           p.unidad_medida, p.precio_venta, p.precio_costo, p.cod_isv,
            COALESCE(i.porcentaje, 0) AS isv_porcentaje,
            COALESCE(i.descripcion, 'Sin ISV') AS isv_descripcion,
           p.estado_producto, p.imagen_url, p.cod_ubicacion,
@@ -72,7 +72,7 @@ export const createProducto = async (datos, db = pool) => {
   // // 2. Buscar el producto recién creado por nombre (método confiable con Supabase pooler)
   const buscar = `
     SELECT cod_producto, nombre_producto, cod_categoria,
-           unidad_medida, precio_venta, cod_isv, estado_producto,
+          descripcion, especificaciones, unidad_medida, precio_venta, precio_costo, cod_isv, estado_producto,
         stock_minimo, punto_reorden,
            creado_por, fecha_creacion, modificado_por, fecha_modificacion
     FROM producto

@@ -5,7 +5,7 @@ import ProductoFicha from '../components/producto/ProductoFicha.jsx'; // // HU-0
 import { useProducto } from '../hooks/useProducto.js'; // // Hook
 import { useAuth } from '../contexts/AuthContext.jsx'; // // HU-09: Permisos
 import { useCategorias } from '../hooks/useCategorias.js'; // // HU-09: Mapa categorías
-import { FiPackage, FiPlusCircle, FiArrowLeft } from 'react-icons/fi';
+import { FiPackage } from 'react-icons/fi';
 
 const ProductoPage = () => {
   const { usuario } = useAuth(); // // HU-09: rol del usuario
@@ -35,6 +35,8 @@ const ProductoPage = () => {
   // HU-09: Determinar si el usuario puede editar
   const puedeEditar = ['Administrador', 'Bodeguero', 'Cajero'].includes(usuario?.rol);
   const puedeVerAuditoriaProducto = ['Administrador', 'Super Administrador'].includes(usuario?.rol);
+  const puedeVerPrecioCosto = usuario?.rol !== 'Cajero';
+  const puedeVerMargen = usuario?.rol === 'Administrador';
 
   const handleEdit = (p) => {
     setSelected(p);
@@ -93,10 +95,10 @@ const ProductoPage = () => {
             {puedeEditar && (
               <button
                 type="button"
-                className="btn jyr-btn-primary"
+                className="jyr-btn jyr-btn-primary"
                 onClick={() => { setSelected(null); setDuplicateSource(null); setVista('formulario'); }}
               >
-                <FiPlusCircle className="me-1" /> Nuevo Producto
+                Nuevo Producto
               </button>
             )}
           </div>
@@ -119,6 +121,7 @@ const ProductoPage = () => {
               onEliminarImagen={eliminarImagenProducto}
               onDuplicate={handleDuplicate}
               onVerFicha={(p) => setFichaProducto(p)}
+              mostrarMargen={puedeVerMargen}
             />
           )}
         </>
@@ -126,14 +129,13 @@ const ProductoPage = () => {
         <>
           <button
             type="button"
-            className="btn btn-sm btn-outline-secondary mb-3"
+            className="jyr-btn jyr-btn-primary mb-3"
             onClick={handleCancelEdit}
           >
-            <FiArrowLeft className="me-1" /> Volver
+            Volver
           </button>
 
           <h3 className="mb-4">
-            <FiPlusCircle className="me-2 text-info" />
             {selected ? 'Editar Producto' : duplicateSource ? 'Duplicar Producto' : 'Nuevo Producto'}
           </h3>
 
@@ -144,6 +146,8 @@ const ProductoPage = () => {
             duplicateFrom={duplicateSource}
             onCancelEdit={handleCancelEdit}
             onSubirImagen={subirImagen}
+            mostrarPrecioCosto={puedeVerPrecioCosto}
+            mostrarMargen={puedeVerMargen}
           />
         </>
       )}
@@ -156,6 +160,7 @@ const ProductoPage = () => {
           onEdit={puedeEditar ? (p) => { setFichaProducto(null); handleEdit(p); } : undefined}
           mostrarAuditoria={puedeVerAuditoriaProducto}
           categoriasMap={categoriasMap}
+          mostrarMargen={puedeVerMargen}
         />
       )}
     </div>

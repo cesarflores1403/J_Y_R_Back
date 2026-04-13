@@ -1,4 +1,5 @@
-﻿import { FiX, FiEdit2, FiPackage, FiCheckCircle, FiAlertTriangle, FiXCircle } from 'react-icons/fi';
+﻿import { useState } from 'react';
+import { FiX, FiEdit2, FiPackage, FiCheckCircle, FiAlertTriangle, FiXCircle } from 'react-icons/fi';
 import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 // =====================================================
@@ -8,7 +9,9 @@ import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 const API_URL = resolveApiBase();
 
-const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {}, mostrarAuditoria = false }) => {
+const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {}, mostrarAuditoria = false, mostrarMargen = false }) => {
+  const [headerElevado, setHeaderElevado] = useState(false);
+
   if (!producto) return null;
 
   const codigo = producto.codigo_producto || `PROD-${String(producto.cod_producto).padStart(4, '0')}`;
@@ -29,6 +32,23 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {}, mostrarA
   const categoria = categoriasMap[producto.cod_categoria] || `Categoría ${producto.cod_categoria}`;
   const creadoPorTexto = producto.creado_por_nombre || producto.creado_por || 'N/D';
   const modificadoPorTexto = producto.modificado_por_nombre || producto.modificado_por || 'N/D';
+  const descripcion = typeof producto.descripcion === 'string' ? producto.descripcion.trim() : '';
+  const especificaciones = (producto.especificaciones && typeof producto.especificaciones === 'object' && !Array.isArray(producto.especificaciones))
+    ? Object.entries(producto.especificaciones)
+      .filter(([clave, valor]) => String(clave || '').trim() && String(valor || '').trim())
+    : [];
+
+  const calcularMargen = () => {
+    if (Number.isFinite(Number(producto.margen_ganancia))) return Number(producto.margen_ganancia);
+
+    const venta = Number(producto.precio_venta);
+    const costo = Number(producto.precio_costo);
+    if (!Number.isFinite(venta) || venta <= 0) return null;
+    if (!Number.isFinite(costo) || costo < 0) return null;
+    return Number((((venta - costo) / venta) * 100).toFixed(2));
+  };
+
+  const margen = calcularMargen();
 
   const formatearFecha = (valor) => {
     if (!valor) return 'N/D';
@@ -60,7 +80,10 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {}, mostrarA
         style={{
           background: '#fff', borderRadius: 12,
           boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-          width: '100%', maxWidth: 600,
+          width: 'min(960px, 96vw)',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
           overflow: 'hidden',
           animation: 'fadeIn 0.2s ease'
         }}
@@ -69,7 +92,13 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {}, mostrarA
         <div style={{
           background: 'var(--jyr-red)', color: '#fff',
           padding: '16px 20px', display: 'flex',
-          alignItems: 'center', justifyContent: 'space-between'
+          alignItems: 'center', justifyContent: 'space-between',
+          flexShrink: 0,
+          position: 'sticky',
+          top: 0,
+          zIndex: 5,
+          boxShadow: headerElevado ? '0 8px 20px rgba(0,0,0,0.22)' : 'none',
+          transition: 'box-shadow 0.2s ease'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <FiPackage size={20} />
@@ -90,7 +119,10 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {}, mostrarA
         </div>
 
         {/* Body */}
-        <div style={{ padding: 24, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <div
+          style={{ padding: 24, display: 'flex', gap: 24, flexWrap: 'wrap', overflowY: 'auto' }}
+          onScroll={(e) => setHeaderElevado(e.currentTarget.scrollTop > 0)}
+        >
           {/* Imagen */}
           <div style={{
             flex: '0 0 auto', display: 'flex',
@@ -169,6 +201,38 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {}, mostrarA
                 </p>
               </div>
 
+              {mostrarMargen && (
+                <>
+                  <div>
+                    <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
+                      Precio de costo
+                    </span>
+                    <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--jyr-gray-700)' }}>
+                      {producto.precio_costo === null || producto.precio_costo === undefined
+                        ? 'N/D'
+                        : `L. ${Number(producto.precio_costo).toFixed(2)}`}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
+                      Margen de ganancia
+                    </span>
+                    <p style={{
+                      margin: '2px 0 0',
+                      fontSize: 16,
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono)',
+                      color: margen === null
+                        ? 'var(--jyr-gray-400)'
+                        : (margen >= 0 ? 'var(--jyr-success, #16a34a)' : 'var(--jyr-danger, #dc2626)')
+                    }}>
+                      {margen === null ? 'N/D' : `${margen.toFixed(2)}%`}
+                    </p>
+                  </div>
+                </>
+              )}
+
               {/* ISV */}
               <div>
                 <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
@@ -209,6 +273,46 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {}, mostrarA
                 <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--jyr-gray-700)' }}>
                   {producto.cod_producto}
                 </p>
+              </div>
+
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
+                  Descripción
+                </span>
+                <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--jyr-gray-700)', lineHeight: 1.5 }}>
+                  {descripcion || 'Sin descripción registrada.'}
+                </p>
+              </div>
+
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: 0.5 }}>
+                  Especificaciones
+                </span>
+                {especificaciones.length > 0 ? (
+                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {especificaciones.map(([clave, valor]) => (
+                      <span
+                        key={`${clave}-${valor}`}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          fontSize: 12,
+                          padding: '4px 10px',
+                          borderRadius: 999,
+                          background: 'var(--jyr-gray-100, #f3f4f6)',
+                          color: 'var(--jyr-gray-700)'
+                        }}
+                      >
+                        <strong>{clave}:</strong> {valor}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--jyr-gray-400)', fontStyle: 'italic' }}>
+                    Sin especificaciones registradas.
+                  </p>
+                )}
               </div>
 
               {/* HU-10: Ubicación en bodega */}
@@ -308,7 +412,8 @@ const ProductoFicha = ({ producto, onClose, onEdit, categoriasMap = {}, mostrarA
         <div style={{
           padding: '14px 24px', borderTop: '1px solid var(--jyr-gray-200)',
           display: 'flex', justifyContent: 'flex-end', gap: 10,
-          background: 'var(--jyr-gray-50, #f9fafb)'
+          background: 'var(--jyr-gray-50, #f9fafb)',
+          flexShrink: 0
         }}>
           {onEdit && (
             <button

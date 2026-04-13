@@ -10,6 +10,124 @@ import bitacoraFacturacionService from './bitacoraFacturacionService.js';
 // HU-03: Normalización y validación de reglas de negocio
 // =====================================================
 
+const calcularMargenGanancia = (precioVenta, precioCosto) => {
+  const venta = Number(precioVenta);
+  const costo = Number(precioCosto);
+
+  if (!Number.isFinite(venta) || venta <= 0) return null;
+  if (!Number.isFinite(costo) || costo < 0) return null;
+
+  const margen = ((venta - costo) / venta) * 100;
+  return Number(margen.toFixed(2));
+};
+
+const normalizarEspecificacionesEntrada = (especificaciones) => {
+  if (especificaciones === undefined) return undefined;
+  if (especificaciones === null || especificaciones === '') return null;
+
+  let objeto = especificaciones;
+  if (typeof objeto === 'string') {
+    try {
+      objeto = JSON.parse(objeto);
+    } catch {
+      const error = new Error('especificaciones debe ser un objeto JSON válido.');
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  if (typeof objeto !== 'object' || Array.isArray(objeto)) {
+    const error = new Error('especificaciones debe ser un objeto clave-valor.');
+    error.status = 400;
+    throw error;
+  }
+
+  const entries = Object.entries(objeto || {})
+    .map(([clave, valor]) => [String(clave || '').trim(), String(valor || '').trim()])
+    .filter(([clave, valor]) => clave && valor);
+
+  if (entries.length === 0) return null;
+  if (entries.length > 30) {
+    const error = new Error('No se permiten más de 30 especificaciones.');
+    error.status = 400;
+    throw error;
+  }
+
+  for (const [clave, valor] of entries) {
+    if (clave.length > 60) {
+      const error = new Error('La clave de una especificación no puede exceder 60 caracteres.');
+      error.status = 400;
+      throw error;
+    }
+    if (valor.length > 120) {
+      const error = new Error('El valor de una especificación no puede exceder 120 caracteres.');
+      error.status = 400;
+      throw error;
+    }
+  }
+
+  return Object.fromEntries(entries);
+};
+
+const normalizarEspecificacionesSalida = (especificaciones) => {
+  if (!especificaciones) return null;
+
+  if (typeof especificaciones === 'string') {
+    try {
+      const parseado = JSON.parse(especificaciones);
+      return (parseado && typeof parseado === 'object' && !Array.isArray(parseado)) ? parseado : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (typeof especificaciones === 'object' && !Array.isArray(especificaciones)) {
+    return especificaciones;
+  }
+
+  return null;
+};
+
+const anexarMargenGanancia = (producto = {}) => {
+  const precioVenta = producto?.precio_venta;
+  const precioCosto = producto?.precio_costo;
+  const descripcion = typeof producto?.descripcion === 'string'
+    ? producto.descripcion.trim()
+    : null;
+  const especificaciones = normalizarEspecificacionesSalida(producto?.especificaciones);
+
+  const precioVentaNum = Number.isFinite(Number(precioVenta)) ? Number(precioVenta) : null;
+  const precioCostoNum = (precioCosto === null || precioCosto === undefined || precioCosto === '')
+    ? null
+    : (Number.isFinite(Number(precioCosto)) ? Number(precioCosto) : null);
+
+  return {
+    ...producto,
+    descripcion,
+    especificaciones,
+    precio_venta: precioVentaNum ?? producto?.precio_venta,
+    precio_costo: precioCostoNum,
+    margen_ganancia: calcularMargenGanancia(precioVentaNum, precioCostoNum)
+  };
+};
+
+const validarPrecioCosto = (precioCosto) => {
+  if (precioCosto === undefined) return;
+  if (precioCosto === null) return;
+
+  if (!Number.isFinite(Number(precioCosto)) || Number(precioCosto) < 0) {
+    const error = new Error('precio_costo debe ser mayor o igual a 0.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (Number(precioCosto) > 999999.99) {
+    const error = new Error('precio_costo no puede exceder 999,999.99.');
+    error.status = 400;
+    throw error;
+  }
+};
+
 // =======================
 // NORMALIZAR DATOS (trim, mayúsculas donde aplica)
 // =======================
@@ -21,6 +139,16 @@ const normalizar = (datos) => {
     resultado.nombre_producto = resultado.nombre_producto.trim();
   }
 
+  if (resultado.descripcion !== undefined) {
+    resultado.descripcion = resultado.descripcion === null || resultado.descripcion === ''
+      ? null
+      : String(resultado.descripcion).trim();
+  }
+
+  if (resultado.especificaciones !== undefined) {
+    resultado.especificaciones = normalizarEspecificacionesEntrada(resultado.especificaciones);
+  }
+
   // Unidad de medida: trim + MAYÚSCULAS
   if (resultado.unidad_medida && typeof resultado.unidad_medida === 'string') {
     resultado.unidad_medida = resultado.unidad_medida.trim().toUpperCase();
@@ -29,6 +157,11 @@ const normalizar = (datos) => {
   // Numéricos
   if (resultado.precio_venta !== undefined) {
     resultado.precio_venta = Number(resultado.precio_venta);
+  }
+  if (resultado.precio_costo !== undefined) {
+    resultado.precio_costo = resultado.precio_costo === '' || resultado.precio_costo === null
+      ? null
+      : Number(resultado.precio_costo);
   }
   if (resultado.cod_categoria !== undefined) {
     resultado.cod_categoria = Number(resultado.cod_categoria);
@@ -117,7 +250,8 @@ const verificarDuplicado = async (nombre_producto, codExcluir = null) => {
 // GET PRODUCTO(S)
 // =======================
 export const getProducto = async () => {
-  return await productoModel.getProducto();
+  const productos = await productoModel.getProducto();
+  return (productos || []).map((p) => anexarMargenGanancia(p));
 };
 
 const quitarAuditoriaProducto = (producto = {}) => {
@@ -135,8 +269,9 @@ const quitarAuditoriaProducto = (producto = {}) => {
 
 export const getProductoConAuditoria = async ({ incluirAuditoria = false } = {}) => {
   const productos = await productoModel.getProducto();
-  if (incluirAuditoria) return productos;
-  return (productos || []).map((p) => quitarAuditoriaProducto(p));
+  const productosConMargen = (productos || []).map((p) => anexarMargenGanancia(p));
+  if (incluirAuditoria) return productosConMargen;
+  return productosConMargen.map((p) => quitarAuditoriaProducto(p));
 };
 
 // =======================
@@ -178,6 +313,14 @@ export const createProducto = async (datos, auditoria = {}) => {
       error.status = 400;
       throw error;
     }
+  }
+
+  validarPrecioCosto(datosNorm.precio_costo);
+
+  if (datosNorm.descripcion !== undefined && datosNorm.descripcion !== null && datosNorm.descripcion.length > 500) {
+    const error = new Error('descripcion no puede exceder 500 caracteres.');
+    error.status = 400;
+    throw error;
   }
 
   if (
@@ -291,7 +434,7 @@ export const createProducto = async (datos, auditoria = {}) => {
     }
 
     await client.query('COMMIT');
-    return productoCreado;
+    return anexarMargenGanancia(productoCreado);
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -345,6 +488,14 @@ export const updateProducto = async ({ cod_producto, datos = {}, stock_agregar =
       error.status = 400;
       throw error;
     }
+  }
+
+  validarPrecioCosto(datosNorm.precio_costo);
+
+  if (datosNorm.descripcion !== undefined && datosNorm.descripcion !== null && datosNorm.descripcion.length > 500) {
+    const error = new Error('descripcion no puede exceder 500 caracteres.');
+    error.status = 400;
+    throw error;
   }
 
   if (

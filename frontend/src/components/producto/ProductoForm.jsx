@@ -2,10 +2,27 @@ import { useEffect, useState, useRef } from 'react'; // // Hooks
 import { useIsv } from '../../hooks/useIsv.js'; // // Hook catálogo ISV
 import { useCategorias } from '../../hooks/useCategorias.js'; // // Hook catálogo Categorías (HU-07)
 import { useUbicaciones } from '../../hooks/useUbicaciones.js'; // // HU-10: Hook ubicaciones
-import { FiCamera, FiX, FiEdit2, FiPlusCircle } from 'react-icons/fi';
+import { FiCamera, FiX } from 'react-icons/fi';
 import { resolveApiBase } from '../../utils/runtimeApi.js';
 
-const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit, onSubirImagen }) => {
+const ProductoForm = ({
+  onSubmit,
+  saving,
+  selected,
+  duplicateFrom,
+  onCancelEdit,
+  onSubirImagen,
+  mostrarPrecioCosto = true,
+  mostrarMargen = false,
+}) => {
+  const clavesEspecificacionFijas = ['Marca', 'Modelo', 'Año del carro'];
+
+  const construirEspecificacionesBase = () => ([
+    { clave: clavesEspecificacionFijas[0], valor: '' },
+    { clave: clavesEspecificacionFijas[1], valor: '' },
+    { clave: clavesEspecificacionFijas[2], valor: '' },
+  ]);
+
   const { catalogoIsv, loadingIsv } = useIsv(); // // Catálogo ISV desde BD
   const { categorias, loadingCategorias } = useCategorias(); // // Categorías dinámicas (HU-07)
   const { ubicaciones, loadingUbicaciones } = useUbicaciones(); // // HU-10: Ubicaciones
@@ -13,8 +30,10 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
   const [form, setForm] = useState({
     cod_categoria: '',
     nombre_producto: '',
+    descripcion: '',
     unidad_medida: 'UND',
     precio_venta: '',
+    precio_costo: '',
     stock_inicial: '',
     stock_nuevo: '',
     stock_agregar: '',
@@ -27,6 +46,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
 
   const [fieldErrors, setFieldErrors] = useState({}); // // Errores por campo
   const [formError, setFormError] = useState(''); // // Error general
+  const [especificacionesRows, setEspecificacionesRows] = useState(construirEspecificacionesBase());
   const isEdit = Boolean(selected?.cod_producto); // // Modo edición
 
   // HU-08: Estado de imagen
@@ -40,8 +60,10 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       setForm({
         cod_categoria: selected.cod_categoria ?? '',
         nombre_producto: selected.nombre_producto ?? '',
+        descripcion: selected.descripcion ?? '',
         unidad_medida: selected.unidad_medida ?? 'UND',
         precio_venta: selected.precio_venta ?? '',
+        precio_costo: selected.precio_costo ?? '',
         stock_inicial: '',
         stock_nuevo: String(Number(selected.stock_total ?? 0)),
         stock_agregar: '',
@@ -53,6 +75,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
         stock_minimo: selected.stock_minimo ?? '',
         punto_reorden: selected.punto_reorden ?? '',
       });
+      setEspecificacionesRows(normalizarEspecificacionesRows(selected.especificaciones));
 
       // HU-08: Mostrar imagen actual si existe
       if (selected.imagen_url) {
@@ -69,8 +92,10 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       setForm({
         cod_categoria: duplicateFrom.cod_categoria ?? '',
         nombre_producto: `(Copia) ${duplicateFrom.nombre_producto ?? ''}`,
+        descripcion: duplicateFrom.descripcion ?? '',
         unidad_medida: duplicateFrom.unidad_medida ?? 'UND',
         precio_venta: duplicateFrom.precio_venta ?? '',
+        precio_costo: duplicateFrom.precio_costo ?? '',
         stock_inicial: '',
         stock_nuevo: '',
         stock_agregar: '',
@@ -82,6 +107,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
         stock_minimo: duplicateFrom.stock_minimo ?? '',
         punto_reorden: duplicateFrom.punto_reorden ?? '',
       });
+      setEspecificacionesRows(normalizarEspecificacionesRows(duplicateFrom.especificaciones));
 
       // HU-14: no copiar imagen en duplicado
       setImagenFile(null);
@@ -92,8 +118,10 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
     setForm({
       cod_categoria: '',
       nombre_producto: '',
+      descripcion: '',
       unidad_medida: 'UND',
       precio_venta: '',
+      precio_costo: '',
       stock_inicial: '',
       stock_nuevo: '',
       stock_agregar: '',
@@ -103,6 +131,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       stock_minimo: '',
       punto_reorden: '',
     });
+    setEspecificacionesRows(construirEspecificacionesBase());
 
     setImagenFile(null);
     setImagenPreview(null);
@@ -160,6 +189,72 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
     }
   };
 
+  const normalizarEspecificacionesRows = (especificaciones) => {
+    if (!especificaciones || typeof especificaciones !== 'object' || Array.isArray(especificaciones)) {
+      return construirEspecificacionesBase();
+    }
+
+    const rows = Object.entries(especificaciones)
+      .map(([clave, valor]) => ({
+        clave: String(clave ?? '').trim(),
+        valor: String(valor ?? '').trim(),
+      }))
+      .filter((item) => item.clave || item.valor);
+
+    if (rows.length === 0) {
+      return construirEspecificacionesBase();
+    }
+
+    const normalizarClave = (texto) => String(texto || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+    const mapValores = new Map(rows.map((item) => [normalizarClave(item.clave), item.valor]));
+    const base = [
+      { clave: clavesEspecificacionFijas[0], valor: mapValores.get('marca') || '' },
+      { clave: clavesEspecificacionFijas[1], valor: mapValores.get('modelo') || '' },
+      {
+        clave: clavesEspecificacionFijas[2],
+        valor: mapValores.get('ano del carro') || mapValores.get('ano') || mapValores.get('material') || ''
+      },
+    ];
+
+    return base;
+  };
+
+  const construirEspecificaciones = () => {
+    const entries = especificacionesRows
+      .slice(0, clavesEspecificacionFijas.length)
+      .map((item) => [String(item.clave || '').trim(), String(item.valor || '').trim()])
+      .filter(([clave, valor]) => clave && valor);
+
+    return entries.length > 0 ? Object.fromEntries(entries) : null;
+  };
+
+  const actualizarEspecificacion = (index, campo, value) => {
+    setEspecificacionesRows((prev) => prev.map((row, i) => (
+      i === index ? { ...row, [campo]: value } : row
+    )));
+
+    if (fieldErrors.especificaciones) {
+      setFieldErrors((prev) => ({ ...prev, especificaciones: '' }));
+    }
+  };
+
+  const calcularMargen = (precioVenta, precioCosto) => {
+    const venta = Number(precioVenta);
+    const costo = Number(precioCosto);
+
+    if (!Number.isFinite(venta) || venta <= 0) return null;
+    if (!Number.isFinite(costo) || costo < 0) return null;
+
+    return Number((((venta - costo) / venta) * 100).toFixed(2));
+  };
+
+  const margenCalculado = calcularMargen(form.precio_venta, form.precio_costo);
+
   // =====================================================
   // HU-03: Validación por campo con mensajes específicos
   // =====================================================
@@ -183,6 +278,38 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       errors.nombre_producto = 'El nombre no puede exceder 100 caracteres.';
     }
 
+    const descripcion = String(form.descripcion ?? '').trim();
+    if (descripcion.length > 500) {
+      errors.descripcion = 'La descripción no puede exceder 500 caracteres.';
+    }
+
+    const especificacionesLimpias = especificacionesRows
+      .slice(0, clavesEspecificacionFijas.length)
+      .map((item) => ({
+        clave: String(item.clave || '').trim(),
+        valor: String(item.valor || '').trim(),
+      }))
+      .filter((item) => item.clave || item.valor);
+
+    if (!errors.especificaciones) {
+      const filaInvalida = especificacionesLimpias.find((item) => {
+        if (!item.clave || !item.valor) return true;
+        if (item.clave.length > 60) return true;
+        if (item.valor.length > 120) return true;
+        return false;
+      });
+
+      if (filaInvalida) {
+        if (!filaInvalida.clave || !filaInvalida.valor) {
+          errors.especificaciones = 'Cada especificación debe tener clave y valor.';
+        } else if (filaInvalida.clave.length > 60) {
+          errors.especificaciones = 'La clave de una especificación no puede exceder 60 caracteres.';
+        } else {
+          errors.especificaciones = 'El valor de una especificación no puede exceder 120 caracteres.';
+        }
+      }
+    }
+
     // Unidad de medida
     const unidad = form.unidad_medida.trim();
     if (!unidad) {
@@ -203,6 +330,17 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
       errors.precio_venta = 'El precio de venta debe ser mayor a 0.';
     } else if (precio > 999999.99) {
       errors.precio_venta = 'El precio no puede exceder L. 999,999.99';
+    }
+
+    if (mostrarPrecioCosto && form.precio_costo !== '') {
+      const costo = Number(form.precio_costo);
+      if (isNaN(costo)) {
+        errors.precio_costo = 'El precio de costo debe ser un número válido.';
+      } else if (costo < 0) {
+        errors.precio_costo = 'El precio de costo debe ser mayor o igual a 0.';
+      } else if (costo > 999999.99) {
+        errors.precio_costo = 'El precio de costo no puede exceder L. 999,999.99';
+      }
     }
 
     // ISV
@@ -263,8 +401,13 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
   const buildCreatePayload = () => ({
     cod_categoria: Number(form.cod_categoria),
     nombre_producto: form.nombre_producto.trim(),
+    descripcion: form.descripcion.trim() || null,
+    especificaciones: construirEspecificaciones(),
     unidad_medida: form.unidad_medida.trim().toUpperCase(),
     precio_venta: Number(form.precio_venta),
+    ...(mostrarPrecioCosto
+      ? { precio_costo: form.precio_costo === '' ? null : Number(form.precio_costo) }
+      : {}),
     stock_inicial: form.stock_inicial === '' ? 0 : Number(form.stock_inicial),
     cod_isv: Number(form.cod_isv),
     estado_producto: form.estado_producto,
@@ -283,8 +426,13 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
     const next = {
       cod_categoria: Number(form.cod_categoria),
       nombre_producto: form.nombre_producto.trim(),
+      descripcion: form.descripcion.trim() || null,
+      especificaciones: construirEspecificaciones(),
       unidad_medida: form.unidad_medida.trim().toUpperCase(),
       precio_venta: Number(form.precio_venta),
+      ...(mostrarPrecioCosto
+        ? { precio_costo: form.precio_costo === '' ? null : Number(form.precio_costo) }
+        : {}),
       cod_isv: Number(form.cod_isv),
       estado_producto: form.estado_producto,
       cod_ubicacion: form.cod_ubicacion ? Number(form.cod_ubicacion) : null,
@@ -295,8 +443,11 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
     const fields = [
       'cod_categoria',
       'nombre_producto',
+      'descripcion',
+      'especificaciones',
       'unidad_medida',
       'precio_venta',
+      ...(mostrarPrecioCosto ? ['precio_costo'] : []),
       'cod_isv',
       'estado_producto',
       'cod_ubicacion',
@@ -305,13 +456,26 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
     ];
 
     // // Detecta TODOS los campos que cambiaron
+    const normalizarComparacion = (valor) => {
+      if (valor === null || valor === undefined) return '';
+      if (typeof valor === 'number') return Number(valor);
+      if (typeof valor === 'object') {
+        try {
+          return JSON.stringify(valor, Object.keys(valor).sort());
+        } catch {
+          return JSON.stringify(valor);
+        }
+      }
+      return String(valor);
+    };
+
     const changedData = {};
     for (const f of fields) {
       const a = original[f];
       const b = next[f];
 
-      const normA = typeof b === 'number' ? Number(a) : String(a ?? '');
-      const normB = typeof b === 'number' ? Number(b) : String(b ?? '');
+      const normA = normalizarComparacion(a);
+      const normB = normalizarComparacion(b);
 
       if (normA !== normB) {
         changedData[f] = next[f];
@@ -367,8 +531,10 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
         setForm({
           cod_categoria: '',
           nombre_producto: '',
+          descripcion: '',
           unidad_medida: 'UND',
           precio_venta: '',
+          precio_costo: '',
           stock_inicial: '',
           stock_nuevo: '',
           stock_agregar: '',
@@ -378,6 +544,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
           stock_minimo: '',
           punto_reorden: '',
         });
+        setEspecificacionesRows(construirEspecificacionesBase());
         handleRemoveImagen();
       }
     } catch (err) {
@@ -388,8 +555,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
   return (
     <div className="jyr-card">
       <div className="jyr-card-header">
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {isEdit ? <FiEdit2 size={16} /> : <FiPlusCircle size={16} />}
+        <h3>
           {isEdit ? 'Editar producto' : 'Crear producto'}
         </h3>
       </div>
@@ -458,7 +624,84 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
             </span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="jyr-form-group">
+            <label className="jyr-form-label">Descripción (opcional)</label>
+            <textarea
+              className={`jyr-form-control ${fieldErrors.descripcion ? 'jyr-input-error' : ''}`}
+              name="descripcion"
+              rows={4}
+              maxLength={500}
+              placeholder="Describe el producto, usos, compatibilidad y detalles relevantes"
+              value={form.descripcion}
+              onChange={onChange}
+              disabled={saving}
+              style={{ resize: 'vertical' }}
+            />
+            {fieldErrors.descripcion && <span className="jyr-field-error">{fieldErrors.descripcion}</span>}
+            <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)' }}>
+              {form.descripcion.trim().length}/500
+            </span>
+          </div>
+
+          <div className="jyr-form-group">
+            <label className="jyr-form-label" style={{ marginBottom: 8 }}>Especificaciones técnicas (Marca, Modelo, Año del carro)</label>
+
+            <div style={{
+              border: '1px solid var(--jyr-gray-200)',
+              borderRadius: 10,
+              padding: 12,
+              background: 'var(--jyr-gray-50, #f9fafb)'
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--jyr-gray-600)', marginBottom: 8 }}>
+                Datos base del producto
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {especificacionesRows.slice(0, clavesEspecificacionFijas.length).map((item, idx) => (
+                  <div
+                    key={`spec-fixed-${idx}`}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '180px 1fr',
+                      gap: 8,
+                      alignItems: 'center'
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: 'var(--jyr-gray-700)',
+                        padding: '0 6px'
+                      }}
+                    >
+                      {clavesEspecificacionFijas[idx]}
+                    </span>
+
+                    <input
+                      className="jyr-form-control"
+                      placeholder={idx === 0 ? 'Ej: Bosch' : idx === 1 ? 'Ej: Civic 2020' : 'Ej: 2018'}
+                      maxLength={120}
+                      value={item.valor}
+                      onChange={(e) => actualizarEspecificacion(idx, 'valor', e.target.value)}
+                      disabled={saving}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {fieldErrors.especificaciones && <span className="jyr-field-error">{fieldErrors.especificaciones}</span>}
+            <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)' }}>
+              Ejemplo: Marca = Bosch, Modelo = Civic 2020, Año del carro = 2018.
+            </span>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: mostrarPrecioCosto ? '1fr 1fr 1fr' : '1fr 1fr',
+            gap: 16
+          }}>
             <div className="jyr-form-group">
               <label className="jyr-form-label">Unidad medida</label>
               <input
@@ -490,7 +733,49 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
               />
               {fieldErrors.precio_venta && <span className="jyr-field-error">{fieldErrors.precio_venta}</span>}
             </div>
+
+            {mostrarPrecioCosto && (
+              <div className="jyr-form-group">
+                <label className="jyr-form-label">Precio costo (L.)</label>
+                <input
+                  className={`jyr-form-control ${fieldErrors.precio_costo ? 'jyr-input-error' : ''}`}
+                  name="precio_costo"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="999999.99"
+                  onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
+                  placeholder="Opcional"
+                  value={form.precio_costo}
+                  onChange={onChange}
+                  disabled={saving}
+                />
+                {fieldErrors.precio_costo && <span className="jyr-field-error">{fieldErrors.precio_costo}</span>}
+              </div>
+            )}
           </div>
+
+          {mostrarMargen && mostrarPrecioCosto && (
+            <div className="jyr-form-group">
+              <label className="jyr-form-label">Margen de ganancia (automático)</label>
+              <div
+                className="jyr-form-control"
+                style={{
+                  background: 'var(--jyr-gray-50, #f9fafb)',
+                  color: margenCalculado === null
+                    ? 'var(--jyr-gray-500)'
+                    : (margenCalculado >= 0 ? 'var(--jyr-success, #16a34a)' : 'var(--jyr-danger, #dc2626)'),
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono)'
+                }}
+              >
+                {margenCalculado === null ? 'Completa precio venta y costo' : `${margenCalculado.toFixed(2)}%`}
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)' }}>
+                Fórmula: ((precio_venta - precio_costo) / precio_venta) × 100.
+              </span>
+            </div>
+          )}
 
           {!isEdit && (
             <div className="jyr-form-group">
@@ -746,11 +1031,11 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          <div style={{ display: 'flex', gap: 10, marginTop: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
             <button
               type="submit"
-              className={`jyr-btn ${isEdit ? 'jyr-btn-primary' : 'jyr-btn-danger'}`}
-              style={{ flex: 1 }}
+              className="jyr-btn jyr-btn-primary"
+              style={{ minWidth: 190 }}
               disabled={saving}
             >
               {saving ? 'Guardando...' : isEdit ? 'Actualizar' : 'Guardar producto'}
@@ -760,6 +1045,7 @@ const ProductoForm = ({ onSubmit, saving, selected, duplicateFrom, onCancelEdit,
               <button
                 type="button"
                 className="jyr-btn jyr-btn-outline"
+                style={{ minWidth: 140 }}
                 disabled={saving}
                 onClick={() => onCancelEdit && onCancelEdit()}
               >

@@ -27,6 +27,29 @@ export const validarCrearProducto = [
     .isLength({ min: 2, max: 100 }).withMessage('El nombre debe tener entre 2 y 100 caracteres.')
     .trim(),
 
+  body('descripcion')
+    .optional({ values: 'null' })
+    .isString().withMessage('La descripción debe ser texto.')
+    .isLength({ max: 500 }).withMessage('La descripción no puede exceder 500 caracteres.')
+    .trim(),
+
+  body('especificaciones')
+    .optional({ values: 'null' })
+    .isObject().withMessage('Las especificaciones deben enviarse como un objeto clave-valor.')
+    .custom((val) => {
+      const entries = Object.entries(val || {});
+      if (entries.length > 30) throw new Error('No se permiten más de 30 especificaciones.');
+
+      for (const [clave, valor] of entries) {
+        if (!String(clave || '').trim()) throw new Error('Cada especificación debe tener una clave válida.');
+        if (!String(valor || '').trim()) throw new Error('Cada especificación debe tener un valor válido.');
+        if (String(clave).trim().length > 60) throw new Error('La clave de una especificación no puede exceder 60 caracteres.');
+        if (String(valor).trim().length > 120) throw new Error('El valor de una especificación no puede exceder 120 caracteres.');
+      }
+
+      return true;
+    }),
+
   body('unidad_medida')
     .notEmpty().withMessage('La unidad de medida es obligatoria.')
     .isString().withMessage('La unidad de medida debe ser texto.')
@@ -38,6 +61,14 @@ export const validarCrearProducto = [
     .isFloat({ gt: 0 }).withMessage('El precio de venta debe ser mayor a 0.')
     .custom((val) => {
       if (Number(val) > 999999.99) throw new Error('El precio no puede exceder L. 999,999.99');
+      return true;
+    }),
+
+  body('precio_costo')
+    .optional({ values: 'null' })
+    .isFloat({ min: 0 }).withMessage('El precio de costo debe ser mayor o igual a 0.')
+    .custom((val) => {
+      if (Number(val) > 999999.99) throw new Error('El precio de costo no puede exceder L. 999,999.99');
       return true;
     }),
 
@@ -112,7 +143,7 @@ export const validarActualizarProducto = [
       const keys = Object.keys(datos);
       if (keys.length === 0) return true;
 
-      const camposPermitidos = ['cod_categoria', 'nombre_producto', 'unidad_medida', 'precio_venta', 'cod_isv', 'estado_producto', 'cod_ubicacion', 'stock_minimo', 'punto_reorden'];
+      const camposPermitidos = ['cod_categoria', 'nombre_producto', 'descripcion', 'especificaciones', 'unidad_medida', 'precio_venta', 'precio_costo', 'cod_isv', 'estado_producto', 'cod_ubicacion', 'stock_minimo', 'punto_reorden'];
 
       // Validar cada campo enviado
       for (const campo of keys) {
@@ -134,6 +165,26 @@ export const validarActualizarProducto = [
             if (!valor || typeof valor !== 'string' || valor.trim().length < 2) throw new Error('nombre_producto debe tener al menos 2 caracteres.');
             if (valor.trim().length > 100) throw new Error('nombre_producto no puede exceder 100 caracteres.');
             break;
+          case 'descripcion':
+            if (valor !== null && typeof valor !== 'string') throw new Error('descripcion debe ser texto o null.');
+            if (valor !== null && valor.trim().length > 500) throw new Error('descripcion no puede exceder 500 caracteres.');
+            break;
+          case 'especificaciones':
+            if (valor !== null && (typeof valor !== 'object' || Array.isArray(valor))) {
+              throw new Error('especificaciones debe ser un objeto clave-valor o null.');
+            }
+            if (valor !== null) {
+              const entries = Object.entries(valor || {});
+              if (entries.length > 30) throw new Error('No se permiten más de 30 especificaciones.');
+
+              for (const [clave, valorEspecificacion] of entries) {
+                if (!String(clave || '').trim()) throw new Error('Cada especificación debe tener una clave válida.');
+                if (!String(valorEspecificacion || '').trim()) throw new Error('Cada especificación debe tener un valor válido.');
+                if (String(clave).trim().length > 60) throw new Error('La clave de una especificación no puede exceder 60 caracteres.');
+                if (String(valorEspecificacion).trim().length > 120) throw new Error('El valor de una especificación no puede exceder 120 caracteres.');
+              }
+            }
+            break;
           case 'unidad_medida':
             if (!valor || typeof valor !== 'string' || valor.trim().length < 1) throw new Error('unidad_medida es obligatoria.');
             if (valor.trim().length > 10) throw new Error('unidad_medida no puede exceder 10 caracteres.');
@@ -141,6 +192,10 @@ export const validarActualizarProducto = [
           case 'precio_venta':
             if (Number(valor) <= 0) throw new Error('precio_venta debe ser mayor a 0.');
             if (Number(valor) > 999999.99) throw new Error('precio_venta no puede exceder 999,999.99.');
+            break;
+          case 'precio_costo':
+            if (valor !== null && valor !== '' && Number(valor) < 0) throw new Error('precio_costo debe ser mayor o igual a 0.');
+            if (valor !== null && valor !== '' && Number(valor) > 999999.99) throw new Error('precio_costo no puede exceder 999,999.99.');
             break;
           case 'cod_isv':
             if (!Number.isInteger(Number(valor)) || Number(valor) < 1) throw new Error('cod_isv debe ser un entero positivo.');

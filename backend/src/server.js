@@ -29,9 +29,12 @@ app.listen(PORT, async () => {
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMP');
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS modificado_por INTEGER');
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS fecha_modificacion TIMESTAMP');
+    await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS precio_costo DECIMAL(10,2)');
+    await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS descripcion VARCHAR(500)');
+    await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS especificaciones JSONB');
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS stock_minimo INTEGER');
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS punto_reorden INTEGER');
-    console.log('✅ Esquema producto verificado (auditoria)');
+    console.log('✅ Esquema producto verificado (auditoria, costo y detalle)');
 
     // Compatibilidad de esquema para facturación de reparación (descripción manual)
     await sequelize.query('ALTER TABLE detalle_factura ADD COLUMN IF NOT EXISTS descripcion_item TEXT');

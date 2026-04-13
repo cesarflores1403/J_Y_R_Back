@@ -18,7 +18,7 @@ const estadoBadge = {
   Descontinuado: { className: 'jyr-badge jyr-badge-warning', label: 'Descontinuado' },
 };
 
-const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCambiarEstadoMasivo, onSubirImagen, onEliminarImagen, onVerFicha, onDuplicate }) => {
+const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCambiarEstadoMasivo, onSubirImagen, onEliminarImagen, onVerFicha, onDuplicate, mostrarMargen = false }) => {
   // HU-07: Categorias dinamicas desde BD
   const { categorias } = useCategorias();
   const fileInputRef = useRef(null); // // HU-08: ref para input file oculto
@@ -39,6 +39,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroBajoStock, setFiltroBajoStock] = useState(false);
+  const [mostrarColumnaMargen, setMostrarColumnaMargen] = useState(false);
   const [ordenarPor, setOrdenarPor] = useState('cod_producto');
   const [ordenDir, setOrdenDir] = useState('asc');
   const [pagina, setPagina] = useState(1);
@@ -70,6 +71,16 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
     return stockTotal <= 0;
   };
 
+  const calcularMargen = (p) => {
+    if (Number.isFinite(Number(p.margen_ganancia))) return Number(p.margen_ganancia);
+
+    const venta = Number(p.precio_venta);
+    const costo = Number(p.precio_costo);
+    if (!Number.isFinite(venta) || venta <= 0) return null;
+    if (!Number.isFinite(costo) || costo < 0) return null;
+    return Number((((venta - costo) / venta) * 100).toFixed(2));
+  };
+
   // =====================================================
   // 1. FILTRAR: busqueda + categoria + estado
   // =====================================================
@@ -77,12 +88,13 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
     const q = busqueda.trim().toLowerCase();
 
     return productos.filter((p) => {
-      // Busqueda por codigo o nombre
+      // Busqueda por codigo, nombre o descripcion
       if (q) {
         const codigo = (p.codigo_producto || `PROD-${String(p.cod_producto).padStart(4, '0')}`).toLowerCase();
         const nombre = (p.nombre_producto || '').toLowerCase();
+        const descripcion = (p.descripcion || '').toLowerCase();
         const codNum = String(p.cod_producto);
-        if (!codigo.includes(q) && !nombre.includes(q) && !codNum.includes(q)) {
+        if (!codigo.includes(q) && !nombre.includes(q) && !descripcion.includes(q) && !codNum.includes(q)) {
           return false;
         }
       }
@@ -398,7 +410,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
           }} />
           <input
             className="jyr-form-control"
-            placeholder="Buscar por código o nombre..."
+            placeholder="Buscar por código, nombre o descripción..."
             value={busqueda}
             onChange={(e) => handleBusqueda(e.target.value)}
             style={{ paddingLeft: 32, fontSize: 13 }}
@@ -443,6 +455,18 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
         >
           Bajo stock
         </button>
+
+        {mostrarMargen && (
+          <button
+            type="button"
+            className={`jyr-btn jyr-btn-sm ${mostrarColumnaMargen ? 'jyr-btn-primary' : 'jyr-btn-outline'}`}
+            onClick={() => setMostrarColumnaMargen((prev) => !prev)}
+            style={{ fontSize: 12 }}
+            title="Mostrar u ocultar columna de margen"
+          >
+            {mostrarColumnaMargen ? 'Ocultar margen' : 'Mostrar margen'}
+          </button>
+        )}
 
         {/* Limpiar filtros */}
         {hayFiltros && (
@@ -589,6 +613,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
               <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('precio_venta')}>
                 Precio <SortIcon campo="precio_venta" />
               </th>
+              {mostrarMargen && mostrarColumnaMargen && <th>Margen</th>}
               <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('stock_total')}>
                 Stock <SortIcon campo="stock_total" />
               </th>
@@ -705,6 +730,25 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                       L. {Number(p.precio_venta).toFixed(2)}
                     </td>
+                    {mostrarMargen && mostrarColumnaMargen && (
+                      <td>
+                        {(() => {
+                          const margen = calcularMargen(p);
+                          if (margen === null) {
+                            return <span style={{ fontSize: 12, color: 'var(--jyr-gray-400)' }}>N/D</span>;
+                          }
+
+                          return (
+                            <span
+                              className={`jyr-badge ${margen >= 0 ? 'jyr-badge-success' : 'jyr-badge-danger'}`}
+                              title="((precio_venta - precio_costo) / precio_venta) × 100"
+                            >
+                              {margen.toFixed(2)}%
+                            </span>
+                          );
+                        })()}
+                      </td>
+                    )}
                     <td>
                       <span
                         className={`jyr-badge ${bajoStock ? 'jyr-badge-danger' : (stockActual > 0 ? 'jyr-badge-success' : 'jyr-badge-danger')}`}
@@ -786,7 +830,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
               })
             ) : (
               <tr>
-                <td colSpan="12" style={{ textAlign: 'center', padding: 40, color: 'var(--jyr-gray-400)' }}>
+                <td colSpan={mostrarMargen && mostrarColumnaMargen ? 13 : 12} style={{ textAlign: 'center', padding: 40, color: 'var(--jyr-gray-400)' }}>
                   {hayFiltros
                     ? 'No se encontraron productos con los filtros aplicados.'
                     : 'No hay productos registrados.'

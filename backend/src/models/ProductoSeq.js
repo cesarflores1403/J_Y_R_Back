@@ -11,8 +11,11 @@ const ProductoSeq = sequelize.define('producto', {
   },
   cod_categoria: { type: DataTypes.INTEGER, allowNull: false },
   nombre_producto: { type: DataTypes.STRING(100), allowNull: false },
+  descripcion: { type: DataTypes.STRING(500), allowNull: true, defaultValue: null },
+  especificaciones: { type: DataTypes.JSONB, allowNull: true, defaultValue: null },
   unidad_medida: { type: DataTypes.STRING(10) },
   precio_venta: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
+  precio_costo: { type: DataTypes.DECIMAL(10, 2), allowNull: true, defaultValue: null },
   cod_isv: { type: DataTypes.INTEGER, allowNull: true },
   estado_producto: {
     type: DataTypes.STRING(15),

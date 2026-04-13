@@ -70,8 +70,11 @@ export const useProducto = () => {
       const camposLegibles = {
         cod_categoria: 'Categoría',
         nombre_producto: 'Nombre',
+        descripcion: 'Descripción',
+        especificaciones: 'Especificaciones',
         unidad_medida: 'Unidad',
         precio_venta: 'Precio',
+        precio_costo: 'Precio de costo',
         cod_isv: 'ISV',
         estado_producto: 'Estado',
         stock_minimo: 'Stock mínimo',

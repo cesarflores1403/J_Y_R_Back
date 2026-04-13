@@ -11,10 +11,19 @@ export const getProducto = async (req, res, next) => {
     const incluirAuditoria = rolUsuario === 'Administrador' || rolUsuario === 'Super Administrador';
     const data = await productoService.getProductoConAuditoria({ incluirAuditoria }); // // Obtener productos desde service
 
+    const dataFiltrada = rolUsuario === 'Cajero'
+      ? (data || []).map((p) => {
+        const sinCosto = { ...p };
+        delete sinCosto.precio_costo;
+        delete sinCosto.margen_ganancia;
+        return sinCosto;
+      })
+      : data;
+
     return sendOk(res, {
       status: 200, // // OK
       message: 'Productos obtenidos correctamente', // // Mensaje
-      data // // Lista de productos
+      data: dataFiltrada // // Lista de productos
     });
   } catch (err) {
     next(err); // // Envía al errorHandler global
@@ -78,8 +87,11 @@ export const updateProducto = async (req, res, next) => {
     const nombresLegibles = {
       cod_categoria: 'Categoría',
       nombre_producto: 'Nombre',
+      descripcion: 'Descripción',
+      especificaciones: 'Especificaciones',
       unidad_medida: 'Unidad de medida',
       precio_venta: 'Precio de venta',
+      precio_costo: 'Precio de costo',
       cod_isv: 'ISV',
       estado_producto: 'Estado',
       cod_ubicacion: 'Ubicación',
