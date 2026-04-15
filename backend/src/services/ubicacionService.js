@@ -1,4 +1,4 @@
-import { Op, col, fn, where } from 'sequelize';
+import { Op, cast, col, fn, where } from 'sequelize';
 import Ubicacion from '../models/Ubicacion.js';
 import { sequelize } from '../config/sequelize.js';
 
@@ -90,12 +90,32 @@ class UbicacionService {
     return formatearCodigoProducto(producto.cod_producto);
   }
 
-  async listar({ includeInactive = 'false', page = 1, limit = LIMITE_DEFECTO }) {
+  async listar({ includeInactive = 'false', page = 1, limit = LIMITE_DEFECTO, search = '', buscar = '', q = '' }) {
     const incluirInactivas = parsearBoolean(includeInactive);
     const pagina = parsearEntero(page, 1, { min: 1 });
     const limite = parsearEntero(limit, LIMITE_DEFECTO, { min: 1, max: LIMITE_MAXIMO });
     const offset = (pagina - 1) * limite;
+    const criterioBusqueda = normalizarTexto(search ?? buscar ?? q);
+    const criterioLike = `%${String(criterioBusqueda || '').toLowerCase()}%`;
     const whereClause = incluirInactivas ? {} : { estado_ubi: ESTADO_ACTIVA };
+
+    if (criterioBusqueda) {
+      whereClause[Op.and] = [
+        {
+          [Op.or]: [
+            where(fn('LOWER', cast(col('cod_ubicacion'), 'TEXT')), { [Op.like]: criterioLike }),
+            where(fn('LOWER', fn('COALESCE', col('codigo_producto'), '')), { [Op.like]: criterioLike }),
+            where(fn('LOWER', cast(col('cod_producto'), 'TEXT')), { [Op.like]: criterioLike }),
+            where(fn('LOWER', fn('COALESCE', col('pasillo'), '')), { [Op.like]: criterioLike }),
+            where(fn('LOWER', fn('COALESCE', col('estanteria'), '')), { [Op.like]: criterioLike }),
+            where(fn('LOWER', fn('COALESCE', col('nivel_1'), '')), { [Op.like]: criterioLike }),
+            where(fn('LOWER', fn('COALESCE', col('nivel_2'), '')), { [Op.like]: criterioLike }),
+            where(fn('LOWER', fn('COALESCE', col('descripcion'), '')), { [Op.like]: criterioLike }),
+            where(fn('LOWER', fn('COALESCE', col('estado_ubi'), '')), { [Op.like]: criterioLike })
+          ]
+        }
+      ];
+    }
 
     const { rows, count } = await Ubicacion.findAndCountAll({
       where: whereClause,
@@ -119,7 +139,8 @@ class UbicacionService {
         total: Number(count || 0),
         page: pagina,
         limit: limite,
-        totalPages: totalPaginas
+        totalPages: totalPaginas,
+        search: criterioBusqueda || ''
       }
     };
   }

@@ -3,10 +3,13 @@ import Alert from '../common/Alert.jsx';
 
 const UbicacionesFiltrosPanel = ({
   error = '',
+  searchValue = '',
   includeInactive = false,
   totalActivas = 0,
   totalInactivas = 0,
   onCloseError,
+  onSearchChange,
+  onClearSearch,
   onToggleInactivas
 }) => (
   <div className="jyr-card kdx-filtros-card">
@@ -21,6 +24,28 @@ const UbicacionesFiltrosPanel = ({
         </div>
 
         <div className="row g-2">
+          <div className="col-12 col-md-4">
+            <label className="form-label mb-1 kdx-label">Busqueda unica</label>
+            <div className="input-group">
+              <input
+                type="text"
+                className="form-control kdx-control"
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Codigo, pasillo, estanteria, nivel, descripcion, estado"
+              />
+              {searchValue && (
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={onClearSearch}
+                  title="Limpiar busqueda"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+          </div>
           <div className="col-12 col-md-4">
             <label className="form-label mb-1 kdx-label">Estado de ubicaciones</label>
             <div className="form-check form-switch ubi-switch-wrap">

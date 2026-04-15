@@ -13,6 +13,18 @@ router.get('/', [
     .optional()
     .isBoolean()
     .withMessage('includeInactive debe ser true o false'),
+  query('search')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 120 })
+    .withMessage('search debe ser texto de hasta 120 caracteres'),
+  query('buscar')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 120 })
+    .withMessage('buscar debe ser texto de hasta 120 caracteres'),
   query('page')
     .optional()
     .isInt({ min: 1 })

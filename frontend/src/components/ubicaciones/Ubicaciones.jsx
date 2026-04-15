@@ -20,6 +20,7 @@ const formularioInicial = {
 const MENSAJE_DUPLICADO = 'Ya existe una ubicacion con esa combinacion fisica.';
 const MENSAJE_PRODUCTOS = 'No se pudo cargar el catalogo de productos.';
 const TAMANIO_PAGINA = 10;
+const DEBOUNCE_BUSQUEDA_MS = 350;
 
 const formatearCodigoProducto = (producto) => {
   const codigo = String(producto?.codigo_producto || '').trim().toUpperCase();
@@ -91,6 +92,8 @@ const normalizarRespuestaUbicaciones = (payload, fallbackLimit = TAMANIO_PAGINA)
   };
 };
 
+const normalizarBusqueda = (valor = '') => String(valor || '').trim().replace(/\s+/g, ' ');
+
 const Ubicaciones = () => {
   const [ubicaciones, setUbicaciones] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +103,11 @@ const Ubicaciones = () => {
   const [error, setError] = useState('');
   const [modalAbierto, setModalAbierto] = useState(false);
   const [includeInactive, setIncludeInactive] = useState(false);
-  const [filtrosAplicados, setFiltrosAplicados] = useState({ includeInactive: false });
+  const [searchInput, setSearchInput] = useState('');
+  const [filtrosAplicados, setFiltrosAplicados] = useState({
+    includeInactive: false,
+    search: ''
+  });
   const [paginaActual, setPaginaActual] = useState(1);
   const [meta, setMeta] = useState({
     total: 0,
@@ -119,6 +126,7 @@ const Ubicaciones = () => {
 
       const { data } = await ubicacionService.listar({
         includeInactive: filtrosAplicados.includeInactive ? 'true' : 'false',
+        search: filtrosAplicados.search || undefined,
         page: paginaActual,
         limit: TAMANIO_PAGINA
       });
@@ -132,7 +140,7 @@ const Ubicaciones = () => {
     } finally {
       setLoading(false);
     }
-  }, [filtrosAplicados.includeInactive, paginaActual]);
+  }, [filtrosAplicados.includeInactive, filtrosAplicados.search, paginaActual]);
 
   useEffect(() => {
     cargarUbicaciones();
@@ -197,6 +205,22 @@ const Ubicaciones = () => {
   useEffect(() => {
     setPaginaActual((prev) => Math.min(Math.max(prev, 1), totalPaginas || 1));
   }, [totalPaginas]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const criterio = normalizarBusqueda(searchInput);
+      setFiltrosAplicados((prev) => {
+        if (prev.search === criterio) return prev;
+        return {
+          ...prev,
+          search: criterio
+        };
+      });
+      setPaginaActual(1);
+    }, DEBOUNCE_BUSQUEDA_MS);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const abrirCrear = () => {
     setEditandoId(null);
@@ -313,7 +337,20 @@ const Ubicaciones = () => {
     setError('');
     setIncludeInactive(checked);
     setPaginaActual(1);
-    setFiltrosAplicados({ includeInactive: checked });
+    setFiltrosAplicados((prev) => ({
+      ...prev,
+      includeInactive: checked,
+      search: normalizarBusqueda(searchInput)
+    }));
+  };
+
+  const limpiarBusqueda = () => {
+    setSearchInput('');
+    setPaginaActual(1);
+    setFiltrosAplicados((prev) => ({
+      ...prev,
+      search: ''
+    }));
   };
 
   const cambiarPagina = (nuevaPagina) => {
@@ -345,10 +382,13 @@ const Ubicaciones = () => {
 
       <UbicacionesFiltrosPanel
         error={error}
+        searchValue={searchInput}
         includeInactive={includeInactive}
         totalActivas={totalActivas}
         totalInactivas={Math.max(totalUbicaciones - totalActivas, 0)}
         onCloseError={() => setError('')}
+        onSearchChange={setSearchInput}
+        onClearSearch={limpiarBusqueda}
         onToggleInactivas={manejarToggleInactivas}
       />
 
