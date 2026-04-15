@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FiDatabase, FiLock, FiPlus } from 'react-icons/fi';
 import { inventarioReservasApi } from './inventarioReservas.api.js';
 import { inventarioMovimientosApi } from './inventarioMovimientos.api.js';
 import { useUbicaciones } from '../../hooks/useUbicaciones.js';
 import ReservaForm from './ReservaForm.jsx';
-import ReservasFiltros from './ReservasFiltros.jsx';
-import ReservasTabla from './ReservasTabla.jsx';
+import ReservaAccionModal from './ReservaAccionModal.jsx';
+import ReservasHeader from './ReservasHeader.jsx';
+import ReservasFiltrosCard from './ReservasFiltrosCard.jsx';
+import ReservasTablaCard from './ReservasTablaCard.jsx';
 import BootstrapPagination from '../common/BootstrapPagination.jsx';
 
 const LIMITE_PAGINA = 10;
@@ -99,128 +100,6 @@ const obtenerMensajeError = (error) => {
   if (status === 401) return serverMessage || 'Sesion expirada. Inicia sesion nuevamente';
   if (status === 403) return serverMessage || 'No tienes permisos para operar reservas';
   return serverMessage || 'Error inesperado en reservas de inventario';
-};
-
-const ReservaAccionModal = ({
-  abierto = false,
-  tipo = '',
-  reserva = null,
-  loading = false,
-  onClose,
-  onConfirm
-}) => {
-  const [form, setForm] = useState({
-    motivo: '',
-    referencia: '',
-    observaciones: ''
-  });
-
-  useEffect(() => {
-    if (!abierto) {
-      setForm({
-        motivo: '',
-        referencia: '',
-        observaciones: ''
-      });
-    }
-  }, [abierto, tipo, reserva?.cod_reserva]);
-
-  if (!abierto || !reserva) return null;
-
-  const cerrarModal = () => {
-    if (loading) return;
-    if (typeof onClose === 'function') onClose();
-  };
-
-  const esLiberar = tipo === 'liberar';
-  const titulo = esLiberar ? 'Liberar reserva' : 'Consumir reserva';
-  const boton = esLiberar ? 'Liberar reserva' : 'Consumir reserva';
-  const botonClase = esLiberar ? 'btn btn-warning' : 'btn jyr-btn-primary';
-
-  return (
-    <div
-      className="modal show d-block"
-      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) cerrarModal();
-      }}
-    >
-      <div className="modal-dialog">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">{titulo}</h5>
-            <button type="button" className="btn-close" onClick={cerrarModal} disabled={loading} />
-          </div>
-          <form
-            onSubmit={async (event) => {
-              event.preventDefault();
-              if (typeof onConfirm === 'function') {
-                await onConfirm({
-                  motivo: String(form.motivo || '').trim(),
-                  referencia: String(form.referencia || '').trim(),
-                  observaciones: String(form.observaciones || '').trim()
-                });
-              }
-            }}
-          >
-            <div className="modal-body">
-              <div className="alert alert-light border mb-3">
-                <strong>Reserva:</strong> #{reserva.cod_reserva} <br />
-                <strong>Producto:</strong> {reserva.nombre_producto || reserva.cod_producto} <br />
-                <strong>Cantidad:</strong> {reserva.cantidad}
-              </div>
-
-              {esLiberar ? (
-                <div className="mb-3">
-                  <label className="form-label">Motivo (opcional)</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={form.motivo}
-                    onChange={(event) => setForm((prev) => ({ ...prev, motivo: event.target.value }))}
-                    maxLength={200}
-                    placeholder="Motivo de liberacion"
-                  />
-                </div>
-              ) : (
-                <div className="mb-3">
-                  <label className="form-label">Referencia (opcional)</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={form.referencia}
-                    onChange={(event) => setForm((prev) => ({ ...prev, referencia: event.target.value }))}
-                    maxLength={200}
-                    placeholder="Referencia de consumo"
-                  />
-                </div>
-              )}
-
-              <div className="mb-2">
-                <label className="form-label">Observaciones (opcional)</label>
-                <textarea
-                  className="form-control"
-                  rows="3"
-                  value={form.observaciones}
-                  onChange={(event) => setForm((prev) => ({ ...prev, observaciones: event.target.value }))}
-                  maxLength={500}
-                  placeholder="Notas de la operacion"
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={cerrarModal} disabled={loading}>
-                Cancelar
-              </button>
-              <button type="submit" className={botonClase} disabled={loading}>
-                {loading ? 'Procesando...' : boton}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 const InventarioReservasPage = () => {
@@ -421,84 +300,34 @@ const InventarioReservasPage = () => {
   const finMostrado = meta.total > 0 ? Math.min(meta.pagina * meta.limite, meta.total) : 0;
   return (
     <section className="kdx-shell mt-4">
-      <div className="kdx-hero">
-        <div className="kdx-hero-head">
-          <div className="kdx-title-wrap">
-            <div className="kdx-title-icon">
-              <FiLock />
-            </div>
-            <div>
-              <h5 className="mb-0">Reservas</h5>
-              <p className="kdx-subtitle mb-0">Reserva de stock por producto y ubicacion con seguimiento de estado.</p>
-            </div>
-          </div>
+      <ReservasHeader
+        total={meta.total}
+        onNuevaReserva={() => setModalReservaAbierto(true)}
+      />
 
-          <div className="ubi-hero-actions">
-            <div className="kdx-mini-kpi">
-              <span className="kdx-mini-kpi-label">Total</span>
-              <strong>{meta.total}</strong>
-            </div>
-            <button
-              type="button"
-              className="btn kdx-btn kdx-btn-accent"
-              onClick={() => setModalReservaAbierto(true)}
-            >
-              <FiPlus className="me-1" />
-              Nueva reserva
-            </button>
-          </div>
-        </div>
-      </div>
+      <ReservasFiltrosCard
+        success={success}
+        error={error}
+        resumenPagina={resumenPagina}
+        filtros={filtros}
+        productos={productos}
+        ubicaciones={ubicaciones}
+        loading={loading}
+        onChange={manejarCambioFiltro}
+        onAplicar={aplicarFiltros}
+        onLimpiar={limpiarFiltros}
+      />
 
-      <div className="jyr-card kdx-filtros-card">
-        <div className="jyr-card-body">
-          {success && (
-            <div className="alert alert-success kdx-error-alert" role="alert">
-              {success}
-            </div>
-          )}
-          {error && (
-            <div className="alert alert-danger kdx-error-alert" role="alert">
-              {error}
-            </div>
-          )}
-
-          <div className="alert alert-light border mb-3">
-            <strong>En pagina:</strong> Activas {resumenPagina.activas} | Liberadas {resumenPagina.liberadas} | Consumidas {resumenPagina.consumidas}
-          </div>
-
-          <ReservasFiltros
-            filtros={filtros}
-            productos={productos}
-            ubicaciones={ubicaciones}
-            loading={loading}
-            onChange={manejarCambioFiltro}
-            onAplicar={aplicarFiltros}
-            onLimpiar={limpiarFiltros}
-          />
-        </div>
-      </div>
-
-      <div className="jyr-card kdx-table-card">
-        <div className="kdx-table-topbar">
-          <div className="kdx-table-topbar-left">
-            <FiDatabase />
-            <span>Reservas registradas</span>
-          </div>
-          <div className="kdx-table-topbar-right">
-            Mostrando {inicioMostrado}-{finMostrado} de {meta.total}
-          </div>
-        </div>
-        <div className="jyr-card-body p-0">
-          <ReservasTabla
-            filas={filas}
-            loading={loading}
-            procesandoId={procesandoId}
-            onLiberar={(reserva) => abrirAccion('liberar', reserva)}
-            onConsumir={(reserva) => abrirAccion('consumir', reserva)}
-          />
-        </div>
-      </div>
+      <ReservasTablaCard
+        inicioMostrado={inicioMostrado}
+        finMostrado={finMostrado}
+        total={meta.total}
+        filas={filas}
+        loading={loading}
+        procesandoId={procesandoId}
+        onLiberar={(reserva) => abrirAccion('liberar', reserva)}
+        onConsumir={(reserva) => abrirAccion('consumir', reserva)}
+      />
 
       <BootstrapPagination
         pagina={meta.pagina}

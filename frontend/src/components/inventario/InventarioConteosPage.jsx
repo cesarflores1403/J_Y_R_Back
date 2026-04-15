@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FiClipboard, FiDatabase, FiPlus } from 'react-icons/fi';
 import { inventarioConteosApi } from './inventarioConteos.api.js';
 import { inventarioMovimientosApi } from './inventarioMovimientos.api.js';
-import ConteosFiltros from './ConteosFiltros.jsx';
-import ConteosTabla from './ConteosTabla.jsx';
-import ConteosDetallesTabla from './ConteosDetallesTabla.jsx';
+import ConteosHeader from './ConteosHeader.jsx';
+import ConteosFiltrosCard from './ConteosFiltrosCard.jsx';
+import ConteosTablaCard from './ConteosTablaCard.jsx';
+import ConteoSeleccionadoPanel from './ConteoSeleccionadoPanel.jsx';
+import ConteosDetallesCard from './ConteosDetallesCard.jsx';
+import { ConteoAperturaModal, ConteoCierreModal, ConteoDetalleModal } from './ConteosModals.jsx';
 import { useUbicaciones } from '../../hooks/useUbicaciones.js';
 import BootstrapPagination from '../common/BootstrapPagination.jsx';
 
@@ -486,6 +488,13 @@ const InventarioConteosPage = () => {
     }
   };
 
+  const actualizarFormDetalle = (campo, valor) => {
+    setFormDetalle((prev) => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
   const inicioConteos = meta.total > 0 ? ((meta.pagina - 1) * meta.limite) + 1 : 0;
   const finConteos = meta.total > 0 ? Math.min(meta.pagina * meta.limite, meta.total) : 0;
 
@@ -494,76 +503,30 @@ const InventarioConteosPage = () => {
 
   return (
     <section className="kdx-shell mt-4">
-      <div className="kdx-hero">
-        <div className="kdx-hero-head">
-          <div className="kdx-title-wrap">
-            <div className="kdx-title-icon">
-              <FiClipboard />
-            </div>
-            <div>
-              <h5 className="mb-0">Conteos</h5>
-              <p className="kdx-subtitle mb-0">Conteo fisico con diferencia persistida, ajuste trazable y cierre transaccional.</p>
-            </div>
-          </div>
+      <ConteosHeader
+        total={meta.total}
+        onNuevoConteo={() => setModalAperturaAbierto(true)}
+      />
 
-          <div className="ubi-hero-actions">
-            <div className="kdx-mini-kpi">
-              <span className="kdx-mini-kpi-label">Total</span>
-              <strong>{meta.total}</strong>
-            </div>
-            <button
-              type="button"
-              className="btn kdx-btn kdx-btn-accent"
-              onClick={() => setModalAperturaAbierto(true)}
-            >
-              <FiPlus className="me-1" />
-              Nuevo conteo
-            </button>
-          </div>
-        </div>
-      </div>
+      <ConteosFiltrosCard
+        success={success}
+        error={error}
+        filtros={filtros}
+        loading={loadingConteos}
+        onChange={manejarCambioFiltro}
+        onAplicar={aplicarFiltros}
+        onLimpiar={limpiarFiltros}
+      />
 
-      <div className="jyr-card kdx-filtros-card">
-        <div className="jyr-card-body">
-          {success && (
-            <div className="alert alert-success kdx-error-alert" role="alert">
-              {success}
-            </div>
-          )}
-          {error && (
-            <div className="alert alert-danger kdx-error-alert" role="alert">
-              {error}
-            </div>
-          )}
-          <ConteosFiltros
-            filtros={filtros}
-            loading={loadingConteos}
-            onChange={manejarCambioFiltro}
-            onAplicar={aplicarFiltros}
-            onLimpiar={limpiarFiltros}
-          />
-        </div>
-      </div>
-
-      <div className="jyr-card kdx-table-card mt-3">
-        <div className="kdx-table-topbar">
-          <div className="kdx-table-topbar-left">
-            <FiDatabase />
-            <span>Conteos registrados</span>
-          </div>
-          <div className="kdx-table-topbar-right">
-            Mostrando {inicioConteos}-{finConteos} de {meta.total}
-          </div>
-        </div>
-        <div className="jyr-card-body p-0">
-          <ConteosTabla
-            filas={conteos}
-            loading={loadingConteos}
-            conteoActivoId={Number(conteoActivo?.cod_conteo || 0)}
-            onSeleccionar={seleccionarConteo}
-          />
-        </div>
-      </div>
+      <ConteosTablaCard
+        inicioConteos={inicioConteos}
+        finConteos={finConteos}
+        total={meta.total}
+        filas={conteos}
+        loading={loadingConteos}
+        conteoActivoId={Number(conteoActivo?.cod_conteo || 0)}
+        onSeleccionar={seleccionarConteo}
+      />
 
       <BootstrapPagination
         pagina={meta.pagina}
@@ -574,81 +537,24 @@ const InventarioConteosPage = () => {
 
       {conteoActivo?.cod_conteo && (
         <>
-          <div className="jyr-card mt-3">
-            <div className="jyr-card-body">
-              <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
-                <div>
-                  <h6 className="mb-1">
-                    Conteo seleccionado #{conteoActivo.cod_conteo}
-                  </h6>
-                  <p className="text-muted mb-2">
-                    Estado: <strong>{conteoActivo.estado || '-'}</strong> | Apertura: {formatearFecha(conteoActivo.fecha_apertura)}
-                  </p>
-                  <div className="kdx-kpi-grid">
-                    <div className="kdx-kpi-card">
-                      <span>Detalles</span>
-                      <strong>{metaDetalles.total}</strong>
-                    </div>
-                    <div className="kdx-kpi-card">
-                      <span>Diferencias +</span>
-                      <strong>{resumenDiferencias.positivos}</strong>
-                    </div>
-                    <div className="kdx-kpi-card">
-                      <span>Diferencias -</span>
-                      <strong>{resumenDiferencias.negativos}</strong>
-                    </div>
-                  </div>
-                </div>
+          <ConteoSeleccionadoPanel
+            conteoActivo={conteoActivo}
+            formatearFecha={formatearFecha}
+            metaDetalles={metaDetalles}
+            resumenDiferencias={resumenDiferencias}
+            conteoAbierto={conteoAbierto}
+            resumenCierre={resumenCierre}
+            onCapturarDetalle={() => setModalDetalleAbierto(true)}
+            onCerrarConteo={() => setModalCierreAbierto(true)}
+          />
 
-                <div className="d-flex gap-2">
-                  <button
-                    type="button"
-                    className="btn kdx-btn kdx-btn-accent"
-                    onClick={() => setModalDetalleAbierto(true)}
-                    disabled={!conteoAbierto}
-                  >
-                    Capturar detalle
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    onClick={() => setModalCierreAbierto(true)}
-                    disabled={!conteoAbierto || metaDetalles.total === 0}
-                  >
-                    Cerrar conteo
-                  </button>
-                </div>
-              </div>
-
-              {resumenCierre && (
-                <div className="alert alert-light border mt-3 mb-0">
-                  <div><strong>Total detalles:</strong> {resumenCierre.total_detalles ?? 0}</div>
-                  <div><strong>Ajustes +:</strong> {resumenCierre.ajustes_positivos ?? 0}</div>
-                  <div><strong>Ajustes -:</strong> {resumenCierre.ajustes_negativos ?? 0}</div>
-                  <div><strong>Sin cambio:</strong> {resumenCierre.detalles_sin_cambio ?? 0}</div>
-                  <div><strong>Movimientos generados:</strong> {resumenCierre.total_movimientos_generados ?? 0}</div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="jyr-card kdx-table-card mt-3">
-            <div className="kdx-table-topbar">
-              <div className="kdx-table-topbar-left">
-                <FiDatabase />
-                <span>Detalle persistido del conteo</span>
-              </div>
-              <div className="kdx-table-topbar-right">
-                Mostrando {inicioDetalles}-{finDetalles} de {metaDetalles.total}
-              </div>
-            </div>
-            <div className="jyr-card-body p-0">
-              <ConteosDetallesTabla
-                filas={detalles}
-                loading={loadingDetalles}
-              />
-            </div>
-          </div>
+          <ConteosDetallesCard
+            inicioDetalles={inicioDetalles}
+            finDetalles={finDetalles}
+            total={metaDetalles.total}
+            filas={detalles}
+            loading={loadingDetalles}
+          />
 
           <BootstrapPagination
             pagina={metaDetalles.pagina}
@@ -659,210 +565,38 @@ const InventarioConteosPage = () => {
         </>
       )}
 
-      {modalAperturaAbierto && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onMouseDown={(event) => {
-          if (event.target === event.currentTarget && !savingApertura) setModalAperturaAbierto(false);
-        }}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Abrir conteo fisico</h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setModalAperturaAbierto(false)}
-                  disabled={savingApertura}
-                />
-              </div>
-              <form onSubmit={abrirConteo}>
-                <div className="modal-body">
-                  <label className="form-label">Observaciones (opcional)</label>
-                  <textarea
-                    rows="3"
-                    maxLength={500}
-                    className="form-control"
-                    placeholder="Conteo general de bodega"
-                    value={observacionesApertura}
-                    onChange={(event) => setObservacionesApertura(event.target.value)}
-                  />
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setModalAperturaAbierto(false)}
-                    disabled={savingApertura}
-                  >
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn jyr-btn-primary" disabled={savingApertura}>
-                    {savingApertura ? 'Abriendo...' : 'Abrir conteo'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConteoAperturaModal
+        abierto={modalAperturaAbierto}
+        saving={savingApertura}
+        observaciones={observacionesApertura}
+        onClose={() => setModalAperturaAbierto(false)}
+        onChangeObservaciones={setObservacionesApertura}
+        onSubmit={abrirConteo}
+      />
 
-      {modalDetalleAbierto && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onMouseDown={(event) => {
-          if (event.target === event.currentTarget && !savingDetalle) setModalDetalleAbierto(false);
-        }}>
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  Capturar detalle conteo #{conteoActivo?.cod_conteo}
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setModalDetalleAbierto(false)}
-                  disabled={savingDetalle}
-                />
-              </div>
+      <ConteoDetalleModal
+        abierto={modalDetalleAbierto}
+        saving={savingDetalle}
+        conteoId={conteoActivo?.cod_conteo}
+        formDetalle={formDetalle}
+        opcionesProducto={opcionesProducto}
+        opcionesUbicacion={opcionesUbicacion}
+        loadingUbicaciones={loadingUbicaciones}
+        formatearEtiquetaUbicacion={formatearEtiquetaUbicacion}
+        onClose={() => setModalDetalleAbierto(false)}
+        onChangeFormDetalle={actualizarFormDetalle}
+        onSubmit={registrarDetalle}
+      />
 
-              <form onSubmit={registrarDetalle}>
-                <div className="modal-body">
-                  <div className="row g-3">
-                    <div className="col-12 col-md-6">
-                      <label className="form-label">Codigo de producto *</label>
-                      <select
-                        className="form-select"
-                        value={formDetalle.cod_producto}
-                        onChange={(event) => setFormDetalle((prev) => ({ ...prev, cod_producto: event.target.value }))}
-                        disabled={savingDetalle || opcionesProducto.length === 0}
-                        required
-                      >
-                        <option value="">
-                          {opcionesProducto.length === 0 ? 'Cargando productos...' : 'Seleccione un producto real'}
-                        </option>
-                        {opcionesProducto.map((item) => (
-                          <option key={item.cod_producto} value={String(item.cod_producto)}>
-                            {item.codigo_producto} - {item.nombre_producto}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="col-12 col-md-6">
-                      <label className="form-label">Cod. Ubicacion *</label>
-                      <select
-                        className="form-select"
-                        value={formDetalle.cod_ubicacion}
-                        onChange={(event) => setFormDetalle((prev) => ({ ...prev, cod_ubicacion: event.target.value }))}
-                        disabled={savingDetalle || loadingUbicaciones || opcionesUbicacion.length === 0}
-                        required
-                      >
-                        <option value="">
-                          {loadingUbicaciones ? 'Cargando ubicaciones...' : 'Seleccione una ubicacion activa'}
-                        </option>
-                        {opcionesUbicacion.map((item) => (
-                          <option key={item.cod_ubicacion} value={String(item.cod_ubicacion)}>
-                            {formatearEtiquetaUbicacion(item)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="col-12 col-md-4">
-                      <label className="form-label">Stock fisico *</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        className="form-control"
-                        placeholder="Ej: 18"
-                        value={formDetalle.stock_fisico}
-                        onChange={(event) => setFormDetalle((prev) => ({ ...prev, stock_fisico: event.target.value }))}
-                        required
-                      />
-                    </div>
-
-                    <div className="col-12">
-                      <label className="form-label">Observaciones (opcional)</label>
-                      <textarea
-                        rows="3"
-                        maxLength={500}
-                        className="form-control"
-                        placeholder="Detalle del conteo por ubicacion"
-                        value={formDetalle.observaciones}
-                        onChange={(event) => setFormDetalle((prev) => ({ ...prev, observaciones: event.target.value }))}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setModalDetalleAbierto(false)}
-                    disabled={savingDetalle}
-                  >
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn jyr-btn-primary" disabled={savingDetalle}>
-                    {savingDetalle ? 'Guardando...' : 'Guardar detalle'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modalCierreAbierto && (
-        <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onMouseDown={(event) => {
-          if (event.target === event.currentTarget && !savingCierre) setModalCierreAbierto(false);
-        }}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  Cerrar conteo #{conteoActivo?.cod_conteo}
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setModalCierreAbierto(false)}
-                  disabled={savingCierre}
-                />
-              </div>
-              <form onSubmit={cerrarConteo}>
-                <div className="modal-body">
-                  <p className="mb-2">
-                    Se aplicaran ajustes de inventario segun las diferencias capturadas en este conteo.
-                  </p>
-                  <label className="form-label">Observaciones de cierre (opcional)</label>
-                  <textarea
-                    rows="3"
-                    maxLength={500}
-                    className="form-control"
-                    placeholder="Cierre validado por administracion"
-                    value={observacionesCierre}
-                    onChange={(event) => setObservacionesCierre(event.target.value)}
-                  />
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setModalCierreAbierto(false)}
-                    disabled={savingCierre}
-                  >
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn btn-danger" disabled={savingCierre}>
-                    {savingCierre ? 'Cerrando...' : 'Cerrar conteo'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConteoCierreModal
+        abierto={modalCierreAbierto}
+        saving={savingCierre}
+        conteoId={conteoActivo?.cod_conteo}
+        observaciones={observacionesCierre}
+        onClose={() => setModalCierreAbierto(false)}
+        onChangeObservaciones={setObservacionesCierre}
+        onSubmit={cerrarConteo}
+      />
     </section>
   );
 };
