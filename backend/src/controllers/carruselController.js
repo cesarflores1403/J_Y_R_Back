@@ -1,4 +1,33 @@
 import carruselService from '../services/carruselService.js';
+import path from 'path';
+import { promises as fs } from 'fs';
+import sharp from 'sharp';
+
+const EXT_SVG = '.svg';
+
+const convertirImagenCarruselAWebp = async (file) => {
+  if (!file?.path || !file?.filename) return null;
+
+  const ext = path.extname(file.filename || '').toLowerCase();
+  if (ext === EXT_SVG || ext === '.webp') {
+    return `/uploads/${file.filename}`;
+  }
+
+  const baseName = ext ? file.filename.slice(0, file.filename.length - ext.length) : file.filename;
+  const webpFilename = `${baseName}.webp`;
+  const webpPath = path.join(path.dirname(file.path), webpFilename);
+
+  await sharp(file.path)
+    .rotate()
+    .webp({ quality: 80, effort: 4 })
+    .toFile(webpPath);
+
+  if (file.path !== webpPath) {
+    await fs.unlink(file.path).catch(() => undefined);
+  }
+
+  return `/uploads/${webpFilename}`;
+};
 
 /* GET /api/carrusel  — cualquier usuario autenticado */
 export const listar = async (req, res, next) => {
@@ -27,7 +56,15 @@ export const subir = async (req, res, next) => {
       return res.status(400).json({ ok: false, mensaje: 'Debe adjuntar una imagen' });
     }
 
-    const imagen_url = `/uploads/${req.file.filename}`;
+    let imagen_url = `/uploads/${req.file.filename}`;
+    try {
+      const convertida = await convertirImagenCarruselAWebp(req.file);
+      if (convertida) imagen_url = convertida;
+    } catch (conversionError) {
+      // Si falla la conversión, se mantiene el archivo original para no bloquear la carga.
+      console.warn('[carrusel] No se pudo convertir imagen a WebP:', conversionError?.message || conversionError);
+    }
+
     const { titulo, descripcion, orden } = req.body;
 
     const nueva = await carruselService.crear({

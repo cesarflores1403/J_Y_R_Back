@@ -10,6 +10,22 @@ import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 const API_BASE = resolveApiBase();
 
+const precargarCarrusel = (items = []) => {
+  if (!items.length) return;
+
+  const [primera, ...resto] = items;
+  const imagenPrincipal = new Image();
+  imagenPrincipal.src = primera.logo;
+
+  // Precarga escalonada para no saturar la red al entrar al login.
+  resto.forEach((item, index) => {
+    setTimeout(() => {
+      const img = new Image();
+      img.src = item.logo;
+    }, 250 * (index + 1));
+  });
+};
+
 const Login = () => {
   const [nombreUsuario, setNombreUsuario] = useState('');
   const [password, setPassword]           = useState('');
@@ -27,11 +43,14 @@ const Login = () => {
       try {
         const { data } = await axios.get(`${API_BASE}/api/carrusel`);
         if (data.ok && data.datos?.length > 0) {
-          setMarcas(data.datos.map(img => ({
+          const imagenes = data.datos.map(img => ({
             nombre: img.titulo || '',
             logo: img.imagen_url.startsWith('http') ? img.imagen_url : `${API_BASE}${img.imagen_url}`,
             color: '#CC0000',
-          })));
+          }));
+
+          setMarcas(imagenes);
+          precargarCarrusel(imagenes);
         }
       } catch (err) {
         console.error('Error cargando carrusel:', err);
@@ -44,7 +63,7 @@ const Login = () => {
     if (marcas.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % marcas.length);
-    }, 1000);
+    }, 3500);
     return () => clearInterval(timer);
   }, [marcas.length]);
 
@@ -82,10 +101,17 @@ const Login = () => {
 
         <div className="login-carousel-track">
           {marcas.map((marca, i) => (
-            <div key={marca.nombre}
+            <div key={`${marca.nombre}-${i}`}
               className={`login-slide ${i === currentSlide ? 'active' : ''}`}>
               <div className="login-slide-glow" style={{ background: marca.color }} />
-              <img src={marca.logo} alt={marca.nombre} className="login-slide-img" />
+              <img
+                src={marca.logo}
+                alt={marca.nombre}
+                className="login-slide-img"
+                loading={i === currentSlide ? 'eager' : 'lazy'}
+                fetchPriority={i === currentSlide ? 'high' : 'auto'}
+                decoding="async"
+              />
               <h2 className="login-slide-name">{marca.nombre}</h2>
             </div>
           ))}

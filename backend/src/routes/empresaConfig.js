@@ -54,7 +54,7 @@ router.get('/', obtener);
 
 // Correlativos (solo Super Administrador)
 router.get('/correlativos', autorizar('Super Administrador'), obtenerCorrelativos);
-router.get('/url-sistema', autorizar('Super Administrador'), obtenerUrlSistema);
+router.get('/url-sistema', autorizar('Administrador'), obtenerUrlSistema);
 
 router.put('/correlativos',
 	autorizar('Super Administrador'),

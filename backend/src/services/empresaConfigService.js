@@ -7,6 +7,36 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const CORRELATIVO_IDENTIFICADORES = {
+  factura: {
+    tabla: 'factura',
+    columna: 'cod_factura'
+  },
+  cotizacion: {
+    tabla: 'cotizacion',
+    columna: 'cod_cotizacion'
+  }
+};
+
+const obtenerIdentificadorSeguro = (tabla, columna) => {
+  const match = Object.values(CORRELATIVO_IDENTIFICADORES).find(
+    (item) => item.tabla === tabla && item.columna === columna
+  );
+
+  if (!match) {
+    throw Object.assign(new Error('Identificador de correlativo no permitido'), { statusCode: 400 });
+  }
+
+  return match;
+};
+
+const asegurarSecuenciaSegura = (secuencia) => {
+  // Permite formatos como public.factura_cod_factura_seq
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)?$/.test(String(secuencia || ''))) {
+    throw Object.assign(new Error('Nombre de secuencia no valido'), { statusCode: 500 });
+  }
+};
+
 const empresaConfigService = {
   async _asegurarCampoLogoFactura() {
     await sequelize.query(
@@ -33,15 +63,18 @@ const empresaConfigService = {
   },
 
   async _obtenerMaximo(tabla, columna, transaction = null) {
+    const id = obtenerIdentificadorSeguro(tabla, columna);
     const row = await sequelize.query(
-      `SELECT COALESCE(MAX(${columna}), 0) AS maximo FROM ${tabla}`,
+      `SELECT COALESCE(MAX(${id.columna}), 0) AS maximo FROM ${id.tabla}`,
       { type: QueryTypes.SELECT, transaction }
     );
     return parseInt(row?.[0]?.maximo || 0, 10);
   },
 
   async _obtenerSiguienteNumero(tabla, columna, transaction = null) {
+    const id = obtenerIdentificadorSeguro(tabla, columna);
     const secuencia = await this._obtenerSecuencia(tabla, columna, transaction);
+    asegurarSecuenciaSegura(secuencia);
     const estadoSecuencia = await sequelize.query(
       `SELECT last_value, is_called FROM ${secuencia}`,
       { type: QueryTypes.SELECT, transaction }
@@ -49,7 +82,7 @@ const empresaConfigService = {
     const ultimoValor = parseInt(estadoSecuencia?.[0]?.last_value || 0, 10);
     const fueUsada = Boolean(estadoSecuencia?.[0]?.is_called);
     const siguientePorSecuencia = fueUsada ? (ultimoValor + 1) : ultimoValor;
-    const maximoTabla = await this._obtenerMaximo(tabla, columna, transaction);
+    const maximoTabla = await this._obtenerMaximo(id.tabla, id.columna, transaction);
     return Math.max(siguientePorSecuencia, maximoTabla + 1);
   },
 

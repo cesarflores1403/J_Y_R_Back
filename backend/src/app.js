@@ -108,7 +108,14 @@ app.use('/uploads', (req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.setHeader('Access-Control-Allow-Origin', '*');
   next();
-}, express.static(path.resolve(__dirname, '../uploads')));
+}, express.static(path.resolve(__dirname, '../uploads'), {
+  maxAge: '7d',
+  setHeaders: (res, filePath) => {
+    if (/\.(png|jpe?g|gif|webp|svg)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+    }
+  }
+}));
 
 app.use('/api', routes); // // Prefijo global de la API
 

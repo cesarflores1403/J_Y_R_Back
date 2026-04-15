@@ -7,6 +7,13 @@ const http = require('http');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const TUNNEL_ENV_FILE = path.join(ROOT_DIR, '.env.tunnel');
 
+function getCliArgValue(flagName) {
+  const idx = process.argv.findIndex((arg) => arg === flagName);
+  if (idx === -1) return undefined;
+  const value = process.argv[idx + 1];
+  return value;
+}
+
 function loadSimpleEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
 
@@ -35,7 +42,10 @@ function loadSimpleEnvFile(filePath) {
 
 loadSimpleEnvFile(TUNNEL_ENV_FILE);
 
-const FRONTEND_PORT = Number(process.env.FRONTEND_PORT || 5173);
+const FRONTEND_PORT_FROM_CLI = Number(getCliArgValue('--port'));
+const FRONTEND_PORT = Number.isInteger(FRONTEND_PORT_FROM_CLI) && FRONTEND_PORT_FROM_CLI > 0
+  ? FRONTEND_PORT_FROM_CLI
+  : Number(process.env.FRONTEND_PORT || 5173);
 const FRONTEND_PORT_CANDIDATES = process.env.FRONTEND_PORT_CANDIDATES
   ? process.env.FRONTEND_PORT_CANDIDATES.split(',').map((p) => Number(p.trim())).filter((p) => Number.isInteger(p) && p > 0)
   : [FRONTEND_PORT, FRONTEND_PORT + 1, FRONTEND_PORT + 2];
@@ -210,29 +220,15 @@ async function startTunnelWithCandidates(candidates, args) {
   return null;
 }
 
-(async () => {
-  if (USE_FIXED_TUNNEL) {
-    console.log('[tunnel] Modo fijo activado (token configurado).');
-    if (TUNNEL_PUBLIC_URL) {
-      try {
-        fs.writeFileSync(PUBLIC_URL_FILE, `${TUNNEL_PUBLIC_URL}\n`, 'utf8');
-        console.log(`[tunnel] URL fija guardada en: ${PUBLIC_URL_FILE}`);
-      } catch (err) {
-        console.error(`[tunnel] No se pudo guardar URL fija: ${err.message}`);
-      }
-    } else {
-      console.warn('[tunnel] TUNNEL_PUBLIC_URL no definido. Configuralo en .env.tunnel para guardar tu URL fija.');
-    }
-  } else {
-    console.log('[tunnel] Modo rapido activado (URL temporal).');
-  }
+let isShuttingDown = false;
 
+const startTunnelProcess = async () => {
   console.log('[tunnel] Esperando a que frontend inicie...');
   const frontend = await waitForFrontend();
 
   if (!frontend) {
     console.error('[tunnel] No se pudo detectar frontend en los puertos esperados.');
-    process.exit(1);
+    return null;
   }
 
   const FRONTEND_URL = `http://${frontend.host}:${frontend.port}`;
@@ -246,12 +242,13 @@ async function startTunnelWithCandidates(candidates, args) {
 
   if (!started) {
     console.error('[tunnel] No se encontró cloudflared. Instala Cloudflare Tunnel o define CLOUDFLARED_PATH.');
-    process.exit(1);
+    return null;
   }
 
-  const { child, candidate } = started;
-  console.log(`[tunnel] cloudflared iniciado con: ${candidate}`);
+  return started;
+};
 
+const setupTunnelHandlers = (child, candidate) => {
   let announced = USE_FIXED_TUNNEL && Boolean(TUNNEL_PUBLIC_URL);
   const announceUrl = (line) => {
     if (announced) return;
@@ -273,8 +270,62 @@ async function startTunnelWithCandidates(candidates, args) {
   forwardStream(child.stdout, (line) => console.log(`[tunnel] ${line}`), announceUrl);
   forwardStream(child.stderr, (line) => console.log(`[tunnel] ${line}`), announceUrl);
 
+  return child;
+};
+
+(async () => {
+  if (USE_FIXED_TUNNEL) {
+    console.log('[tunnel] Modo fijo activado (token configurado).');
+    if (TUNNEL_PUBLIC_URL) {
+      try {
+        fs.writeFileSync(PUBLIC_URL_FILE, `${TUNNEL_PUBLIC_URL}\n`, 'utf8');
+        console.log(`[tunnel] URL fija guardada en: ${PUBLIC_URL_FILE}`);
+      } catch (err) {
+        console.error(`[tunnel] No se pudo guardar URL fija: ${err.message}`);
+      }
+    } else {
+      console.warn('[tunnel] TUNNEL_PUBLIC_URL no definido. Configuralo en .env.tunnel para guardar tu URL fija.');
+    }
+  } else {
+    console.log('[tunnel] Modo rapido activado (URL temporal).');
+  }
+
+  let child = null;
+  let candidate = null;
+
+  const startOrRestart = async () => {
+    if (isShuttingDown) return;
+    if (child && !child.killed) {
+      child.kill('SIGINT');
+      await sleep(500);
+    }
+
+    const result = await startTunnelProcess();
+    if (!result) {
+      console.error('[tunnel] Fallo al iniciar túnel. Reintentando en 5s...');
+      await sleep(5000);
+      return startOrRestart();
+    }
+
+    child = result.child;
+    candidate = result.candidate;
+    console.log(`[tunnel] cloudflared iniciado con: ${candidate}`);
+    setupTunnelHandlers(child, candidate);
+
+    child.once('exit', (code) => {
+      if (!isShuttingDown) {
+        console.warn(`[tunnel] Túnel se desconectó (código ${code ?? 'null'}). Reintentando en 3s...`);
+        setTimeout(startOrRestart, 3000);
+      } else {
+        console.log(`[tunnel] Finalizado (codigo ${code ?? 'null'}).`);
+        process.exit(code ?? 0);
+      }
+    });
+  };
+
   const shutdown = () => {
-    if (!child.killed) {
+    isShuttingDown = true;
+    if (child && !child.killed) {
       child.kill('SIGINT');
     }
   };
@@ -282,8 +333,5 @@ async function startTunnelWithCandidates(candidates, args) {
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
-  child.on('exit', (code) => {
-    console.log(`[tunnel] Finalizado (codigo ${code ?? 'null'}).`);
-    process.exit(code ?? 0);
-  });
+  await startOrRestart();
 })();

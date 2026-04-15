@@ -22,7 +22,7 @@ const obtenerNombreArchivo = (headers, fallbackName = 'backup.zip') => {
 
 const BackupSistema = () => {
   const { usuario } = useAuth();
-  const esSuperAdmin = usuario?.rol === 'Super Administrador';
+  const puedeRestaurar = ['Administrador', 'Super Administrador'].includes(usuario?.rol);
   const [backups, setBackups] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [ejecutando, setEjecutando] = useState(false);
@@ -163,7 +163,7 @@ const BackupSistema = () => {
           </div>
         </div>
 
-        {esSuperAdmin && (
+        {puedeRestaurar && (
           <div className="border rounded p-3 mb-3">
             <h6 className="mb-2 d-flex align-items-center gap-2">
               <FiFile /> Restaurar desde archivo ZIP
@@ -224,7 +224,7 @@ const BackupSistema = () => {
                       <FiDownload className="me-1" />
                       {descargando === bkp.ruta_relativa ? 'Descargando...' : 'Descargar'}
                     </button>
-                    {esSuperAdmin && (
+                    {puedeRestaurar && (
                       <button
                         type="button"
                         className="btn btn-outline-danger btn-sm"

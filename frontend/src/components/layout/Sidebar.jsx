@@ -48,7 +48,7 @@ const menuItems = [
   ]},
   { section: 'Configuración', items: [
     { path: '/config-empresa', label: 'Datos Factura', icon: <FiFileText />, roles: ['Super Administrador'] },
-    { path: '/url-sistema', label: 'URL del Sistema', icon: <FiLink2 />, roles: ['Super Administrador'] },
+    { path: '/url-sistema', label: 'URL del Sistema', icon: <FiLink2 />, roles: ['Administrador', 'Super Administrador'] },
     { path: '/respaldos', label: 'Respaldos', icon: <FiHardDrive />, roles: ['Administrador', 'Super Administrador'] },
   ]},
 ];

@@ -7,7 +7,9 @@
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend -- --host",
     "dev:tunnel": "node scripts/start-tunnel.cjs",
+    "dev:tunnel:preview": "node scripts/start-tunnel.cjs --port 4173",
     "dev:public": "concurrently -n BACK,FRONT,TUNNEL -c blue,green,magenta \"npm run dev:backend\" \"npx wait-on tcp:5000 && npm run dev:frontend\" \"npm run dev:tunnel\"",
+    "dev:public:fast": "npm run build:frontend && concurrently -n BACK,PREVIEW,TUNNEL -c blue,green,magenta \"npm run dev:backend\" \"npm run preview --prefix frontend -- --host --port 4173\" \"npm run dev:tunnel:preview\"",
     "start:backend": "npm start --prefix backend",
     "start:frontend": "npm run dev --prefix frontend",
     "install:backend": "npm install --prefix backend",
@@ -15,7 +17,13 @@
     "install:all": "npm run install:backend && npm run install:frontend",
     "dev": "npm run dev:public",
     "build:frontend": "npm run build --prefix frontend",
-    "test": "npm test --prefix backend"
+    "test": "npm test --prefix backend",
+    "services:install": "powershell -Command \"Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser -Force; & '.\\scripts\\install-services.ps1'\"",
+    "services:uninstall": "powershell -Command \"Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser -Force; & '.\\scripts\\uninstall-services.ps1'\"",
+    "services:diagnose": "powershell -Command \"& '.\\scripts\\diagnose-services.ps1'\"",
+    "services:start": "powershell -Command \"Start-Service JyRBackend, CloudfareTunnel -ErrorAction SilentlyContinue\"",
+    "services:stop": "powershell -Command \"Stop-Service JyRBackend, CloudfareTunnel -ErrorAction SilentlyContinue\"",
+    "services:restart": "powershell -Command \"Restart-Service JyRBackend, CloudfareTunnel -ErrorAction SilentlyContinue\""
   },
   "devDependencies": {
     "concurrently": "^8.2.0",

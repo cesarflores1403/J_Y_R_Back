@@ -76,7 +76,7 @@ const App = () => {
             <Route path="usuarios" element={<PrivateRoute roles={['Administrador']}><Usuarios /></PrivateRoute>} />
             <Route path="compras/ordenes" element={<PrivateRoute roles={['Administrador','Bodeguero']}><OrdenesCompra /></PrivateRoute>} />
             <Route path="config-empresa" element={<PrivateRoute roles={['Super Administrador']}><ConfigEmpresa /></PrivateRoute>} />
-            <Route path="url-sistema" element={<PrivateRoute roles={['Super Administrador']}><UrlSistema /></PrivateRoute>} />
+            <Route path="url-sistema" element={<PrivateRoute roles={['Administrador', 'Super Administrador']}><UrlSistema /></PrivateRoute>} />
             <Route path="respaldos" element={<PrivateRoute roles={['Administrador', 'Super Administrador']}><BackupSistema /></PrivateRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" />} />

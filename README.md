@@ -29,6 +29,9 @@ npm run dev
 # Equivalente explicito (mismo comportamiento)
 npm run dev:public
 
+# Iniciar backend + frontend compilado + URL publica mas rapida
+npm run dev:public:fast
+
 # Solo backend (puerto 5000)
 npm run start:backend
 
@@ -39,6 +42,8 @@ npm run start:frontend
 ## URL Publica Fija (Cloudflare)
 
 El script `npm run dev` ya levanta el tunel automaticamente.
+
+Para una URL publica con mejor rendimiento, usa `npm run dev:public:fast`.
 
 - Si no configuras token, usa modo rapido (`trycloudflare`) y la URL cambia en cada arranque.
 - Si configuras token, usa modo fijo y mantiene tu URL estable.
@@ -58,6 +63,31 @@ npm run dev
 ```
 
 La URL publica activa se guarda en `public-url.txt`.
+
+## 🔌 Servicios de Windows (Producción)
+
+**¿Quieres que la URL pública siga funcionando cuando la máquina duerma?**
+
+Usa servicios de Windows para que Backend y Cloudflare Tunnel se ejecuten automáticamente:
+
+```powershell
+# 1) Abre PowerShell como Administrador (requerido)
+
+# 2) Ejecuta el instalador:
+cd scripts
+.\install-services.ps1
+
+# 3) Verifica el estado:
+.\diagnose-services.ps1
+```
+
+**Beneficios:**
+- ✅ La URL pública sigue funcionando cuando la máquina duerme
+- ✅ Se inicia automáticamente al encender Windows
+- ✅ Se reinicia automáticamente si falla
+- ✅ No requiere sesión iniciada
+
+Para más detalles: Ver [scripts/README.md](scripts/README.md)
 
 ## Build
 

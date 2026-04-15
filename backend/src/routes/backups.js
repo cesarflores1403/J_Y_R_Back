@@ -48,10 +48,9 @@ router.get('/download', [
   validarCampos
 ], descargarBackup);
 router.post('/restore', [
-  autorizar('Super Administrador'),
   body('backupFolder').notEmpty().withMessage('backupFolder es requerido'),
   validarCampos
 ], restaurarBackup);
-router.post('/restore-file', autorizar('Super Administrador'), uploadZip.single('backupFile'), restaurarBackupArchivo);
+router.post('/restore-file', uploadZip.single('backupFile'), restaurarBackupArchivo);
 
 export default router;
