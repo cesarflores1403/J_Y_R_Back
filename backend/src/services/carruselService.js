@@ -4,15 +4,62 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDir = path.resolve(__dirname, '../../uploads');
+
+const titulosFallback = {
+  chevrolet: 'Chevrolet',
+  honda: 'Honda',
+  hyundai: 'Hyundai',
+  mitsubishi: 'Mitsubishi',
+  nissan: 'Nissan',
+  suzuki: 'Suzuki',
+  toyota: 'Toyota'
+};
+
+const esErrorConexion = (error) => {
+  const nombre = String(error?.name || '');
+  const codigo = String(error?.parent?.code || error?.original?.code || error?.code || '');
+  return nombre.includes('Connection') || ['XX000', 'ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT'].includes(codigo);
+};
+
+const listarFallbackLocal = () => {
+  if (!fs.existsSync(uploadsDir)) return [];
+
+  return fs.readdirSync(uploadsDir)
+    .filter((archivo) => /^carrusel-marca_.+\.(png|jpe?g|webp|gif|svg)$/i.test(archivo))
+    .sort((a, b) => a.localeCompare(b))
+    .map((archivo, index) => {
+      const clave = archivo
+        .replace(/^carrusel-marca_/i, '')
+        .replace(/\.[^.]+$/, '')
+        .toLowerCase();
+
+      return {
+        cod_imagen: -(index + 1),
+        titulo: titulosFallback[clave] || clave,
+        descripcion: null,
+        imagen_url: `/uploads/${archivo}`,
+        orden: index + 1,
+        activo: true,
+        fecha_creacion: null
+      };
+    });
+};
 
 class CarruselService {
 
   /* ── Listar imágenes activas (ordenadas) ── */
   async listar() {
-    return await CarruselImagen.findAll({
-      where: { activo: true },
-      order: [['orden', 'ASC'], ['cod_imagen', 'ASC']]
-    });
+    try {
+      return await CarruselImagen.findAll({
+        where: { activo: true },
+        order: [['orden', 'ASC'], ['cod_imagen', 'ASC']]
+      });
+    } catch (error) {
+      if (!esErrorConexion(error)) throw error;
+      console.warn('[carrusel] BD no disponible; usando imagenes locales:', error.message);
+      return listarFallbackLocal();
+    }
   }
 
   /* ── Listar todas (admin) ── */

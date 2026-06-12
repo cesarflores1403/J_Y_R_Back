@@ -14,11 +14,12 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || DEFAULT_DB_PASSWORD
 };
 
-const dialectOptions = {
+const usarSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
+const dialectOptions = usarSsl ? {
   ssl: {
     rejectUnauthorized: false
   }
-};
+} : {};
 
 const sequelize = new Sequelize(
   dbConfig.name,
