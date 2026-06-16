@@ -1,1 +1,1 @@
-C:/Users/CESAR FLORES/scoop/apps/postgresql/current/bin/postgres.exe "-D" "C:/Users/CESAR FLORES/Documents/GitHub/J_Y_R_Back/.local-postgres/data" "-p" "5433"
+C:/Program Files/PostgreSQL/18/bin/postgres.exe "-D" ".local-postgres/data" "-p" "5440"
