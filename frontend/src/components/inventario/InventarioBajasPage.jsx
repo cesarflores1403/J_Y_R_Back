@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FiAlertTriangle, FiDatabase, FiPlus } from 'react-icons/fi';
+import { FiAlertTriangle, FiDatabase, FiDownload, FiPlus } from 'react-icons/fi';
 import BajaForm from './BajaForm.jsx';
 import BajasFiltros from './BajasFiltros.jsx';
 import BajasTabla from './BajasTabla.jsx';
@@ -85,6 +85,7 @@ const InventarioBajasPage = () => {
   const [productos, setProductos] = useState([]);
   const [filas, setFilas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
   const [error, setError] = useState('');
   const [meta, setMeta] = useState({
     total: 0,
@@ -244,6 +245,36 @@ const InventarioBajasPage = () => {
     }
   };
 
+  const exportarPdf = async () => {
+    try {
+      setExportandoPdf(true);
+      setError('');
+
+      const params = limpiarParamsConsulta({
+        fecha_desde: consulta.fecha_desde,
+        fecha_hasta: consulta.fecha_hasta,
+        cod_producto: normalizarCodProducto(consulta.cod_producto),
+        cod_ubicacion: normalizarCodUbicacion(consulta.cod_ubicacion),
+        estado: consulta.estado || 'TODAS'
+      });
+
+      const { data } = await inventarioBajasApi.exportarPdf(params);
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'reporte-bajas.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(obtenerMensajeError(err));
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
   const inicioMostrado = meta.total > 0 ? ((meta.pagina - 1) * meta.limite) + 1 : 0;
   const finMostrado = meta.total > 0 ? Math.min(meta.pagina * meta.limite, meta.total) : 0;
   return (
@@ -265,6 +296,15 @@ const InventarioBajasPage = () => {
               <span className="kdx-mini-kpi-label">Total</span>
               <strong>{meta.total}</strong>
             </div>
+            <button
+              type="button"
+              className="btn kdx-btn kdx-btn-accent"
+              onClick={exportarPdf}
+              disabled={exportandoPdf || loading}
+            >
+              {exportandoPdf ? <span className="spinner-border spinner-border-sm me-1" /> : <FiDownload className="me-1" />}
+              Exportar PDF
+            </button>
             <button
               type="button"
               className="btn kdx-btn kdx-btn-accent"

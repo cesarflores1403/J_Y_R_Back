@@ -4,6 +4,8 @@ import api from '../../services/axiosApi.js';
 export const inventarioReservasApi = {
   // // Lista reservas persistidas con filtros/paginacion
   listar: (params) => api.get('/inventario/reservas', { params }),
+  // // Exporta reservas persistidas en PDF
+  exportarPdf: (params) => api.get('/inventario/reservas/reporte/pdf', { params, responseType: 'blob' }),
   // // Crea reserva activa sobre inventario disponible
   crear: (data) => api.post('/inventario/reservas', data),
   // // Libera reserva activa

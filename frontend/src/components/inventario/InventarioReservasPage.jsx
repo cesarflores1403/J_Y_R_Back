@@ -115,6 +115,7 @@ const InventarioReservasPage = () => {
   });
 
   const [loading, setLoading] = useState(true);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [modalReservaAbierto, setModalReservaAbierto] = useState(false);
@@ -296,6 +297,38 @@ const InventarioReservasPage = () => {
     }
   };
 
+  const exportarPdf = async () => {
+    try {
+      setExportandoPdf(true);
+      setError('');
+      setSuccess('');
+
+      const params = limpiarParamsConsulta({
+        cod_producto: normalizarCodProducto(consulta.cod_producto),
+        cod_ubicacion: normalizarCodUbicacion(consulta.cod_ubicacion),
+        estado: consulta.estado || 'TODAS',
+        referencia: String(consulta.referencia || '').trim(),
+        fecha_desde: consulta.fecha_desde || undefined,
+        fecha_hasta: consulta.fecha_hasta || undefined
+      });
+
+      const { data } = await inventarioReservasApi.exportarPdf(params);
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'reporte-reservas.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(obtenerMensajeError(err));
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
   const inicioMostrado = meta.total > 0 ? ((meta.pagina - 1) * meta.limite) + 1 : 0;
   const finMostrado = meta.total > 0 ? Math.min(meta.pagina * meta.limite, meta.total) : 0;
   return (
@@ -303,6 +336,8 @@ const InventarioReservasPage = () => {
       <ReservasHeader
         total={meta.total}
         onNuevaReserva={() => setModalReservaAbierto(true)}
+        onExportarPdf={exportarPdf}
+        exportandoPdf={exportandoPdf}
       />
 
       <ReservasFiltrosCard

@@ -1,9 +1,11 @@
 import React from 'react';
-import { FiLock, FiPlus } from 'react-icons/fi';
+import { FiDownload, FiLock, FiPlus } from 'react-icons/fi';
 
 const ReservasHeader = ({
   total = 0,
-  onNuevaReserva
+  onNuevaReserva,
+  onExportarPdf,
+  exportandoPdf = false
 }) => (
   <div className="kdx-hero">
     <div className="kdx-hero-head">
@@ -22,6 +24,15 @@ const ReservasHeader = ({
           <span className="kdx-mini-kpi-label">Total</span>
           <strong>{total}</strong>
         </div>
+        <button
+          type="button"
+          className="btn kdx-btn kdx-btn-accent"
+          onClick={onExportarPdf}
+          disabled={exportandoPdf}
+        >
+          {exportandoPdf ? <span className="spinner-border spinner-border-sm me-1" /> : <FiDownload className="me-1" />}
+          Exportar PDF
+        </button>
         <button
           type="button"
           className="btn kdx-btn kdx-btn-accent"
