@@ -1,6 +1,7 @@
 import { Op, cast, col, fn, where } from 'sequelize';
 import Ubicacion from '../models/Ubicacion.js';
 import { sequelize } from '../config/sequelize.js';
+import { generarReportePdf } from '../utils/pdfReport.js';
 
 const ESTADO_ACTIVA = 'ACTIVA';
 const ESTADO_INACTIVA = 'INACTIVA';
@@ -42,6 +43,33 @@ const parsearEntero = (valor, defecto, { min = 1, max = Number.MAX_SAFE_INTEGER 
   const numero = Number.parseInt(valor, 10);
   if (Number.isNaN(numero)) return defecto;
   return Math.min(max, Math.max(min, numero));
+};
+
+const construirWhereUbicaciones = ({ includeInactive = 'false', search = '', buscar = '', q = '' } = {}) => {
+  const incluirInactivas = parsearBoolean(includeInactive);
+  const criterioBusqueda = normalizarTexto(search ?? buscar ?? q);
+  const criterioLike = `%${String(criterioBusqueda || '').toLowerCase()}%`;
+  const whereClause = incluirInactivas ? {} : { estado_ubi: ESTADO_ACTIVA };
+
+  if (criterioBusqueda) {
+    whereClause[Op.and] = [
+      {
+        [Op.or]: [
+          where(fn('LOWER', cast(col('cod_ubicacion'), 'TEXT')), { [Op.like]: criterioLike }),
+          where(fn('LOWER', fn('COALESCE', col('codigo_producto'), '')), { [Op.like]: criterioLike }),
+          where(fn('LOWER', cast(col('cod_producto'), 'TEXT')), { [Op.like]: criterioLike }),
+          where(fn('LOWER', fn('COALESCE', col('pasillo'), '')), { [Op.like]: criterioLike }),
+          where(fn('LOWER', fn('COALESCE', col('estanteria'), '')), { [Op.like]: criterioLike }),
+          where(fn('LOWER', fn('COALESCE', col('nivel_1'), '')), { [Op.like]: criterioLike }),
+          where(fn('LOWER', fn('COALESCE', col('nivel_2'), '')), { [Op.like]: criterioLike }),
+          where(fn('LOWER', fn('COALESCE', col('descripcion'), '')), { [Op.like]: criterioLike }),
+          where(fn('LOWER', fn('COALESCE', col('estado_ubi'), '')), { [Op.like]: criterioLike })
+        ]
+      }
+    ];
+  }
+
+  return { whereClause, criterioBusqueda, incluirInactivas };
 };
 
 const esErrorColumnaNoExiste = (error, nombreColumna) => {
@@ -91,31 +119,10 @@ class UbicacionService {
   }
 
   async listar({ includeInactive = 'false', page = 1, limit = LIMITE_DEFECTO, search = '', buscar = '', q = '' }) {
-    const incluirInactivas = parsearBoolean(includeInactive);
     const pagina = parsearEntero(page, 1, { min: 1 });
     const limite = parsearEntero(limit, LIMITE_DEFECTO, { min: 1, max: LIMITE_MAXIMO });
     const offset = (pagina - 1) * limite;
-    const criterioBusqueda = normalizarTexto(search ?? buscar ?? q);
-    const criterioLike = `%${String(criterioBusqueda || '').toLowerCase()}%`;
-    const whereClause = incluirInactivas ? {} : { estado_ubi: ESTADO_ACTIVA };
-
-    if (criterioBusqueda) {
-      whereClause[Op.and] = [
-        {
-          [Op.or]: [
-            where(fn('LOWER', cast(col('cod_ubicacion'), 'TEXT')), { [Op.like]: criterioLike }),
-            where(fn('LOWER', fn('COALESCE', col('codigo_producto'), '')), { [Op.like]: criterioLike }),
-            where(fn('LOWER', cast(col('cod_producto'), 'TEXT')), { [Op.like]: criterioLike }),
-            where(fn('LOWER', fn('COALESCE', col('pasillo'), '')), { [Op.like]: criterioLike }),
-            where(fn('LOWER', fn('COALESCE', col('estanteria'), '')), { [Op.like]: criterioLike }),
-            where(fn('LOWER', fn('COALESCE', col('nivel_1'), '')), { [Op.like]: criterioLike }),
-            where(fn('LOWER', fn('COALESCE', col('nivel_2'), '')), { [Op.like]: criterioLike }),
-            where(fn('LOWER', fn('COALESCE', col('descripcion'), '')), { [Op.like]: criterioLike }),
-            where(fn('LOWER', fn('COALESCE', col('estado_ubi'), '')), { [Op.like]: criterioLike })
-          ]
-        }
-      ];
-    }
+    const { whereClause, criterioBusqueda } = construirWhereUbicaciones({ includeInactive, search, buscar, q });
 
     const { rows, count } = await Ubicacion.findAndCountAll({
       where: whereClause,
@@ -143,6 +150,60 @@ class UbicacionService {
         search: criterioBusqueda || ''
       }
     };
+  }
+
+  async exportarReportePdf({ includeInactive = 'false', search = '', buscar = '', q = '' } = {}) {
+    const { whereClause, criterioBusqueda, incluirInactivas } = construirWhereUbicaciones({
+      includeInactive,
+      search,
+      buscar,
+      q
+    });
+
+    const ubicaciones = await Ubicacion.findAll({
+      where: whereClause,
+      order: [
+        ['estado_ubi', 'ASC'],
+        ['pasillo', 'ASC'],
+        ['estanteria', 'ASC'],
+        ['nivel_1', 'ASC'],
+        ['nivel_2', 'ASC'],
+        ['cod_ubicacion', 'ASC']
+      ]
+    });
+
+    return generarReportePdf({
+      titulo: 'Reporte de ubicaciones',
+      filtros: [
+        { label: 'Busqueda', value: criterioBusqueda || 'Todos' },
+        { label: 'Incluye inactivas', value: incluirInactivas ? 'Si' : 'No' }
+      ],
+      metricas: [
+        { label: 'Total de ubicaciones', value: ubicaciones.length }
+      ],
+      columnas: [
+        { header: '#', key: 'numero', width: 32, align: 'center' },
+        { header: 'ID', key: 'id', width: 42, align: 'center' },
+        { header: 'Producto', key: 'codigoProducto', width: 76 },
+        { header: 'Pasillo', key: 'pasillo', width: 70 },
+        { header: 'Estanteria', key: 'estanteria', width: 82 },
+        { header: 'Nivel 1', key: 'nivel1', width: 70 },
+        { header: 'Nivel 2', key: 'nivel2', width: 70 },
+        { header: 'Estado', key: 'estado', width: 76 },
+        { header: 'Descripcion', key: 'descripcion', width: 202 }
+      ],
+      filas: ubicaciones.map((ubicacion, index) => ({
+        numero: index + 1,
+        id: ubicacion.cod_ubicacion,
+        codigoProducto: ubicacion.codigo_producto || (ubicacion.cod_producto ? formatearCodigoProducto(ubicacion.cod_producto) : '-'),
+        pasillo: ubicacion.pasillo,
+        estanteria: ubicacion.estanteria,
+        nivel1: ubicacion.nivel_1,
+        nivel2: ubicacion.nivel_2 || '-',
+        estado: ubicacion.estado_ubi,
+        descripcion: ubicacion.descripcion || '-'
+      }))
+    });
   }
 
   async obtenerPorId(id) {

@@ -3,6 +3,7 @@ import ProductoSeq from '../models/ProductoSeq.js';
 import Ubicacion from '../models/Ubicacion.js';
 import inventarioMovimientosSchemaService from './inventarioMovimientosSchemaService.js';
 import inventarioConteosSchemaService from './inventarioConteosSchemaService.js';
+import { generarReportePdf } from '../utils/pdfReport.js';
 import {
   obtenerSelectInventarioPorProductoUbicacion,
   obtenerSelectInventarioPorId,
@@ -45,6 +46,17 @@ const normalizarTexto = (valor) => {
   if (valor === undefined || valor === null) return null;
   const limpio = String(valor).trim();
   return limpio.length > 0 ? limpio : null;
+};
+
+const formatearTextoPdfMultilinea = (valor = '') => {
+  const limpio = String(valor || '').trim();
+  if (!limpio) return '-';
+  return limpio
+    .replace(/_/g, '_ ')
+    .replace(/-/g, '- ')
+    .replace(/\//g, '/ ')
+    .replace(/\s+/g, ' ')
+    .trim();
 };
 
 // // Normaliza fechas de query a Date o null
@@ -255,6 +267,58 @@ class InventarioConteosService {
       limit,
       totalPages
     };
+  }
+
+  async exportarReportePdf(query = {}) {
+    const resultado = await this.listarConteos({
+      ...query,
+      page: 1,
+      pagina: 1,
+      limit: LIMITE_MAXIMO,
+      limite: LIMITE_MAXIMO
+    });
+
+    const filas = Array.isArray(resultado?.data) ? resultado.data : [];
+
+    return generarReportePdf({
+      titulo: 'Reporte de conteos fisicos',
+      filtros: [
+        { label: 'Conteo', value: query.cod_conteo || 'Todos' },
+        { label: 'Estado', value: query.estado || 'Todos' },
+        { label: 'Desde', value: query.fecha_desde || 'Todos' },
+        { label: 'Hasta', value: query.fecha_hasta || 'Todos' }
+      ],
+      metricas: [
+        { label: 'Total filtrado', value: resultado?.total || filas.length },
+        { label: 'Registros exportados', value: filas.length }
+      ],
+      columnas: [
+        { header: '#', key: 'numero', width: 24, align: 'center' },
+        { header: 'Conteo', key: 'codConteo', width: 46, align: 'center' },
+        { header: 'Estado', key: 'estado', width: 60 },
+        { header: 'Apertura', key: 'fechaApertura', width: 86 },
+        { header: 'Cierre', key: 'fechaCierre', width: 86 },
+        { header: 'Abierto por', key: 'usuarioApertura', width: 70 },
+        { header: 'Cerrado por', key: 'usuarioCierre', width: 70 },
+        { header: 'Detalles', key: 'totalDetalles', width: 45, align: 'right' },
+        { header: 'Dif. +', key: 'positivas', width: 38, align: 'right' },
+        { header: 'Dif. -', key: 'negativas', width: 38, align: 'right' },
+        { header: 'Observaciones', key: 'observaciones', width: 157 }
+      ],
+      filas: filas.map((fila, index) => ({
+        numero: index + 1,
+        codConteo: fila.cod_conteo,
+        estado: fila.estado,
+        fechaApertura: fila.fecha_apertura ? new Date(fila.fecha_apertura).toLocaleString('es-HN') : '-',
+        fechaCierre: fila.fecha_cierre ? new Date(fila.fecha_cierre).toLocaleString('es-HN') : '-',
+        usuarioApertura: fila.usuario_apertura || '-',
+        usuarioCierre: fila.usuario_cierre || '-',
+        totalDetalles: Number(fila.total_detalles || 0),
+        positivas: Number(fila.total_diferencias_positivas || 0),
+        negativas: Number(fila.total_diferencias_negativas || 0),
+        observaciones: formatearTextoPdfMultilinea(fila.observaciones || fila.observaciones_cierre || '-')
+      }))
+    });
   }
 
   // // Lista detalle persistido de un conteo para recuperar historial completo

@@ -18,6 +18,19 @@ export const listarConteos = async (req, res, next) => {
   }
 };
 
+// // GET /api/inventario/conteos/reporte/pdf
+// // Exporta historial de conteos en PDF profesional
+export const exportarConteosPdf = async (req, res, next) => {
+  try {
+    const pdf = await inventarioConteosService.exportarReportePdf(req.query);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="reporte-conteos.pdf"');
+    return res.send(pdf);
+  } catch (error) {
+    next(error);
+  }
+};
+
 // // GET /api/inventario/conteos/:id/detalles
 // // Lista detalles persistidos de un conteo especifico
 export const listarDetallesConteo = async (req, res, next) => {

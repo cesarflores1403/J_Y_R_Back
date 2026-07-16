@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { getProducto, createProducto, updateProducto, deleteProducto, cambiarEstado, cambiarEstadoMasivo, subirImagen, eliminarImagen } from '../controllers/productoController.js';
+import { getProducto, createProducto, updateProducto, deleteProducto, cambiarEstado, cambiarEstadoMasivo, subirImagen, eliminarImagen, exportarReportePdf } from '../controllers/productoController.js';
 import { importarProductos, descargarPlantilla } from '../controllers/importacionController.js';
 import {
   validarCrearProducto,
@@ -50,6 +50,9 @@ const upload = multer({
 
 // GET /api/v1/productos
 router.get('/', getProducto);
+
+// GET /api/v1/productos/reporte/pdf
+router.get('/reporte/pdf', exportarReportePdf);
 
 // POST /api/v1/productos
 router.post('/', validarCrearProducto, createProducto);

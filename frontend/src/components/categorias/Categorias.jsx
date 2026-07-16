@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { categoriaService } from '../../services/serviceIndex.js';
 import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
-import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight, FiTrash2, FiTag } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight, FiTrash2, FiTag, FiDownload } from 'react-icons/fi';
 import { confirmDialog } from '../../utils/notifications.js';
 
 const camposIniciales = { nombre_categoria: '', descripcion: '' };
@@ -18,6 +18,7 @@ const Categorias = () => {
   const [editando, setEditando] = useState(null);
   const [form, setForm] = useState(camposIniciales);
   const [guardando, setGuardando] = useState(false);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -94,6 +95,26 @@ const Categorias = () => {
     }
   };
 
+  const exportarPdf = async () => {
+    setExportandoPdf(true);
+    try {
+      const response = await categoriaService.exportarPdf({ buscar });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'reporte-categorias.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Reporte de categorias exportado');
+    } catch (err) {
+      toast.error(err.response?.data?.mensaje || 'Error al exportar categorias en PDF');
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -113,7 +134,13 @@ const Categorias = () => {
             </p>
           </div>
         </div>
-        <button className="btn jyr-btn-primary" onClick={abrirCrear}><FiPlus className="me-2" />Nueva Categoría</button>
+        <div className="d-flex gap-2">
+          <button className="btn jyr-btn-primary" onClick={exportarPdf} disabled={exportandoPdf || cargando}>
+            {exportandoPdf ? <span className="spinner-border spinner-border-sm me-2" /> : <FiDownload className="me-2" />}
+            Exportar PDF
+          </button>
+          <button className="btn jyr-btn-primary" onClick={abrirCrear}><FiPlus className="me-2" />Nueva Categoría</button>
+        </div>
       </div>
 
       {/* Buscador */}

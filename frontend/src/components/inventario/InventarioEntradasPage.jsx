@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FiDatabase, FiPlus, FiPlusCircle } from 'react-icons/fi';
+import { FiDatabase, FiDownload, FiPlus, FiPlusCircle } from 'react-icons/fi';
 import EntradaForm from './EntradaForm.jsx';
 import EntradasFiltros from './EntradasFiltros.jsx';
 import EntradasTabla from './EntradasTabla.jsx';
@@ -113,6 +113,7 @@ const InventarioEntradasPage = () => {
   const [productos, setProductos] = useState([]);
   const [filas, setFilas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
   const [error, setError] = useState('');
   const [meta, setMeta] = useState({
     total: 0,
@@ -294,6 +295,36 @@ const InventarioEntradasPage = () => {
     }
   };
 
+  const exportarPdf = async () => {
+    try {
+      setExportandoPdf(true);
+      setError('');
+
+      const params = limpiarParamsConsulta({
+        fecha_desde: consulta.fecha_desde,
+        fecha_hasta: consulta.fecha_hasta,
+        cod_producto: normalizarCodProducto(consulta.cod_producto),
+        cod_ubicacion: normalizarCodUbicacion(consulta.cod_ubicacion),
+        estado: consulta.estado || 'TODAS'
+      });
+
+      const { data } = await inventarioEntradasApi.exportarPdf(params);
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'reporte-entradas.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(obtenerMensajeError(err));
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
   const inicioMostrado = meta.total > 0
     ? ((meta.pagina - 1) * meta.limite) + 1
     : 0;
@@ -329,6 +360,15 @@ const InventarioEntradasPage = () => {
               <span className="kdx-mini-kpi-label">Total</span>
               <strong>{meta.total}</strong>
             </div>
+            <button
+              type="button"
+              className="btn kdx-btn kdx-btn-accent"
+              onClick={exportarPdf}
+              disabled={exportandoPdf || loading}
+            >
+              {exportandoPdf ? <span className="spinner-border spinner-border-sm me-1" /> : <FiDownload className="me-1" />}
+              Exportar PDF
+            </button>
             <button
               type="button"
               className="btn kdx-btn kdx-btn-accent"

@@ -108,6 +108,7 @@ const Ubicaciones = () => {
   const [ubicaciones, setUbicaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
   const [loadingProductos, setLoadingProductos] = useState(false);
   const confirm = useConfirm();
   const [error, setError] = useState('');
@@ -393,11 +394,39 @@ const Ubicaciones = () => {
     await reactivar(ubicacion.cod_ubicacion);
   };
 
+  const exportarPdf = async () => {
+    try {
+      setExportandoPdf(true);
+      setError('');
+
+      const { data } = await ubicacionService.exportarPdf({
+        includeInactive: filtrosAplicados.includeInactive ? 'true' : 'false',
+        search: filtrosAplicados.search || undefined
+      });
+
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'reporte-ubicaciones.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(extraerError(err));
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
   return (
     <section className="kdx-shell mt-4">
       <UbicacionesHeader
         totalUbicaciones={totalUbicaciones}
         onNuevaUbicacion={abrirCrear}
+        onExportarPdf={exportarPdf}
+        exportandoPdf={exportandoPdf}
       />
 
       <UbicacionesFiltrosPanel

@@ -5,7 +5,7 @@ import ProductoFicha from '../components/producto/ProductoFicha.jsx'; // // HU-0
 import { useProducto } from '../hooks/useProducto.js'; // // Hook
 import { useAuth } from '../contexts/AuthContext.jsx'; // // HU-09: Permisos
 import { useCategorias } from '../hooks/useCategorias.js'; // // HU-09: Mapa categorías
-import { FiPackage } from 'react-icons/fi';
+import { FiDownload, FiPackage, FiPlus } from 'react-icons/fi';
 
 const ProductoPage = () => {
   const { usuario } = useAuth(); // // HU-09: rol del usuario
@@ -14,6 +14,7 @@ const ProductoPage = () => {
     producto,
     loading,
     saving,
+    exportandoPdf,
     crear,
     actualizar,
     eliminar,
@@ -21,6 +22,7 @@ const ProductoPage = () => {
     cambiarEstadoMasivo,
     subirImagen,
     eliminarImagenProducto,
+    exportarPdf,
   } = useProducto();
 
   const [selected, setSelected] = useState(null);
@@ -92,15 +94,27 @@ const ProductoPage = () => {
               </div>
             </div>
 
-            {puedeEditar && (
+            <div className="d-flex gap-2">
               <button
                 type="button"
                 className="jyr-btn jyr-btn-primary"
-                onClick={() => { setSelected(null); setDuplicateSource(null); setVista('formulario'); }}
+                onClick={() => exportarPdf()}
+                disabled={exportandoPdf || loading}
               >
-                Nuevo Producto
+                {exportandoPdf ? <span className="spinner-border spinner-border-sm me-2" /> : <FiDownload className="me-2" />}
+                Exportar PDF
               </button>
-            )}
+
+              {puedeEditar && (
+                <button
+                  type="button"
+                  className="jyr-btn jyr-btn-primary"
+                  onClick={() => { setSelected(null); setDuplicateSource(null); setVista('formulario'); }}
+                >
+                  <FiPlus className="me-2" />Nuevo Producto
+                </button>
+              )}
+            </div>
           </div>
 
           {loading ? (

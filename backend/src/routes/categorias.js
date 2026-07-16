@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { validarCampos } from '../middlewares/validar.js';
 import { autenticar } from '../middlewares/auth.js';
-import { listar, listarActivas, obtener, crear, actualizar, toggleEstado, eliminar } from '../controllers/categoriaProductoController.js';
+import { listar, listarActivas, obtener, crear, actualizar, toggleEstado, eliminar, exportarReportePdf } from '../controllers/categoriaProductoController.js';
 
 const router = Router();
 
@@ -13,6 +13,9 @@ router.get('/', listar);
 
 // GET /api/categorias/activas — solo activas (para selects)
 router.get('/activas', listarActivas);
+
+// GET /api/categorias/reporte/pdf — exportar reporte PDF
+router.get('/reporte/pdf', exportarReportePdf);
 
 // GET /api/categorias/:id — detalle
 router.get('/:id', obtener);

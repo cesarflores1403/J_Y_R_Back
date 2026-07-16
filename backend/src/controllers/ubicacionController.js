@@ -14,6 +14,17 @@ export const listar = async (req, res, next) => {
   }
 };
 
+export const exportarReportePdf = async (req, res, next) => {
+  try {
+    const pdf = await ubicacionService.exportarReportePdf(req.query);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="reporte-ubicaciones.pdf"');
+    return res.send(pdf);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const obtener = async (req, res, next) => {
   try {
     const data = await ubicacionService.obtenerPorId(req.params.id);

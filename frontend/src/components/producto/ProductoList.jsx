@@ -468,7 +468,6 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
           </button>
         )}
 
-        {/* Limpiar filtros */}
         {hayFiltros && (
           <button
             className="jyr-btn jyr-btn-sm jyr-btn-outline"

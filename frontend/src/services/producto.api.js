@@ -11,6 +11,30 @@ const construirUrlApi = (ruta) => {
 export const productoApi = {
   getAll: () => apiFetch('/api/producto', { method: 'GET' }), // // GET lista
 
+  exportarPdf: async ({ buscar = '', estado = '' } = {}) => {
+    const params = new URLSearchParams();
+    if (buscar) params.set('buscar', buscar);
+    if (estado) params.set('estado', estado);
+
+    const query = params.toString();
+    const url = construirUrlApi(`/api/producto/reporte/pdf${query ? `?${query}` : ''}`);
+    const token = localStorage.getItem('jyr_token');
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error al exportar productos en PDF (HTTP ${response.status})`);
+    }
+
+    return response.blob();
+  },
+
   create: (payload) =>
     apiFetch('/api/producto', {
       method: 'POST',

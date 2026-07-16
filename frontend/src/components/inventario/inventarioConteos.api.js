@@ -4,6 +4,7 @@ import api from '../../services/axiosApi.js';
 export const inventarioConteosApi = {
   // // GET listado de conteos persistidos
   listar: (params) => api.get('/inventario/conteos', { params }),
+  exportarPdf: (params) => api.get('/inventario/conteos/reporte/pdf', { params, responseType: 'blob' }),
   // // GET detalle persistido de un conteo
   listarDetalles: (codConteo, params) => api.get(`/inventario/conteos/${codConteo}/detalles`, { params }),
   // // Etapa 1: abrir conteo

@@ -38,6 +38,7 @@ export const ubicacionService = {
   desactivar: (id) => api.patch(`/ubicaciones/${id}/desactivar`),
   reactivar: (id) => api.patch(`/ubicaciones/${id}/reactivar`),
   eliminar: (id) => api.delete(`/ubicaciones/${id}`),
+  exportarPdf: (params) => api.get('/ubicaciones/reporte/pdf', { params, responseType: 'blob' }),
 };
 
 export const productoService = {
@@ -78,6 +79,7 @@ export const categoriaService = {
   actualizar: (id, data) => api.put(`/categorias/${id}`, data),
   toggleEstado: (id) => api.patch(`/categorias/${id}/toggle-estado`),
   eliminar: (id) => api.delete(`/categorias/${id}`),
+  exportarPdf: (params) => api.get('/categorias/reporte/pdf', { params, responseType: 'blob' }),
 };
 
 // ==================== COTIZACIONES (HU-FAC-08) ====================

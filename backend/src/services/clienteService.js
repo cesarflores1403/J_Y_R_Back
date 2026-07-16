@@ -1,5 +1,6 @@
 import { Op } from 'sequelize';
 import Cliente from '../models/Cliente.js';
+import { generarReportePdf } from '../utils/pdfReport.js';
 
 const construirWhereClientes = (buscar = '') => {
   const where = {};
@@ -15,79 +16,6 @@ const construirWhereClientes = (buscar = '') => {
   }
 
   return where;
-};
-
-const limpiarTextoPdf = (valor = '') => String(valor ?? '')
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .replace(/[^\x20-\x7E]/g, ' ')
-  .replace(/\s+/g, ' ')
-  .trim();
-
-const escaparTextoPdf = (valor = '') => limpiarTextoPdf(valor)
-  .replace(/\\/g, '\\\\')
-  .replace(/\(/g, '\\(')
-  .replace(/\)/g, '\\)');
-
-const truncar = (valor = '', largo = 20) => {
-  const texto = limpiarTextoPdf(valor);
-  return texto.length > largo ? `${texto.slice(0, largo - 1)}.` : texto;
-};
-
-const crearPdfDesdeLineas = (lineas = []) => {
-  const lineasPorPagina = 38;
-  const paginas = [];
-
-  for (let i = 0; i < lineas.length; i += lineasPorPagina) {
-    paginas.push(lineas.slice(i, i + lineasPorPagina));
-  }
-
-  const objetos = [];
-  objetos[1] = '';
-  objetos[2] = '<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>';
-  objetos[3] = '';
-
-  const kids = [];
-
-  for (const lineasPagina of paginas) {
-    const contenido = [
-      'BT',
-      '/F1 8 Tf',
-      '12 TL',
-      '36 550 Td',
-      ...lineasPagina.map((linea) => `(${escaparTextoPdf(linea)}) Tj T*`),
-      'ET'
-    ].join('\n');
-
-    const contenidoIndice = objetos.length;
-    objetos[contenidoIndice] = `<< /Length ${Buffer.byteLength(contenido, 'latin1')} >>\nstream\n${contenido}\nendstream`;
-
-    const paginaIndice = objetos.length;
-    objetos[paginaIndice] = `<< /Type /Page /Parent 3 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 2 0 R >> >> /Contents ${contenidoIndice} 0 R >>`;
-    kids.push(`${paginaIndice} 0 R`);
-  }
-
-  objetos[1] = '<< /Type /Catalog /Pages 3 0 R >>';
-  objetos[3] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${kids.length} >>`;
-
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-
-  for (let i = 1; i < objetos.length; i += 1) {
-    offsets[i] = Buffer.byteLength(pdf, 'latin1');
-    pdf += `${i} 0 obj\n${objetos[i]}\nendobj\n`;
-  }
-
-  const xrefOffset = Buffer.byteLength(pdf, 'latin1');
-  pdf += `xref\n0 ${objetos.length}\n0000000000 65535 f \n`;
-
-  for (let i = 1; i < objetos.length; i += 1) {
-    pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
-  }
-
-  pdf += `trailer\n<< /Size ${objetos.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-
-  return Buffer.from(pdf, 'latin1');
 };
 
 class ClienteService {
@@ -212,36 +140,35 @@ class ClienteService {
       order: [['cod_cliente', 'DESC']]
     });
 
-    const fecha = new Date().toLocaleString();
-    const lineas = [
-      'REPORTE DE CLIENTES',
-      `Fecha de generacion: ${fecha}`,
-      buscar ? `Filtro aplicado: ${buscar}` : 'Filtro aplicado: Todos',
-      `Total de clientes: ${clientes.length}`,
-      '',
-      '#    Nombre                   DNI           RTN            Empresa          Telefono  Correo',
-      '---- ------------------------ ------------- -------------- ---------------- -------- ------------------------------'
-    ];
-
-    clientes.forEach((cliente, index) => {
-      const nombre = `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim();
-      lineas.push([
-        String(index + 1).padEnd(4),
-        truncar(nombre, 24).padEnd(24),
-        truncar(cliente.dni || '-', 13).padEnd(13),
-        truncar(cliente.rtn || '-', 14).padEnd(14),
-        truncar(cliente.empresa || '-', 16).padEnd(16),
-        truncar(cliente.telefono || '-', 8).padEnd(8),
-        truncar(cliente.correo || '-', 30).padEnd(30)
-      ].join(' '));
-
-      const direccion = truncar(cliente.direccion || '-', 100);
-      if (direccion && direccion !== '-') {
-        lineas.push(`     Direccion: ${direccion}`);
-      }
+    return generarReportePdf({
+      titulo: 'Reporte de clientes',
+      filtros: [
+        { label: 'Filtro', value: buscar || 'Todos' }
+      ],
+      metricas: [
+        { label: 'Total de clientes', value: clientes.length }
+      ],
+      columnas: [
+        { header: '#', key: 'numero', width: 28, align: 'center' },
+        { header: 'Cliente', key: 'cliente', width: 105 },
+        { header: 'DNI', key: 'dni', width: 75 },
+        { header: 'RTN', key: 'rtn', width: 78 },
+        { header: 'Empresa', key: 'empresa', width: 80 },
+        { header: 'Telefono', key: 'telefono', width: 55 },
+        { header: 'Correo', key: 'correo', width: 125 },
+        { header: 'Direccion', key: 'direccion', width: 174 }
+      ],
+      filas: clientes.map((cliente, index) => ({
+        numero: index + 1,
+        cliente: `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim(),
+        dni: cliente.dni,
+        rtn: cliente.rtn,
+        empresa: cliente.empresa,
+        telefono: cliente.telefono,
+        correo: cliente.correo,
+        direccion: cliente.direccion
+      }))
     });
-
-    return crearPdfDesdeLineas(lineas);
   }
 }
 

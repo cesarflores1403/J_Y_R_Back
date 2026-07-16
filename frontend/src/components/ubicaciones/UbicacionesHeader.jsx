@@ -1,9 +1,11 @@
 import React from 'react';
-import { FiMapPin, FiPlus } from 'react-icons/fi';
+import { FiDownload, FiMapPin, FiPlus } from 'react-icons/fi';
 
 const UbicacionesHeader = ({
   totalUbicaciones = 0,
-  onNuevaUbicacion
+  onNuevaUbicacion,
+  onExportarPdf,
+  exportandoPdf = false
 }) => (
   <div className="kdx-hero">
     <div className="kdx-hero-head">
@@ -24,6 +26,10 @@ const UbicacionesHeader = ({
           <span className="kdx-mini-kpi-label">Total</span>
           <strong>{totalUbicaciones}</strong>
         </div>
+        <button type="button" className="btn kdx-btn kdx-btn-accent" onClick={onExportarPdf} disabled={exportandoPdf}>
+          {exportandoPdf ? <span className="spinner-border spinner-border-sm me-1" /> : <FiDownload className="me-1" />}
+          Exportar PDF
+        </button>
         <button type="button" className="btn kdx-btn kdx-btn-accent" onClick={onNuevaUbicacion}>
           <FiPlus className="me-1" />
           Nueva ubicacion

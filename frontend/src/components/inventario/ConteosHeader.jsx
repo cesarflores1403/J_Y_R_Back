@@ -1,9 +1,11 @@
 import React from 'react';
-import { FiClipboard, FiPlus } from 'react-icons/fi';
+import { FiClipboard, FiDownload, FiPlus } from 'react-icons/fi';
 
 const ConteosHeader = ({
   total = 0,
-  onNuevoConteo
+  onNuevoConteo,
+  onExportarPdf,
+  exportandoPdf = false
 }) => (
   <div className="kdx-hero">
     <div className="kdx-hero-head">
@@ -22,6 +24,15 @@ const ConteosHeader = ({
           <span className="kdx-mini-kpi-label">Total</span>
           <strong>{total}</strong>
         </div>
+        <button
+          type="button"
+          className="btn kdx-btn kdx-btn-accent"
+          onClick={onExportarPdf}
+          disabled={exportandoPdf}
+        >
+          {exportandoPdf ? <span className="spinner-border spinner-border-sm me-1" /> : <FiDownload className="me-1" />}
+          Exportar PDF
+        </button>
         <button
           type="button"
           className="btn kdx-btn kdx-btn-accent"

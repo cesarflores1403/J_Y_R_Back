@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import { validarCampos } from '../middlewares/validar.js';
 import { autenticar } from '../middlewares/auth.js';
-import { listar, obtener, crear, actualizar, eliminar, desactivar, reactivar } from '../controllers/ubicacionController.js';
+import { listar, obtener, crear, actualizar, eliminar, desactivar, reactivar, exportarReportePdf } from '../controllers/ubicacionController.js';
 
 const router = Router();
 const esBusquedaNumericaInvalida = (valor = '') => {
@@ -52,6 +52,28 @@ router.get('/', [
     .withMessage('limit debe ser un entero entre 1 y 200'),
   validarCampos
 ], listar);
+
+router.get('/reporte/pdf', [
+  query('includeInactive')
+    .optional()
+    .isBoolean()
+    .withMessage('includeInactive debe ser true o false'),
+  query('search')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 120 })
+    .withMessage('search debe ser texto de hasta 120 caracteres')
+    .custom(rechazarBusquedaNumericaInvalida),
+  query('buscar')
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 120 })
+    .withMessage('buscar debe ser texto de hasta 120 caracteres')
+    .custom(rechazarBusquedaNumericaInvalida),
+  validarCampos
+], exportarReportePdf);
 
 router.get('/:id', [
   param('id')

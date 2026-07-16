@@ -9,6 +9,17 @@ export const listar = async (req, res) => {
   }
 };
 
+export const exportarReportePdf = async (req, res) => {
+  try {
+    const pdf = await categoriaProductoService.exportarReportePdf(req.query);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="reporte-categorias.pdf"');
+    res.send(pdf);
+  } catch (error) {
+    res.status(500).json({ ok: false, mensaje: error.message });
+  }
+};
+
 export const listarActivas = async (req, res) => {
   try {
     const datos = await categoriaProductoService.listarActivas();

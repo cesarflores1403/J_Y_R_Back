@@ -3,6 +3,7 @@ import pool from '../config/db-connection.js';
 import fs from 'fs';
 import path from 'path';
 import bitacoraFacturacionService from './bitacoraFacturacionService.js';
+import { generarReportePdf } from '../utils/pdfReport.js';
 
 // =====================================================
 // SERVICE: Producto
@@ -272,6 +273,76 @@ export const getProductoConAuditoria = async ({ incluirAuditoria = false } = {})
   const productosConMargen = (productos || []).map((p) => anexarMargenGanancia(p));
   if (incluirAuditoria) return productosConMargen;
   return productosConMargen.map((p) => quitarAuditoriaProducto(p));
+};
+
+const formatearUbicacionProducto = (producto = {}) => {
+  const partes = [
+    producto.ubi_pasillo ? `P:${producto.ubi_pasillo}` : '',
+    producto.ubi_estanteria ? `E:${producto.ubi_estanteria}` : '',
+    producto.ubi_nivel_1 ? `N1:${producto.ubi_nivel_1}` : '',
+    producto.ubi_nivel_2 ? `N2:${producto.ubi_nivel_2}` : ''
+  ].filter(Boolean);
+
+  return partes.length > 0 ? partes.join(' / ') : '-';
+};
+
+export const exportarReportePdf = async ({ incluirAuditoria = false, buscar = '', estado = '' } = {}) => {
+  const productos = await getProductoConAuditoria({ incluirAuditoria });
+  const busqueda = String(buscar || '').trim().toLowerCase();
+  const estadoFiltro = String(estado || '').trim();
+
+  const filtrados = productos.filter((producto) => {
+    if (estadoFiltro && producto.estado_producto !== estadoFiltro) return false;
+
+    if (!busqueda) return true;
+
+    const texto = [
+      producto.codigo_producto,
+      producto.cod_producto,
+      producto.nombre_producto,
+      producto.descripcion,
+      producto.unidad_medida,
+      producto.estado_producto,
+      producto.isv_descripcion
+    ].join(' ').toLowerCase();
+
+    return texto.includes(busqueda);
+  });
+
+  return generarReportePdf({
+    titulo: 'Reporte de productos',
+    filtros: [
+      { label: 'Busqueda', value: buscar || 'Todos' },
+      { label: 'Estado', value: estado || 'Todos' }
+    ],
+    metricas: [
+      { label: 'Total de productos', value: filtrados.length }
+    ],
+    columnas: [
+      { header: '#', key: 'numero', width: 28, align: 'center' },
+      { header: 'Codigo', key: 'codigo', width: 58 },
+      { header: 'Producto', key: 'nombre', width: 138 },
+      { header: 'Unidad', key: 'unidad', width: 48 },
+      { header: 'Precio', key: 'precio', width: 54, align: 'right' },
+      { header: 'Stock', key: 'stock', width: 42, align: 'right' },
+      { header: 'ISV', key: 'isv', width: 45, align: 'right' },
+      { header: 'Estado', key: 'estado', width: 68 },
+      { header: 'Ubicacion', key: 'ubicacion', width: 105 },
+      { header: 'Descripcion', key: 'descripcion', width: 134 }
+    ],
+    filas: filtrados.map((producto, index) => ({
+      numero: index + 1,
+      codigo: producto.codigo_producto || `PROD-${String(producto.cod_producto).padStart(4, '0')}`,
+      nombre: producto.nombre_producto,
+      unidad: producto.unidad_medida,
+      precio: `L. ${Number(producto.precio_venta || 0).toFixed(2)}`,
+      stock: Number(producto.stock_total || 0),
+      isv: `${Number(producto.isv_porcentaje || 0).toFixed(2)}%`,
+      estado: producto.estado_producto,
+      ubicacion: formatearUbicacionProducto(producto),
+      descripcion: producto.descripcion || '-'
+    }))
+  });
 };
 
 // =======================

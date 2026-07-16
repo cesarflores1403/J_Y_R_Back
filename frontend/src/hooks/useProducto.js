@@ -6,6 +6,7 @@ export const useProducto = () => {
   const [producto, setProducto] = useState([]); // // Lista
   const [loading, setLoading] = useState(true); // // Loading lista
   const [saving, setSaving] = useState(false); // // Loading acciones (POST/PUT/DELETE)
+  const [exportandoPdf, setExportandoPdf] = useState(false);
   const [error, setError] = useState(''); // // Error general
   const [success, setSuccess] = useState(''); // // Mensaje éxito
 
@@ -213,6 +214,29 @@ export const useProducto = () => {
     }
   };
 
+  const exportarPdf = async (filtros = {}) => {
+    try {
+      setExportandoPdf(true);
+      limpiarMensajes();
+
+      const blob = await productoApi.exportarPdf(filtros);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'reporte-productos.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Reporte de productos exportado');
+    } catch (e) {
+      setError(e.message || 'Error al exportar productos en PDF');
+      toast.error(e.message || 'Error al exportar productos en PDF');
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
   useEffect(() => {
     cargar(); // // Carga inicial
   }, []);
@@ -221,6 +245,7 @@ export const useProducto = () => {
     producto, // // Lista
     loading, // // Loading lista
     saving, // // Loading acciones
+    exportandoPdf,
     error, // // Mensaje error
     success, // // Mensaje éxito
     setError, // // Setter error
@@ -233,6 +258,7 @@ export const useProducto = () => {
     cambiarEstadoMasivo, // // Cambiar estado masivo
     subirImagen, // // HU-08: Subir/reemplazar imagen
     eliminarImagenProducto, // // HU-08: Eliminar imagen
+    exportarPdf,
   };
 };
 

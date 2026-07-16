@@ -1,22 +1,29 @@
 import { Op } from 'sequelize';
 import CategoriaProducto from '../models/CategoriaProducto.js';
 import ProductoSeq from '../models/ProductoSeq.js';
+import { generarReportePdf } from '../utils/pdfReport.js';
+
+const construirWhereCategorias = (buscar = '', soloActivas = '') => {
+  const where = {};
+
+  if (buscar) {
+    where[Op.or] = [
+      { nombre_categoria: { [Op.iLike]: `%${buscar}%` } },
+      { descripcion: { [Op.iLike]: `%${buscar}%` } }
+    ];
+  }
+
+  if (soloActivas === 'true' || soloActivas === '1') {
+    where.estado_categoria = true;
+  }
+
+  return where;
+};
 
 class CategoriaProductoService {
   // Listar categorías con búsqueda y paginación
   async listar({ pagina = 1, limite = 15, buscar = '', soloActivas = '' }) {
-    const where = {};
-
-    if (buscar) {
-      where[Op.or] = [
-        { nombre_categoria: { [Op.iLike]: `%${buscar}%` } },
-        { descripcion: { [Op.iLike]: `%${buscar}%` } }
-      ];
-    }
-
-    if (soloActivas === 'true' || soloActivas === '1') {
-      where.estado_categoria = true;
-    }
+    const where = construirWhereCategorias(buscar, soloActivas);
 
     const { count, rows } = await CategoriaProducto.findAndCountAll({
       where,
@@ -28,6 +35,38 @@ class CategoriaProductoService {
     return { datos: rows, total: count, pagina: parseInt(pagina), totalPaginas: Math.ceil(count / limite) };
   }
 
+  async exportarReportePdf({ buscar = '', soloActivas = '' } = {}) {
+    const categorias = await CategoriaProducto.findAll({
+      where: construirWhereCategorias(buscar, soloActivas),
+      order: [['nombre_categoria', 'ASC']],
+      attributes: ['cod_categoria', 'nombre_categoria', 'descripcion', 'estado_categoria']
+    });
+
+    return generarReportePdf({
+      titulo: 'Reporte de categorias',
+      filtros: [
+        { label: 'Busqueda', value: buscar || 'Todos' },
+        { label: 'Solo activas', value: soloActivas === 'true' || soloActivas === '1' ? 'Si' : 'No' }
+      ],
+      metricas: [
+        { label: 'Total de categorias', value: categorias.length }
+      ],
+      columnas: [
+        { header: '#', key: 'numero', width: 36, align: 'center' },
+        { header: 'ID', key: 'id', width: 50, align: 'center' },
+        { header: 'Categoria', key: 'nombre', width: 190 },
+        { header: 'Descripcion', key: 'descripcion', width: 330 },
+        { header: 'Estado', key: 'estado', width: 114 }
+      ],
+      filas: categorias.map((categoria, index) => ({
+        numero: index + 1,
+        id: categoria.cod_categoria,
+        nombre: categoria.nombre_categoria,
+        descripcion: categoria.descripcion || '-',
+        estado: categoria.estado_categoria ? 'Activa' : 'Inactiva'
+      }))
+    });
+  }
   // Listar todas las activas (para selects/dropdowns, sin paginación)
   async listarActivas() {
     const categorias = await CategoriaProducto.findAll({

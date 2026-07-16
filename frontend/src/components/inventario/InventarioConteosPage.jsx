@@ -142,6 +142,7 @@ const InventarioConteosPage = () => {
     totalPaginas: 1
   });
   const [loadingConteos, setLoadingConteos] = useState(true);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
 
   const [conteoActivo, setConteoActivo] = useState(null);
   const [detalles, setDetalles] = useState([]);
@@ -495,6 +496,38 @@ const InventarioConteosPage = () => {
     }));
   };
 
+  const exportarPdf = async () => {
+    try {
+      setExportandoPdf(true);
+      setError('');
+      setSuccess('');
+
+      const params = limpiarParams({
+        cod_conteo: normalizarEnteroPositivo(consulta.cod_conteo),
+        estado: consulta.estado,
+        cod_usuario_apertura: normalizarEnteroPositivo(consulta.cod_usuario_apertura),
+        cod_usuario_cierre: normalizarEnteroPositivo(consulta.cod_usuario_cierre),
+        fecha_desde: consulta.fecha_desde,
+        fecha_hasta: consulta.fecha_hasta
+      });
+
+      const { data } = await inventarioConteosApi.exportarPdf(params);
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'reporte-conteos.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(obtenerMensajeError(err, 'Error al exportar conteos en PDF'));
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
   const inicioConteos = meta.total > 0 ? ((meta.pagina - 1) * meta.limite) + 1 : 0;
   const finConteos = meta.total > 0 ? Math.min(meta.pagina * meta.limite, meta.total) : 0;
 
@@ -506,6 +539,8 @@ const InventarioConteosPage = () => {
       <ConteosHeader
         total={meta.total}
         onNuevoConteo={() => setModalAperturaAbierto(true)}
+        onExportarPdf={exportarPdf}
+        exportandoPdf={exportandoPdf}
       />
 
       <ConteosFiltrosCard

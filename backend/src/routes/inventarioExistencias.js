@@ -4,11 +4,11 @@ import { autenticar, autorizar } from '../middlewares/auth.js';
 import { validarCampos } from '../middlewares/validar.js';
 import { listarExistencias, listarAlertasStockBajo, actualizarMinMax } from '../controllers/inventarioExistenciasController.js';
 import { listarMovimientos } from '../controllers/inventarioMovimientosController.js';
-import { registrarEntrada, anularEntrada } from '../controllers/inventarioEntradasController.js';
+import { registrarEntrada, anularEntrada, exportarEntradasPdf } from '../controllers/inventarioEntradasController.js';
 import { registrarSalida, anularSalida } from '../controllers/inventarioSalidasController.js';
 import { registrarBaja, anularBaja } from '../controllers/inventarioBajasController.js';
 import { listarTransferencias, registrarTransferencia, anularTransferencia } from '../controllers/inventarioTransferenciasController.js';
-import { listarConteos, listarDetallesConteo, abrirConteo, registrarDetalleConteo, cerrarConteo } from '../controllers/inventarioConteosController.js';
+import { listarConteos, listarDetallesConteo, abrirConteo, registrarDetalleConteo, cerrarConteo, exportarConteosPdf } from '../controllers/inventarioConteosController.js';
 import { listarReservas, crearReserva, liberarReserva, consumirReserva } from '../controllers/inventarioReservasController.js';
 
 const router = Router();
@@ -254,6 +254,37 @@ router.put('/existencias/:id', autorizar(...ROLES_INVENTARIO), [
   // // Ejecuta respuesta 400 si alguna validacion falla
   validarCampos
 ], actualizarMinMax);
+
+// // GET /api/inventario/entradas/reporte/pdf
+// // Exporta entradas historicas en PDF
+router.get('/entradas/reporte/pdf', autorizar(...ROLES_INVENTARIO), [
+  query('fecha_desde')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_desde debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  query('fecha_hasta')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_hasta debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  query('cod_producto')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_producto debe ser un entero mayor a 0')
+    .toInt(),
+  query('cod_ubicacion')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_ubicacion debe ser un entero mayor a 0')
+    .toInt(),
+  query('estado')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('estado debe tener entre 1 y 20 caracteres'),
+  validarCampos
+], exportarEntradasPdf);
 
 // // POST /api/inventario/entradas
 // // Registra una entrada y actualiza inventario de forma transaccional (HU4)
@@ -702,6 +733,42 @@ router.get('/conteos', autorizar(...ROLES_INVENTARIO), [
     .toDate(),
   validarCampos
 ], listarConteos);
+
+// // GET /api/inventario/conteos/reporte/pdf
+// // Exporta historial de conteos en PDF
+router.get('/conteos/reporte/pdf', autorizar(...ROLES_INVENTARIO), [
+  query('cod_conteo')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_conteo debe ser un entero mayor a 0')
+    .toInt(),
+  query('estado')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('estado debe tener entre 1 y 20 caracteres'),
+  query('cod_usuario_apertura')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_usuario_apertura debe ser un entero mayor a 0')
+    .toInt(),
+  query('cod_usuario_cierre')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_usuario_cierre debe ser un entero mayor a 0')
+    .toInt(),
+  query('fecha_desde')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_desde debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  query('fecha_hasta')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_hasta debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  validarCampos
+], exportarConteosPdf);
 
 // // POST /api/inventario/conteos
 // // Abre encabezado de conteo fisico para captura posterior de detalle

@@ -246,7 +246,7 @@ const Clientes = () => {
         <h3 className="mb-0">Clientes ({clientes.length})</h3>
         <div className="d-flex gap-2">
           <button
-            className="btn btn-outline-secondary"
+            className="btn jyr-btn-primary"
             onClick={exportarPdf}
             disabled={exportandoPdf || cargando}
           >

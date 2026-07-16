@@ -31,6 +31,27 @@ export const getProducto = async (req, res, next) => {
 };
 
 // =======================
+// EXPORTAR REPORTE PDF
+// =======================
+export const exportarReportePdf = async (req, res, next) => {
+  try {
+    const rolUsuario = req.usuario?.rol || '';
+    const incluirAuditoria = rolUsuario === 'Administrador' || rolUsuario === 'Super Administrador';
+    const pdf = await productoService.exportarReportePdf({
+      incluirAuditoria,
+      buscar: req.query?.buscar || '',
+      estado: req.query?.estado || ''
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="reporte-productos.pdf"');
+    return res.send(pdf);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// =======================
 // CREATE PRODUCTO (HU-04: retorna producto con cod_producto asignado)
 // =======================
 export const createProducto = async (req, res, next) => {
