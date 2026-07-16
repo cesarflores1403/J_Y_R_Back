@@ -18,6 +18,19 @@ export const listarReservas = async (req, res, next) => {
   }
 };
 
+// // GET /api/inventario/reservas/reporte/pdf
+// // Exporta reservas de inventario en PDF profesional
+export const exportarReservasPdf = async (req, res, next) => {
+  try {
+    const pdf = await inventarioReservasService.exportarReportePdf(req.query);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="reporte-reservas.pdf"');
+    return res.send(pdf);
+  } catch (error) {
+    next(error);
+  }
+};
+
 // // POST /api/inventario/reservas
 // // Crea una reserva activa incrementando stock_reservado sin afectar stock total
 export const crearReserva = async (req, res, next) => {

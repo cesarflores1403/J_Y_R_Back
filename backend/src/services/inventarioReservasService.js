@@ -3,6 +3,7 @@ import ProductoSeq from '../models/ProductoSeq.js';
 import Ubicacion from '../models/Ubicacion.js';
 import inventarioMovimientosSchemaService from './inventarioMovimientosSchemaService.js';
 import inventarioReservasSchemaService from './inventarioReservasSchemaService.js';
+import { generarReportePdf } from '../utils/pdfReport.js';
 import {
   obtenerSelectInventarioPorProductoUbicacion,
   obtenerSelectInventarioPorId,
@@ -52,6 +53,22 @@ const normalizarFecha = (valor) => {
   const fecha = valor instanceof Date ? valor : new Date(valor);
   if (Number.isNaN(fecha.getTime())) return null;
   return fecha;
+};
+
+const formatearFechaPdf = (valor) => {
+  if (!valor) return '-';
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return String(valor);
+  return fecha.toLocaleString('es-HN');
+};
+
+const formatearUbicacionPdf = (valor = '') => {
+  const texto = String(valor || '').trim();
+  if (!texto) return '-';
+  const partes = texto.split('-').map((parte) => parte.trim()).filter(Boolean);
+  if (partes.length !== 4) return texto;
+  const [pasillo, estanteria, nivel1, nivel2] = partes;
+  return `P:${pasillo} E:${estanteria} N1:${nivel1} N2:${nivel2}`;
 };
 
 // // Detecta error de columna no existente (undefined_column) en PostgreSQL
@@ -326,6 +343,58 @@ class InventarioReservasService {
       limit,
       totalPages
     };
+  }
+
+  async exportarReportePdf(query = {}) {
+    const resultado = await this.listarReservas({
+      ...query,
+      page: 1,
+      pagina: 1,
+      limit: LIMITE_MAXIMO,
+      limite: LIMITE_MAXIMO
+    });
+
+    const filas = Array.isArray(resultado?.data) ? resultado.data : [];
+
+    return generarReportePdf({
+      titulo: 'Reporte de reservas',
+      filtros: [
+        { label: 'Producto', value: query.cod_producto || 'Todos' },
+        { label: 'Ubicacion', value: query.cod_ubicacion || 'Todas' },
+        { label: 'Estado', value: query.estado || 'TODAS' },
+        { label: 'Referencia', value: query.referencia || 'Todas' },
+        { label: 'Desde', value: query.fecha_desde || 'Todos' },
+        { label: 'Hasta', value: query.fecha_hasta || 'Todos' }
+      ],
+      metricas: [
+        { label: 'Total filtrado', value: resultado?.total || filas.length },
+        { label: 'Registros exportados', value: filas.length }
+      ],
+      columnas: [
+        { header: '#', key: 'numero', width: 26, align: 'center' },
+        { header: 'Reserva', key: 'codReserva', width: 52, align: 'center' },
+        { header: 'Fecha', key: 'fecha', width: 90 },
+        { header: 'Producto', key: 'producto', width: 120 },
+        { header: 'Ubicacion', key: 'ubicacion', width: 100 },
+        { header: 'Cant.', key: 'cantidad', width: 42, align: 'right' },
+        { header: 'Estado', key: 'estado', width: 70 },
+        { header: 'Referencia', key: 'referencia', width: 100 },
+        { header: 'Usuario', key: 'usuario', width: 70 },
+        { header: 'Observaciones', key: 'observaciones', width: 50 }
+      ],
+      filas: filas.map((fila, index) => ({
+        numero: index + 1,
+        codReserva: fila.cod_reserva,
+        fecha: formatearFechaPdf(fila.fecha_creacion),
+        producto: `${fila.nombre_producto || '-'} (${fila.cod_producto ?? '-'})`,
+        ubicacion: `${formatearUbicacionPdf(fila.ubicacion)} (${fila.cod_ubicacion ?? '-'})`,
+        cantidad: Number(fila.cantidad || 0).toLocaleString('es-HN'),
+        estado: fila.estado || '-',
+        referencia: fila.referencia || '-',
+        usuario: fila.usuario_creacion || '-',
+        observaciones: fila.observaciones || fila.motivo_liberacion || '-'
+      }))
+    });
   }
 
   // // Crea reserva valida incrementando stock_reservado sin tocar stock total

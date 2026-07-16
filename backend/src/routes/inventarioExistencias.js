@@ -6,10 +6,10 @@ import { listarExistencias, listarAlertasStockBajo, actualizarMinMax } from '../
 import { listarMovimientos } from '../controllers/inventarioMovimientosController.js';
 import { registrarEntrada, anularEntrada, exportarEntradasPdf } from '../controllers/inventarioEntradasController.js';
 import { registrarSalida, anularSalida } from '../controllers/inventarioSalidasController.js';
-import { registrarBaja, anularBaja } from '../controllers/inventarioBajasController.js';
+import { registrarBaja, anularBaja, exportarBajasPdf } from '../controllers/inventarioBajasController.js';
 import { listarTransferencias, registrarTransferencia, anularTransferencia } from '../controllers/inventarioTransferenciasController.js';
 import { listarConteos, listarDetallesConteo, abrirConteo, registrarDetalleConteo, cerrarConteo, exportarConteosPdf } from '../controllers/inventarioConteosController.js';
-import { listarReservas, crearReserva, liberarReserva, consumirReserva } from '../controllers/inventarioReservasController.js';
+import { listarReservas, crearReserva, liberarReserva, consumirReserva, exportarReservasPdf } from '../controllers/inventarioReservasController.js';
 
 const router = Router();
 const ROLES_INVENTARIO = ['Administrador', 'Bodeguero'];
@@ -431,6 +431,37 @@ router.patch('/salidas/:id/anular', autorizar(...ROLES_INVENTARIO), [
     .withMessage('observaciones no puede exceder 500 caracteres'),
   validarCampos
 ], anularSalida);
+
+// // GET /api/inventario/bajas/reporte/pdf
+// // Exporta bajas historicas en PDF
+router.get('/bajas/reporte/pdf', autorizar(...ROLES_INVENTARIO), [
+  query('fecha_desde')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_desde debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  query('fecha_hasta')
+    .optional({ values: 'falsy' })
+    .isISO8601()
+    .withMessage('fecha_hasta debe tener formato de fecha valido (YYYY-MM-DD)')
+    .toDate(),
+  query('cod_producto')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_producto debe ser un entero mayor a 0')
+    .toInt(),
+  query('cod_ubicacion')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('cod_ubicacion debe ser un entero mayor a 0')
+    .toInt(),
+  query('estado')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('estado debe tener entre 1 y 20 caracteres'),
+  validarCampos
+], exportarBajasPdf);
 
 // // POST /api/inventario/bajas
 // // Registra una baja por dano/perdida con trazabilidad y control transaccional
@@ -932,6 +963,19 @@ router.get('/reservas', autorizar(...ROLES_RESERVAS), [
     .toDate(),
   validarCampos
 ], listarReservas);
+
+// // GET /api/inventario/reservas/reporte/pdf
+// // Exporta reservas persistidas en PDF
+router.get('/reservas/reporte/pdf', autorizar(...ROLES_RESERVAS), [
+  query('cod_reserva').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('cod_reserva debe ser un entero mayor a 0').toInt(),
+  query('cod_producto').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('cod_producto debe ser un entero mayor a 0').toInt(),
+  query('cod_ubicacion').optional({ values: 'falsy' }).isInt({ min: 1 }).withMessage('cod_ubicacion debe ser un entero mayor a 0').toInt(),
+  query('estado').optional({ values: 'falsy' }).trim().isLength({ min: 1, max: 20 }).withMessage('estado debe tener entre 1 y 20 caracteres'),
+  query('referencia').optional({ values: 'falsy' }).trim().isLength({ min: 1, max: 200 }).withMessage('referencia debe tener entre 1 y 200 caracteres'),
+  query('fecha_desde').optional({ values: 'falsy' }).isISO8601().withMessage('fecha_desde debe tener formato de fecha valido (YYYY-MM-DD)').toDate(),
+  query('fecha_hasta').optional({ values: 'falsy' }).isISO8601().withMessage('fecha_hasta debe tener formato de fecha valido (YYYY-MM-DD)').toDate(),
+  validarCampos
+], exportarReservasPdf);
 
 // // POST /api/inventario/reservas
 // // Crea una reserva incrementando stock_reservado sin descontar stock total
