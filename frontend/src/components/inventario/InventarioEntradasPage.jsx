@@ -124,6 +124,7 @@ const InventarioEntradasPage = () => {
   const [anulandoId, setAnulandoId] = useState(null);
   const [feedbackAnulacion, setFeedbackAnulacion] = useState('');
   const [modalEntradaAbierto, setModalEntradaAbierto] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { ubicaciones } = useUbicaciones();
 
   const obtenerCodigoProducto = (codProducto) => {
@@ -180,7 +181,7 @@ const InventarioEntradasPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [consulta]);
+  }, [consulta, refreshKey]);
 
   useEffect(() => {
     cargarEntradas();
@@ -243,7 +244,9 @@ const InventarioEntradasPage = () => {
   const manejarEntradaRegistrada = async (resultado) => {
     setUltimaEntrada(resultado || null);
     setFeedbackAnulacion('');
-    await cargarEntradas();
+    setFiltros((prev) => ({ ...prev, pagina: 1 }));
+    setConsulta((prev) => ({ ...prev, pagina: 1 }));
+    setRefreshKey((prev) => prev + 1);
   };
 
   const anularEntrada = async (fila) => {

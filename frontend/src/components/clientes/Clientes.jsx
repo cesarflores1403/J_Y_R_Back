@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { clienteService } from '../../services/serviceIndex.js';
 import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiDownload } from 'react-icons/fi';
 import { confirmDialog } from '../../utils/notifications.js';
 
 const camposIniciales = { nombre: '', apellido: '', dni: '', rtn: '', empresa: '', telefono: '', correo: '', direccion: '' };
@@ -43,6 +43,7 @@ const Clientes = () => {
   const [form, setForm] = useState(camposIniciales);
   const [guardando, setGuardando] = useState(false);
   const [seleccionados, setSeleccionados] = useState([]);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
 
   const cargar = useCallback(async (paginaForzada = pagina) => {
     setCargando(true);
@@ -217,11 +218,41 @@ const Clientes = () => {
     await cargar(pagina);
   };
 
+  const exportarPdf = async () => {
+    setExportandoPdf(true);
+
+    try {
+      const response = await clienteService.exportarPdf({ buscar });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'reporte-clientes.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Reporte de clientes exportado');
+    } catch (err) {
+      toast.error(err.response?.data?.mensaje || 'Error al exportar clientes en PDF');
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h3 className="mb-0">Clientes ({clientes.length})</h3>
         <div className="d-flex gap-2">
+          <button
+            className="btn btn-outline-secondary"
+            onClick={exportarPdf}
+            disabled={exportandoPdf || cargando}
+          >
+            {exportandoPdf ? <span className="spinner-border spinner-border-sm me-2" /> : <FiDownload className="me-2" />}
+            Exportar PDF
+          </button>
           <button className="btn jyr-btn-primary" onClick={abrirCrear}>
             <FiPlus className="me-2" />Nuevo Cliente
           </button>

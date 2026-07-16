@@ -16,6 +16,7 @@ export const clienteService = {
   actualizar: (id, data) => api.put(`/clientes/${id}`, data),
   eliminar: (id) => api.delete(`/clientes/${id}`),
   verificarDuplicado: (params) => api.get('/clientes/verificar-duplicado', { params }),
+  exportarPdf: (params) => api.get('/clientes/reporte/pdf', { params, responseType: 'blob' }),
 };
 
 // ==================== PROVEEDORES ====================

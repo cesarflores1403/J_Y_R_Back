@@ -67,11 +67,11 @@ const obtenerMensajeError = (error) => {
   return serverMessage || 'Error inesperado al registrar la salida';
 };
 
-const SalidaForm = ({ abierto = false, onClose, onSalidaRegistrada, productos = [] }) => {
+const SalidaForm = ({ abierto = false, onClose, onSalidaRegistrada, productos = [], ubicaciones = [] }) => {
   const [form, setForm] = useState(estadoInicial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const { ubicaciones, loadingUbicaciones } = useUbicaciones();
+  const { ubicaciones: ubicacionesHook, loadingUbicaciones } = useUbicaciones();
 
   const opcionesProducto = productos
     .filter((item) => String(item?.estado_producto || '').toLowerCase() === 'activo')
@@ -82,8 +82,15 @@ const SalidaForm = ({ abierto = false, onClose, onSalidaRegistrada, productos = 
     }))
     .filter((item) => Number.isInteger(Number(item.cod_producto)) && Number(item.cod_producto) > 0);
 
-  const opcionesUbicacion = (Array.isArray(ubicaciones) ? ubicaciones : [])
-    .filter((item) => Number.isInteger(Number(item?.cod_ubicacion)) && Number(item.cod_ubicacion) > 0);
+  const usarUbicacionesExternas = Array.isArray(ubicaciones) && ubicaciones.length > 0;
+  const ubicacionesCatalogo = usarUbicacionesExternas ? ubicaciones : ubicacionesHook;
+  const loadingOpcionesUbicacion = usarUbicacionesExternas ? false : loadingUbicaciones;
+  const opcionesUbicacion = (Array.isArray(ubicacionesCatalogo) ? ubicacionesCatalogo : [])
+    .filter((item) => Number.isInteger(Number(item?.cod_ubicacion)) && Number(item.cod_ubicacion) > 0)
+    .filter((item) => {
+      if (!form.cod_producto || item.cod_producto === undefined || item.cod_producto === null) return true;
+      return Number(item.cod_producto) === Number(form.cod_producto);
+    });
 
   useEffect(() => {
     if (!abierto) {
@@ -100,7 +107,8 @@ const SalidaForm = ({ abierto = false, onClose, onSalidaRegistrada, productos = 
   const actualizarCampo = (campo, valor) => {
     setForm((prev) => ({
       ...prev,
-      [campo]: valor
+      [campo]: valor,
+      ...(campo === 'cod_producto' ? { cod_ubicacion: '' } : {})
     }));
   };
 
@@ -195,11 +203,11 @@ const SalidaForm = ({ abierto = false, onClose, onSalidaRegistrada, productos = 
                     className="form-select"
                     value={form.cod_ubicacion}
                     onChange={(event) => actualizarCampo('cod_ubicacion', event.target.value)}
-                    disabled={saving || loadingUbicaciones || opcionesUbicacion.length === 0}
+                    disabled={saving || loadingOpcionesUbicacion || opcionesUbicacion.length === 0}
                     required
                   >
                     <option value="">
-                      {loadingUbicaciones ? 'Cargando ubicaciones...' : 'Seleccione una ubicacion activa'}
+                      {loadingOpcionesUbicacion ? 'Cargando ubicaciones...' : 'Seleccione una ubicacion activa'}
                     </option>
                     {opcionesUbicacion.map((item) => (
                       <option key={item.cod_ubicacion} value={String(item.cod_ubicacion)}>

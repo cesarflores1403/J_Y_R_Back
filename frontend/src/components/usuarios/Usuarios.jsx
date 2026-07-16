@@ -117,6 +117,14 @@ const Usuarios = () => {
     setModal(true);
   };
 
+  const cerrarModal = () => {
+    setModal(false);
+    setEditando(null);
+    setForm(camposIniciales);
+    setVerPass(false);
+    setVerConfirm(false);
+  };
+
   const guardar = async () => {
     if (!puedeCambiarContrasena) return;
     if (!form.nombre_usuario.trim()) return toast.warning('El nombre de usuario es requerido');
@@ -146,7 +154,7 @@ const Usuarios = () => {
         await usuarioService.crear(payload);
         toast.success('Usuario creado correctamente');
       }
-      setModal(false);
+      cerrarModal();
       cargar();
     } catch (err) {
       toast.error(err.response?.data?.mensaje || 'Error al guardar');
@@ -195,11 +203,9 @@ const Usuarios = () => {
         )}
       </div>
 
-      {!esSuperAdmin && (
+      {!esSuperAdmin && !esAdmin && (
         <div className="alert alert-info py-2">
-          {esAdmin
-            ? 'Modo restringido: el rol Administrador puede cambiar contraseñas, pero no crear, eliminar ni cambiar roles.'
-            : 'Modo lectura: tu rol solo puede ver los usuarios del sistema.'}
+          Modo lectura: tu rol solo puede ver los usuarios del sistema.
         </div>
       )}
 
@@ -391,7 +397,7 @@ const Usuarios = () => {
                     ? (esAdmin ? 'Cambiar Contraseña' : 'Editar Usuario')
                     : 'Nuevo Usuario'}
                 </h5>
-                <button className="btn-close" onClick={() => setModal(false)} />
+                <button className="btn-close" onClick={cerrarModal} />
               </div>
               <div className="modal-body">
                 <div className="row g-3">
@@ -470,7 +476,7 @@ const Usuarios = () => {
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setModal(false)}>Cancelar</button>
+                <button className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button>
                 <button className="btn jyr-btn-primary" onClick={guardar} disabled={guardando}>
                   {guardando ? <span className="spinner-border spinner-border-sm me-2" /> : null}
                   {editando ? 'Actualizar' : 'Crear'}

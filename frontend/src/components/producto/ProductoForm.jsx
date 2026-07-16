@@ -5,6 +5,11 @@ import { useUbicaciones } from '../../hooks/useUbicaciones.js'; // // HU-10: Hoo
 import { FiCamera, FiX } from 'react-icons/fi';
 import { resolveApiBase } from '../../utils/runtimeApi.js';
 
+const PRODUCT_NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N}\s.,#()\/&+\-]*$/u;
+const PRODUCT_NAME_FORMAT_MESSAGE = 'El nombre solo puede contener letras, números, espacios y los símbolos . , - / # ( ) & +.';
+const PRODUCT_NAME_REPEATED_PATTERN = /^([\p{L}\p{N}])\1+$/u;
+const PRODUCT_NAME_REPEATED_MESSAGE = 'El nombre no puede estar formado por un mismo carácter repetido.';
+
 const ProductoForm = ({
   onSubmit,
   saving,
@@ -276,6 +281,10 @@ const ProductoForm = ({
       errors.nombre_producto = 'El nombre debe tener al menos 2 caracteres.';
     } else if (nombre.length > 100) {
       errors.nombre_producto = 'El nombre no puede exceder 100 caracteres.';
+    } else if (!PRODUCT_NAME_PATTERN.test(nombre)) {
+      errors.nombre_producto = PRODUCT_NAME_FORMAT_MESSAGE;
+    } else if (PRODUCT_NAME_REPEATED_PATTERN.test(nombre.replace(/\s+/g, ''))) {
+      errors.nombre_producto = PRODUCT_NAME_REPEATED_MESSAGE;
     }
 
     const descripcion = String(form.descripcion ?? '').trim();

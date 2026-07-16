@@ -10,6 +10,10 @@ import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 const API_BASE = resolveApiBase();
 
+const esMensajeTecnico = (mensaje = '') => (
+  /password fall|autenticaci|authentication|postgres|sequelize|database|jyr_|DB_/i.test(String(mensaje))
+);
+
 const precargarCarrusel = (items = []) => {
   if (!items.length) return;
 
@@ -77,7 +81,10 @@ const Login = () => {
       toast.success('¡Bienvenido al sistema JYR!');
       navigate('/');
     } catch (err) {
-      const msg = err.response?.data?.mensaje || err.message || 'Error al iniciar sesión';
+      const mensajeRespuesta = err.response?.data?.mensaje || err.message || '';
+      const msg = esMensajeTecnico(mensajeRespuesta)
+        ? 'No se pudo iniciar sesion en este momento. Intenta nuevamente mas tarde.'
+        : (mensajeRespuesta || 'Error al iniciar sesion');
       setError(msg);
       toast.error(msg);
     } finally {
@@ -206,3 +213,4 @@ const Login = () => {
 };
 
 export default Login;
+

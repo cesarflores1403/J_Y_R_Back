@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiDatabase, FiMinusCircle, FiPlus } from 'react-icons/fi';
 import SalidaForm from './SalidaForm.jsx';
 import SalidasFiltros from './SalidasFiltros.jsx';
 import SalidasTabla from './SalidasTabla.jsx';
 import { inventarioMovimientosApi } from './inventarioMovimientos.api.js';
+import { inventarioExistenciasApi } from './inventarioExistencias.api.js';
 import { inventarioSalidasApi } from './inventarioSalidas.api.js';
 import { useUbicaciones } from '../../hooks/useUbicaciones.js';
 import BootstrapPagination from '../common/BootstrapPagination.jsx';
@@ -70,6 +71,26 @@ const normalizarRespuesta = (payload, fallbackLimite = LIMITE_PAGINA) => {
   };
 };
 
+const fusionarPorClave = (base = [], extra = [], obtenerClave) => {
+  const mapa = new Map();
+  [...base, ...extra].forEach((item) => {
+    const clave = obtenerClave(item);
+    if (!clave) return;
+    mapa.set(String(clave), {
+      ...(mapa.get(String(clave)) || {}),
+      ...item
+    });
+  });
+  return Array.from(mapa.values());
+};
+
+const formatearCodigoProducto = (producto) => {
+  const codigo = String(producto?.codigo_producto || '').trim().toUpperCase();
+  if (codigo) return codigo;
+  const id = Number(producto?.cod_producto || 0);
+  return Number.isInteger(id) && id > 0 ? `PROD-${String(id).padStart(4, '0')}` : '';
+};
+
 const obtenerMensajeError = (error) => {
   const status = error?.response?.status;
   const serverMessage = error?.response?.data?.message || error?.response?.data?.mensaje;
@@ -83,6 +104,7 @@ const InventarioSalidasPage = () => {
   const [filtros, setFiltros] = useState(filtrosIniciales);
   const [consulta, setConsulta] = useState(filtrosIniciales);
   const [productos, setProductos] = useState([]);
+  const [existenciasOpciones, setExistenciasOpciones] = useState([]);
   const [filas, setFilas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -96,6 +118,7 @@ const InventarioSalidasPage = () => {
   const [anulandoId, setAnulandoId] = useState(null);
   const [feedbackAnulacion, setFeedbackAnulacion] = useState('');
   const [modalSalidaAbierto, setModalSalidaAbierto] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { ubicaciones } = useUbicaciones();
 
   const cargarSalidas = useCallback(async () => {
@@ -144,7 +167,7 @@ const InventarioSalidasPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [consulta]);
+  }, [consulta, refreshKey]);
 
   useEffect(() => {
     cargarSalidas();
@@ -161,6 +184,60 @@ const InventarioSalidasPage = () => {
     };
     cargarProductos();
   }, []);
+
+  useEffect(() => {
+    const cargarExistenciasOpciones = async () => {
+      try {
+        const limite = 100;
+        const acumuladas = [];
+        let pagina = 1;
+        let totalPaginas = 1;
+
+        do {
+          const { data } = await inventarioExistenciasApi.listar({
+            includeInactive: false,
+            page: pagina,
+            limit: limite
+          });
+          const normalizado = normalizarRespuesta(data?.data, limite);
+          acumuladas.push(...normalizado.filas);
+          totalPaginas = Number(normalizado.meta.totalPaginas || 1);
+          pagina += 1;
+        } while (pagina <= totalPaginas);
+
+        setExistenciasOpciones(acumuladas);
+      } catch {
+        setExistenciasOpciones([]);
+      }
+    };
+
+    cargarExistenciasOpciones();
+  }, []);
+
+  const productosOpciones = useMemo(() => {
+    const productosDesdeExistencias = existenciasOpciones
+      .filter((item) => Number.isInteger(Number(item?.cod_producto)) && Number(item.cod_producto) > 0)
+      .map((item) => ({
+        cod_producto: item.cod_producto,
+        nombre_producto: item.nombre_producto || 'Sin nombre',
+        codigo_producto: formatearCodigoProducto(item),
+        estado_producto: 'Activo'
+      }));
+
+    return fusionarPorClave(productos, productosDesdeExistencias, (item) => item?.cod_producto);
+  }, [productos, existenciasOpciones]);
+
+  const ubicacionesOpciones = useMemo(() => {
+    const ubicacionesDesdeExistencias = existenciasOpciones
+      .filter((item) => Number.isInteger(Number(item?.cod_ubicacion)) && Number(item.cod_ubicacion) > 0)
+      .map((item) => ({
+        cod_ubicacion: item.cod_ubicacion,
+        cod_producto: item.cod_producto,
+        descripcion: item.ubicacion || `Ubicacion ${item.cod_ubicacion}`
+      }));
+
+    return fusionarPorClave(ubicaciones, ubicacionesDesdeExistencias, (item) => item?.cod_ubicacion);
+  }, [ubicaciones, existenciasOpciones]);
 
   const manejarCambioFiltro = (campo, valor) => {
     setFiltros((prev) => ({
@@ -198,7 +275,9 @@ const InventarioSalidasPage = () => {
   const manejarSalidaRegistrada = async (resultado) => {
     setUltimaSalida(resultado || null);
     setFeedbackAnulacion('');
-    await cargarSalidas();
+    setFiltros((prev) => ({ ...prev, pagina: 1 }));
+    setConsulta((prev) => ({ ...prev, pagina: 1 }));
+    setRefreshKey((prev) => prev + 1);
   };
 
   const anularSalida = async (fila) => {
@@ -305,8 +384,8 @@ const InventarioSalidasPage = () => {
           )}
           <SalidasFiltros
             filtros={filtros}
-            productos={productos}
-            ubicaciones={ubicaciones}
+            productos={productosOpciones}
+            ubicaciones={ubicacionesOpciones}
             loading={loading}
             onChange={manejarCambioFiltro}
             onAplicar={aplicarFiltros}
@@ -345,7 +424,8 @@ const InventarioSalidasPage = () => {
         abierto={modalSalidaAbierto}
         onClose={() => setModalSalidaAbierto(false)}
         onSalidaRegistrada={manejarSalidaRegistrada}
-        productos={productos}
+        productos={productosOpciones}
+        ubicaciones={ubicacionesOpciones}
       />
     </section>
   );

@@ -91,6 +91,7 @@ const InventarioTransferenciasPage = () => {
   const [ultimaTransferencia, setUltimaTransferencia] = useState(null);
   const [modalTransferenciaAbierto, setModalTransferenciaAbierto] = useState(false);
   const [anulandoId, setAnulandoId] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { ubicaciones } = useUbicaciones();
 
   const cargarTransferencias = useCallback(async () => {
@@ -137,7 +138,7 @@ const InventarioTransferenciasPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [consulta]);
+  }, [consulta, refreshKey]);
 
   useEffect(() => {
     cargarTransferencias();
@@ -191,7 +192,9 @@ const InventarioTransferenciasPage = () => {
   const manejarTransferenciaRegistrada = async (resultado) => {
     setUltimaTransferencia(resultado || null);
     setFeedbackAnulacion('');
-    await cargarTransferencias();
+    setFiltros((prev) => ({ ...prev, pagina: 1 }));
+    setConsulta((prev) => ({ ...prev, pagina: 1 }));
+    setRefreshKey((prev) => prev + 1);
   };
 
   const anularTransferencia = async (fila) => {

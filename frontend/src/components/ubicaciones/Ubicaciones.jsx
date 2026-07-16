@@ -21,6 +21,16 @@ const MENSAJE_DUPLICADO = 'Ya existe una ubicacion con esa combinacion fisica.';
 const MENSAJE_PRODUCTOS = 'No se pudo cargar el catalogo de productos.';
 const TAMANIO_PAGINA = 10;
 const DEBOUNCE_BUSQUEDA_MS = 350;
+const MENSAJE_BUSQUEDA_NUMERICA_INVALIDA = 'La busqueda de ubicacion solo permite texto o IDs numericos positivos.';
+const esBusquedaNumericaInvalida = (valor = '') => {
+  const criterio = String(valor || '').trim();
+  if (!criterio) return false;
+  if (/^-\d/.test(criterio)) return true;
+  if (/^\d+(?:[.,]\d+)?$/.test(criterio)) {
+    return !Number.isInteger(Number(criterio.replace(',', '.'))) || Number(criterio.replace(',', '.')) < 1;
+  }
+  return false;
+};
 
 const formatearCodigoProducto = (producto) => {
   const codigo = String(producto?.codigo_producto || '').trim().toUpperCase();
@@ -344,6 +354,16 @@ const Ubicaciones = () => {
     }));
   };
 
+  const manejarCambioBusqueda = (valor) => {
+    if (esBusquedaNumericaInvalida(valor)) {
+      setError(MENSAJE_BUSQUEDA_NUMERICA_INVALIDA);
+      return;
+    }
+
+    setError('');
+    setSearchInput(valor);
+  };
+
   const limpiarBusqueda = () => {
     setSearchInput('');
     setPaginaActual(1);
@@ -387,7 +407,7 @@ const Ubicaciones = () => {
         totalActivas={totalActivas}
         totalInactivas={Math.max(totalUbicaciones - totalActivas, 0)}
         onCloseError={() => setError('')}
-        onSearchChange={setSearchInput}
+        onSearchChange={manejarCambioBusqueda}
         onClearSearch={limpiarBusqueda}
         onToggleInactivas={manejarToggleInactivas}
       />
