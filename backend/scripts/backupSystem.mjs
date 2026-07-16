@@ -9,20 +9,20 @@ const ROOT_DIR = path.resolve(path.dirname(__filename), '..');
 const ENV_PATH = path.join(ROOT_DIR, '.env');
 dotenv.config({ path: ENV_PATH });
 
-const defaults = {
-  host: 'aws-1-us-east-1.pooler.supabase.com',
-  port: '5432',
-  name: 'postgres',
-  user: 'postgres.eabyyyzucmjehildotvb',
-  password: 'H0l@mundo123!'
+const requiredEnv = (name) => {
+  const value = process.env[name];
+  if (!value || !String(value).trim()) {
+    throw new Error(`Variable de entorno requerida no configurada: ${name}`);
+  }
+  return value;
 };
 
 const db = {
-  host: process.env.DB_HOST || defaults.host,
-  port: process.env.DB_PORT || defaults.port,
-  name: process.env.DB_NAME || defaults.name,
-  user: process.env.DB_USER || defaults.user,
-  password: process.env.DB_PASSWORD || defaults.password
+  host: requiredEnv('DB_HOST'),
+  port: process.env.DB_PORT || '5432',
+  name: requiredEnv('DB_NAME'),
+  user: process.env.DB_MAINTENANCE_USER || requiredEnv('DB_USER'),
+  password: process.env.DB_MAINTENANCE_PASSWORD || requiredEnv('DB_PASSWORD')
 };
 
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -58,6 +58,8 @@ const main = async () => {
     '-U', db.user,
     '-d', db.name,
     '--schema', 'public',
+    '--no-owner',
+    '--no-privileges',
     '-F', 'c',
     '-f', dbBackupFile
   ], { PGPASSWORD: db.password });

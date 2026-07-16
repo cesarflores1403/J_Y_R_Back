@@ -1,30 +1,36 @@
-import dotenv from 'dotenv'; // // Carga variables de entorno
+import dotenv from 'dotenv';
 
-dotenv.config(); // // Carga .env ANTES de importar app
+dotenv.config();
 
-const { default: app } = await import('./app.js'); // // Import dinámico para respetar dotenv
-const { default: pool } = await import('./config/db-connection.js'); // // Pool BD (dinámico)
-const { sequelize, testSequelizeConnection } = await import('./config/sequelize.js'); // // Sequelize ORM (dinámico)
+const { default: app } = await import('./app.js');
+const { default: pool } = await import('./config/db-connection.js');
+const { sequelize, testSequelizeConnection } = await import('./config/sequelize.js');
 
-const PORT = process.env.PORT || 5000; // // Puerto configurable
+const PORT = process.env.PORT || 5000;
+const DB_STARTUP_LOGS = process.env.DB_STARTUP_LOGS === 'true';
 
 app.listen(PORT, async () => {
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`); // // Log server
+  console.log(`Servidor corriendo en puerto ${PORT}`);
+
   try {
-    await pool.query('SELECT 1'); // // Verificar conexión a BD al arrancar
-    console.log('✅ Conectado correctamente a Supabase (pg pool)');
-  } catch (err) {
-    console.error('❌ Error al conectar a Supabase (pg pool):', err.message);
+    await pool.query('SELECT 1');
+    if (DB_STARTUP_LOGS) {
+      console.log('Conexion PostgreSQL pg pool verificada.');
+    }
+  } catch (_err) {
+    if (DB_STARTUP_LOGS) {
+      console.error('Base de datos no disponible para pg pool. Verifica backend/.env.');
+    }
   }
+
   try {
-    await testSequelizeConnection(); // // Verificar conexión Sequelize
-    console.log('✅ Conectado correctamente a Supabase (Sequelize)');
+    await testSequelizeConnection();
 
-    // // Compatibilidad de esquema para clientes: agregar RTN si no existe
     await sequelize.query('ALTER TABLE clientes ADD COLUMN IF NOT EXISTS rtn VARCHAR(14)');
-    console.log('✅ Esquema clientes verificado (rtn)');
+    if (DB_STARTUP_LOGS) {
+      console.log('Esquema clientes verificado (rtn).');
+    }
 
-    // HU-16: Compatibilidad de esquema para auditoria en producto
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS creado_por INTEGER');
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMP');
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS modificado_por INTEGER');
@@ -34,12 +40,17 @@ app.listen(PORT, async () => {
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS especificaciones JSONB');
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS stock_minimo INTEGER');
     await sequelize.query('ALTER TABLE producto ADD COLUMN IF NOT EXISTS punto_reorden INTEGER');
-    console.log('✅ Esquema producto verificado (auditoria, costo y detalle)');
+    if (DB_STARTUP_LOGS) {
+      console.log('Esquema producto verificado (auditoria, costo y detalle).');
+    }
 
-    // Compatibilidad de esquema para facturación de reparación (descripción manual)
     await sequelize.query('ALTER TABLE detalle_factura ADD COLUMN IF NOT EXISTS descripcion_item TEXT');
-    console.log('✅ Esquema detalle_factura verificado (descripcion_item)');
-  } catch (err) {
-    console.error('❌ Error al conectar Sequelize:', err.message);
+    if (DB_STARTUP_LOGS) {
+      console.log('Esquema detalle_factura verificado (descripcion_item).');
+    }
+  } catch (_err) {
+    if (DB_STARTUP_LOGS) {
+      console.error('Base de datos no disponible para Sequelize. Verifica backend/.env.');
+    }
   }
 });

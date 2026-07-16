@@ -20,4 +20,10 @@ const Rol = sequelize.define('roles', {
   }
 });
 
+Rol.prototype.toJSON = function () {
+  const values = { ...this.get() };
+  delete values.fecha_creacion;
+  return values;
+};
+
 export default Rol;

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { validarCampos } from '../middlewares/validar.js';
 import { autenticar } from '../middlewares/auth.js';
-import { listar, obtener, crear, actualizar, eliminar, verificarDuplicado } from '../controllers/clienteController.js';
+import { listar, obtener, crear, actualizar, eliminar, verificarDuplicado, exportarReportePdf } from '../controllers/clienteController.js';
 
 const router = Router();
 const REGEX_TEXTO_CON_PUNTO = /^[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ.\s]+$/;
@@ -57,6 +57,7 @@ const validarCliente = [
 router.use(autenticar);
 
 router.get('/verificar-duplicado', verificarDuplicado);
+router.get('/reporte/pdf', exportarReportePdf);
 router.get('/', listar);
 router.get('/:id', obtener);
 

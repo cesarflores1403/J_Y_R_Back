@@ -33,7 +33,8 @@ const Usuario = sequelize.define('usuarios', {
 // Hash de contraseña antes de crear
 Usuario.beforeCreate(async (usuario) => {
   if (usuario.contrasena) {
-    usuario.contrasena = await bcrypt.hash(usuario.contrasena, 12);
+    const salt = await bcrypt.genSalt(12);
+    usuario.contrasena = await bcrypt.hash(usuario.contrasena, salt);
   }
 });
 
@@ -46,6 +47,8 @@ Usuario.prototype.validarPassword = async function (password) {
 Usuario.prototype.toJSON = function () {
   const values = { ...this.get() };
   delete values.contrasena;
+  delete values.creado_en;
+  delete values.actualizado_en;
   return values;
 };
 

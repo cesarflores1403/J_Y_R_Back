@@ -16,8 +16,8 @@ const comparePassword = async (password, hash) => {
 // Generar token JWT
 const generateToken = (payload) => {
   const jwt = require('jsonwebtoken');
-  return jwt.sign(payload, process.env.JWT_SECRET, { 
-    expiresIn: process.env.JWT_EXPIRE 
+  return jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || process.env.JWT_EXPIRE || '30m'
   });
 };
 

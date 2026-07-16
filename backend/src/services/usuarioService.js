@@ -3,6 +3,7 @@ import Usuario from '../models/Usuario.js';
 import Rol from '../models/Rol.js';
 import UsuarioRol from '../models/UsuarioRol.js';
 import { Op } from 'sequelize';
+import { assertPasswordPolicy } from '../utils/passwordPolicy.js';
 
 class UsuarioService {
 
@@ -41,6 +42,8 @@ class UsuarioService {
   }
 
   async crear({ nombre_usuario, contrasena, cod_rol }) {
+    assertPasswordPolicy(contrasena, { username: nombre_usuario });
+
     const existe = await Usuario.findOne({ where: { nombre_usuario } });
     if (existe) throw Object.assign(new Error('El nombre de usuario ya está en uso'), { statusCode: 400 });
 
@@ -82,11 +85,11 @@ class UsuarioService {
       if (cod_rol !== undefined) {
         throw Object.assign(new Error('Administrador no puede cambiar roles de usuario'), { statusCode: 403 });
       }
-      if (!contrasena || contrasena.trim().length < 6) {
-        throw Object.assign(new Error('Debes ingresar una contraseña válida de al menos 6 caracteres'), { statusCode: 400 });
-      }
 
-      const hash = await bcrypt.hash(contrasena, 12);
+      assertPasswordPolicy(contrasena, { username: usuario.nombre_usuario });
+
+      const salt = await bcrypt.genSalt(12);
+      const hash = await bcrypt.hash(contrasena, salt);
       await usuario.update({ contrasena: hash });
       return this.obtenerPorId(id);
     }
@@ -99,7 +102,9 @@ class UsuarioService {
     const updates = {};
     if (nombre_usuario) updates.nombre_usuario = nombre_usuario;
     if (contrasena && contrasena.trim() !== '') {
-      updates.contrasena = await bcrypt.hash(contrasena, 12);
+      assertPasswordPolicy(contrasena, { username: nombre_usuario || usuario.nombre_usuario });
+      const salt = await bcrypt.genSalt(12);
+      updates.contrasena = await bcrypt.hash(contrasena, salt);
     }
 
     await usuario.update(updates);

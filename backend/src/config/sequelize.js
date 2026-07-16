@@ -1,17 +1,37 @@
 import { Sequelize } from 'sequelize';
 
-const DEFAULT_DB_HOST = 'aws-1-us-east-1.pooler.supabase.com';
 const DEFAULT_DB_PORT = 5432;
-const DEFAULT_DB_NAME = 'postgres';
-const DEFAULT_DB_USER = 'postgres.eabyyyzucmjehildotvb';
-const DEFAULT_DB_PASSWORD = 'H0l@mundo123!';
+
+const requiredEnv = (name) => {
+  const value = process.env[name];
+  if (!value || !String(value).trim()) {
+    throw new Error(`Variable de entorno requerida no configurada: ${name}`);
+  }
+  return value;
+};
+
+const getDbCredentials = () => {
+  const appUser = String(process.env.DB_APP_USER || '').trim();
+  const appPassword = String(process.env.DB_APP_PASSWORD || '').trim();
+
+  if (appUser && appPassword) {
+    return { user: appUser, password: appPassword };
+  }
+
+  return {
+    user: requiredEnv('DB_USER'),
+    password: requiredEnv('DB_PASSWORD')
+  };
+};
+
+const dbCredentials = getDbCredentials();
 
 const dbConfig = {
-  host: process.env.DB_HOST || DEFAULT_DB_HOST,
+  host: requiredEnv('DB_HOST'),
   port: Number(process.env.DB_PORT || DEFAULT_DB_PORT),
-  name: process.env.DB_NAME || DEFAULT_DB_NAME,
-  user: process.env.DB_USER || DEFAULT_DB_USER,
-  password: process.env.DB_PASSWORD || DEFAULT_DB_PASSWORD
+  name: requiredEnv('DB_NAME'),
+  user: dbCredentials.user,
+  password: dbCredentials.password
 };
 
 const usarSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
@@ -45,12 +65,9 @@ const sequelize = new Sequelize(
 );
 
 const testSequelizeConnection = async () => {
-  try {
-    await sequelize.authenticate();
-    console.log('✅ Sequelize: conexión a PostgreSQL establecida.');
-  } catch (error) {
-    console.error('❌ Sequelize: error al conectar:', error.message);
-  }
+  await sequelize.authenticate();
+  console.log('Sequelize: conexion a PostgreSQL establecida.');
 };
 
 export { sequelize, testSequelizeConnection };
+

@@ -5,6 +5,21 @@ import { autenticar } from '../middlewares/auth.js';
 import { listar, obtener, crear, actualizar, eliminar, desactivar, reactivar } from '../controllers/ubicacionController.js';
 
 const router = Router();
+const esBusquedaNumericaInvalida = (valor = '') => {
+  const criterio = String(valor || '').trim();
+  if (!criterio) return false;
+  if (/^-\d/.test(criterio)) return true;
+  if (/^\d+(?:[.,]\d+)?$/.test(criterio)) {
+    return !Number.isInteger(Number(criterio.replace(',', '.'))) || Number(criterio.replace(',', '.')) < 1;
+  }
+  return false;
+};
+const rechazarBusquedaNumericaInvalida = (valor) => {
+  if (esBusquedaNumericaInvalida(valor)) {
+    throw new Error('La busqueda de ubicacion solo permite texto o IDs numericos positivos.');
+  }
+  return true;
+};
 
 router.use(autenticar);
 
@@ -18,13 +33,15 @@ router.get('/', [
     .isString()
     .trim()
     .isLength({ max: 120 })
-    .withMessage('search debe ser texto de hasta 120 caracteres'),
+    .withMessage('search debe ser texto de hasta 120 caracteres')
+    .custom(rechazarBusquedaNumericaInvalida),
   query('buscar')
     .optional()
     .isString()
     .trim()
     .isLength({ max: 120 })
-    .withMessage('buscar debe ser texto de hasta 120 caracteres'),
+    .withMessage('buscar debe ser texto de hasta 120 caracteres')
+    .custom(rechazarBusquedaNumericaInvalida),
   query('page')
     .optional()
     .isInt({ min: 1 })

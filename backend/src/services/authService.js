@@ -4,9 +4,10 @@ import { Op } from 'sequelize';
 import Usuario from '../models/Usuario.js';
 import Rol from '../models/Rol.js';
 import notificacionSuperAdminService from './notificacionSuperAdminService.js';
+import { assertPasswordPolicy } from '../utils/passwordPolicy.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'CAMBIA_ESTE_SECRET_EN_ENV';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || process.env.JWT_EXPIRE || '8h';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || process.env.JWT_EXPIRE || '30m';
 
 class AuthService {
   generarToken(usuario, nombreRol) {
@@ -71,7 +72,14 @@ class AuthService {
       throw Object.assign(new Error('Contraseña actual incorrecta'), { statusCode: 400 });
     }
 
-    const hash = await bcrypt.hash(passwordNuevo, 12);
+    if (passwordNuevo === passwordActual) {
+      throw Object.assign(new Error('La nueva contraseña debe ser diferente a la actual'), { statusCode: 400 });
+    }
+
+    assertPasswordPolicy(passwordNuevo, { username: usuario.nombre_usuario });
+
+    const salt = await bcrypt.genSalt(12);
+    const hash = await bcrypt.hash(passwordNuevo, salt);
     await usuario.update({ contrasena: hash, actualizado_en: new Date() });
     return { mensaje: 'Contraseña actualizada correctamente' };
   }

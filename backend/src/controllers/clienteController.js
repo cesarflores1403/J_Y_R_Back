@@ -53,3 +53,14 @@ export const verificarDuplicado = async (req, res) => {
     res.status(500).json({ ok: false, mensaje: error.message });
   }
 };
+
+export const exportarReportePdf = async (req, res) => {
+  try {
+    const pdf = await clienteService.exportarReportePdf(req.query);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="reporte-clientes.pdf"');
+    res.send(pdf);
+  } catch (error) {
+    res.status(500).json({ ok: false, mensaje: error.message });
+  }
+};

@@ -2,6 +2,12 @@ import { body } from 'express-validator';
 import { validarCampos } from './validar.js';
 import CategoriaProducto from '../models/CategoriaProducto.js';
 
+const PRODUCT_NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N}\s.,#()\/&+\-]*$/u;
+const PRODUCT_NAME_FORMAT_MESSAGE = 'El nombre solo puede contener letras, números, espacios y los símbolos . , - / # ( ) & +.';
+const PRODUCT_NAME_REPEATED_PATTERN = /^([\p{L}\p{N}])\1+$/u;
+const PRODUCT_NAME_REPEATED_MESSAGE = 'El nombre no puede estar formado por un mismo carácter repetido.';
+const hasRepeatedProductName = (value) => PRODUCT_NAME_REPEATED_PATTERN.test(String(value || '').trim().replace(/\s+/g, ''));
+
 // =====================================================
 // HU-03: Validaciones de producto con express-validator
 // Mensajes por campo, reglas mínimas del catálogo
@@ -22,10 +28,15 @@ export const validarCrearProducto = [
     }),
 
   body('nombre_producto')
+    .trim()
     .notEmpty().withMessage('El nombre del producto es obligatorio.')
     .isString().withMessage('El nombre debe ser texto.')
     .isLength({ min: 2, max: 100 }).withMessage('El nombre debe tener entre 2 y 100 caracteres.')
-    .trim(),
+    .matches(PRODUCT_NAME_PATTERN).withMessage(PRODUCT_NAME_FORMAT_MESSAGE)
+    .custom((value) => {
+      if (hasRepeatedProductName(value)) throw new Error(PRODUCT_NAME_REPEATED_MESSAGE);
+      return true;
+    }),
 
   body('descripcion')
     .optional({ values: 'null' })
@@ -164,6 +175,8 @@ export const validarActualizarProducto = [
           case 'nombre_producto':
             if (!valor || typeof valor !== 'string' || valor.trim().length < 2) throw new Error('nombre_producto debe tener al menos 2 caracteres.');
             if (valor.trim().length > 100) throw new Error('nombre_producto no puede exceder 100 caracteres.');
+            if (!PRODUCT_NAME_PATTERN.test(valor.trim())) throw new Error(PRODUCT_NAME_FORMAT_MESSAGE);
+            if (hasRepeatedProductName(valor)) throw new Error(PRODUCT_NAME_REPEATED_MESSAGE);
             break;
           case 'descripcion':
             if (valor !== null && typeof valor !== 'string') throw new Error('descripcion debe ser texto o null.');

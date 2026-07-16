@@ -3,7 +3,11 @@
 // Maneja errores en un solo lugar (respuesta uniforme)
 // =====================================================
 export const errorHandler = (err, req, res, next) => {
-  console.error('❌ Error capturado:', err);
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Error capturado:', err);
+  } else {
+    console.error('Error capturado:', err.message);
+  }
 
   // =====================================================
   // Errores de PostgreSQL (raw SQL / pool.query)
@@ -11,10 +15,9 @@ export const errorHandler = (err, req, res, next) => {
 
   // 23505 = unique_violation (PK o UNIQUE constraint)
   if (err.code === '23505') {
-    const campo = err.constraint || 'campo';
     return res.status(409).json({
       ok: false,
-      message: `Ya existe un registro con ese valor. Restricción: ${campo}`,
+      message: 'Ya existe un registro con ese valor.',
       data: null
     });
   }
@@ -23,7 +26,7 @@ export const errorHandler = (err, req, res, next) => {
   if (err.code === '23503') {
     return res.status(400).json({
       ok: false,
-      message: 'No se pudo completar la operación porque el registro tiene datos relacionados (inventario, movimientos o documentos).',
+      message: 'No se pudo completar la operacion porque el registro tiene datos relacionados.',
       data: null
     });
   }
@@ -32,7 +35,7 @@ export const errorHandler = (err, req, res, next) => {
   if (err.code === '23502') {
     return res.status(400).json({
       ok: false,
-      message: `El campo "${err.column || 'requerido'}" no puede estar vacío.`,
+      message: 'Faltan datos requeridos.',
       data: null
     });
   }
@@ -43,9 +46,8 @@ export const errorHandler = (err, req, res, next) => {
   if (err.name === 'SequelizeValidationError') {
     return res.status(400).json({
       ok: false,
-      message: 'Error de validación',
-      data: null,
-      errores: err.errors.map(e => ({ campo: e.path, mensaje: e.message }))
+      message: 'Error de validacion',
+      data: null
     });
   }
 
@@ -53,21 +55,22 @@ export const errorHandler = (err, req, res, next) => {
     return res.status(409).json({
       ok: false,
       message: 'Registro duplicado',
-      data: null,
-      errores: err.errors.map(e => ({ campo: e.path, mensaje: e.message }))
+      data: null
     });
   }
 
   if (err.name === 'SequelizeForeignKeyConstraintError') {
     return res.status(400).json({
       ok: false,
-      message: 'No se pudo completar la operación porque el registro tiene datos relacionados (inventario, movimientos o documentos).',
+      message: 'No se pudo completar la operacion porque el registro tiene datos relacionados.',
       data: null
     });
   }
 
   const status = err.status || err.statusCode || 500;
-  const message = err.message || 'Error interno del servidor';
+  const message = status >= 500
+    ? 'Error interno del servidor'
+    : (err.type === 'entity.parse.failed' ? 'Solicitud invalida' : (err.message || 'Solicitud invalida'));
 
   res.status(status).json({
     ok: false,

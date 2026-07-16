@@ -11,6 +11,30 @@ import bitacoraFacturacionService from './bitacoraFacturacionService.js';
 import empresaConfigService from './empresaConfigService.js';
 import { Op } from 'sequelize';
 
+const crearErrorStockInsuficiente = ({ productosConDeficit, rol }) => {
+  const esAdmin = rol === 'Administrador';
+  const err = new Error(
+    esAdmin
+      ? `Stock insuficiente en ${productosConDeficit.length} producto(s). Como Administrador puedes autorizar la venta sin stock.`
+      : `Stock insuficiente en ${productosConDeficit.length} producto(s). No tienes permiso para vender sin existencia. Contacta al Administrador.`
+  );
+  err.statusCode = 409;
+  err.codigo = 'STOCK_INSUFICIENTE';
+  err.productos = productosConDeficit;
+  err.puede_forzar = esAdmin;
+  return err;
+};
+
+const normalizarErrorConcurrenciaFacturacion = (error) => {
+  const codigo = error?.original?.code || error?.parent?.code || error?.code;
+  if (!['40001', '40P01', '55P03'].includes(codigo)) return error;
+
+  const err = new Error('No se pudo procesar la factura por concurrencia de inventario. Intenta nuevamente.');
+  err.statusCode = 409;
+  err.codigo = 'CONFLICTO_CONCURRENCIA_INVENTARIO';
+  return err;
+};
+
 const SOLO_LETRAS_ESPACIOS_REGEX = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/;
 
 class FacturaService {
@@ -295,11 +319,17 @@ class FacturaService {
 
         // HU-FAC-09: Verificar stock en inventario con control de excepción
         const [invResult] = await sequelize.query(
-          'SELECT stock FROM inventario WHERE cod_producto = :codProd LIMIT 1',
+          `SELECT cod_inventario, stock
+           FROM inventario
+           WHERE cod_producto = :codProd
+           ORDER BY cod_inventario ASC
+           LIMIT 1
+           FOR UPDATE`,
           { replacements: { codProd: item.cod_producto }, type: sequelize.QueryTypes.SELECT, transaction: t }
         );
 
         const stockActual = invResult ? parseInt(invResult.stock) : 0;
+        item._codInventario = invResult?.cod_inventario ? Number(invResult.cod_inventario) : null;
         item._stockActual = stockActual;
         item._nombreProducto = producto.nombre_producto;
 
@@ -370,17 +400,7 @@ class FacturaService {
       // HU-FAC-09: Si hay productos con déficit de stock y NO se forzó, lanzar error especial
       if (productosConDeficit.length > 0) {
         await t.rollback();
-        const esAdmin = rol === 'Administrador';
-        const err = new Error(
-          esAdmin
-            ? `Stock insuficiente en ${productosConDeficit.length} producto(s). Como Administrador puedes autorizar la venta sin stock.`
-            : `Stock insuficiente en ${productosConDeficit.length} producto(s). No tienes permiso para vender sin existencia. Contacta al Administrador.`
-        );
-        err.statusCode = 409;
-        err.codigo = 'STOCK_INSUFICIENTE';
-        err.productos = productosConDeficit;
-        err.puede_forzar = esAdmin;
-        throw err;
+        throw crearErrorStockInsuficiente({ productosConDeficit, rol });
       }
 
       // --- Descuento global de factura (HU-FAC-04) ---
@@ -439,10 +459,55 @@ class FacturaService {
       for (const item of items) {
         const tipoItem = String(item.tipo_item || 'PRODUCTO').toUpperCase();
         if (tipoItem !== 'PRODUCTO') continue;
-        await sequelize.query(
-          'UPDATE inventario SET stock = stock - :cant, fecha_ult_mov = NOW() WHERE cod_producto = :codProd',
-          { replacements: { cant: item.cantidad, codProd: item.cod_producto }, transaction: t }
+
+        const cantidadVenta = parseInt(item.cantidad, 10);
+        if (!item._codInventario) {
+          throw crearErrorStockInsuficiente({
+            productosConDeficit: [{
+              cod_producto: item.cod_producto,
+              nombre_producto: item._nombreProducto || `Producto ${item.cod_producto}`,
+              stock_disponible: 0,
+              cantidad_solicitada: cantidadVenta,
+              deficit: cantidadVenta
+            }],
+            rol
+          });
+        }
+
+        const sqlActualizarInventario = forzar_sin_stock
+          ? `UPDATE inventario
+             SET stock = stock - :cant, fecha_ult_mov = NOW()
+             WHERE cod_inventario = :codInventario
+             RETURNING stock`
+          : `UPDATE inventario
+             SET stock = stock - :cant, fecha_ult_mov = NOW()
+             WHERE cod_inventario = :codInventario
+               AND stock >= :cant
+             RETURNING stock`;
+
+        const [filasActualizadas] = await sequelize.query(
+          sqlActualizarInventario,
+          {
+            replacements: {
+              cant: cantidadVenta,
+              codInventario: item._codInventario
+            },
+            transaction: t
+          }
         );
+
+        if (!forzar_sin_stock && (!Array.isArray(filasActualizadas) || filasActualizadas.length === 0)) {
+          throw crearErrorStockInsuficiente({
+            productosConDeficit: [{
+              cod_producto: item.cod_producto,
+              nombre_producto: item._nombreProducto || `Producto ${item.cod_producto}`,
+              stock_disponible: item._stockActual || 0,
+              cantidad_solicitada: cantidadVenta,
+              deficit: Math.max(cantidadVenta - (item._stockActual || 0), 1)
+            }],
+            rol
+          });
+        }
       }
 
       // HU-FAC-09: Si se forzó sin stock → registrar excepciones en bitácora
@@ -509,10 +574,8 @@ class FacturaService {
       return this.obtenerPorId(factura.cod_factura);
 
     } catch (error) {
-      if (error.codigo !== 'STOCK_INSUFICIENTE') {
-        await t.rollback().catch(() => {});
-      }
-      throw error;
+      await t.rollback().catch(() => {});
+      throw normalizarErrorConcurrenciaFacturacion(error);
     }
   }
 

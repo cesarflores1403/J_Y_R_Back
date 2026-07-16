@@ -15,11 +15,34 @@ import { errorHandler } from './middlewares/errorHandler.js'; // // Error global
 
 const app = express();
 
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  baseUri: ["'self'"],
+  fontSrc: ["'self'", 'https:', 'data:'],
+  formAction: ["'self'"],
+  frameAncestors: ["'self'"],
+  imgSrc: ["'self'", 'data:', 'blob:'],
+  objectSrc: ["'none'"],
+  scriptSrc: ["'self'"],
+  scriptSrcAttr: ["'none'"],
+  styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
+  upgradeInsecureRequests: []
+};
+
 // =======================
 // MIDDLEWARES GLOBALES
 // =======================
 
-app.use(helmet()); // // Seguridad HTTP
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: cspDirectives
+  },
+  xFrameOptions: {
+    action: 'sameorigin'
+  },
+  xContentTypeOptions: true
+})); // // Seguridad HTTP
 app.use(morgan('dev')); // // Log de requests en desarrollo
 app.use(express.json()); // // Permite recibir JSON
 app.use(express.urlencoded({ extended: true })); // // Permite recibir form-data
