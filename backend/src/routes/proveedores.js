@@ -2,7 +2,7 @@ import {Router} from 'express';
 import {body} from 'express-validator';
 import {validarCampos} from '../middlewares/validar.js';
 import {autenticar,autorizar} from '../middlewares/auth.js';
-import {listar,obtener,crear,actualizar,toggleEstado,eliminar} from '../controllers/proveedorController.js';
+import {listar,obtener,crear,actualizar,toggleEstado,eliminar,exportarReportePdf} from '../controllers/proveedorController.js';
 
 const router=Router();
 
@@ -15,6 +15,7 @@ router.use(autenticar);
 
 // Obtener datos
 router.get('/',listar);
+router.get('/reporte/pdf',exportarReportePdf);
 router.get('/:id',obtener);
 
 // Crear proveedor

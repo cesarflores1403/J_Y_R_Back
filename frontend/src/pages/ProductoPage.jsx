@@ -15,6 +15,8 @@ const ProductoPage = () => {
     loading,
     saving,
     exportandoPdf,
+    buscar,
+    setBuscar,
     crear,
     actualizar,
     eliminar,
@@ -98,7 +100,7 @@ const ProductoPage = () => {
               <button
                 type="button"
                 className="jyr-btn jyr-btn-primary"
-                onClick={() => exportarPdf()}
+                onClick={() => exportarPdf({ buscar })}
                 disabled={exportandoPdf || loading}
               >
                 {exportandoPdf ? <span className="spinner-border spinner-border-sm me-2" /> : <FiDownload className="me-2" />}
@@ -127,6 +129,8 @@ const ProductoPage = () => {
           ) : (
             <ProductoList
               productos={producto}
+              busqueda={buscar}
+              onBusquedaChange={setBuscar}
               onEdit={handleEdit}
               onDelete={eliminar}
               onCambiarEstado={cambiarEstado}

@@ -1,9 +1,10 @@
 import logger from '../config/logger.js';
+import { registrarEventoSeguridad } from '../utils/auditoriaSeguridad.js';
 
 // =============================================================
 // Limitador de intentos de inicio de sesion por IP.
 // Protege el endpoint de login contra fuerza bruta y credential stuffing
-// sin registrar credenciales ni usuarios enviados por el cliente.
+// sin registrar credenciales ni depender del nombre de usuario enviado.
 // =============================================================
 
 const leerEnteroPositivo = (valor, fallback) => {
@@ -38,6 +39,18 @@ const respuestaBloqueo = (res, reiniciaEn) => {
   });
 };
 
+const auditarBloqueo = (req, reiniciaEn) => {
+  registrarEventoSeguridad(req, {
+    evento: 'LOGIN_BLOQUEADO',
+    detalle: {
+      motivo: 'Rate limit de login excedido',
+      max_intentos: MAX_INTENTOS,
+      ventana_segundos: Math.ceil(VENTANA_MS / 1000),
+      bloqueado_hasta: new Date(reiniciaEn).toISOString()
+    }
+  });
+};
+
 export const loginRateLimiter = (req, res, next) => {
   if (!RATE_LIMIT_ENABLED) {
     return next();
@@ -63,6 +76,7 @@ export const loginRateLimiter = (req, res, next) => {
 
   if (registro.intentos > MAX_INTENTOS) {
     logger.warn('Rate limit de login excedido', { ip: clave });
+    auditarBloqueo(req, registro.reiniciaEn);
     return respuestaBloqueo(res, registro.reiniciaEn);
   }
 

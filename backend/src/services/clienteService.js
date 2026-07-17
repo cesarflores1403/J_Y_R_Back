@@ -1,6 +1,7 @@
 import { Op, ForeignKeyConstraintError } from 'sequelize';
 import Cliente from '../models/Cliente.js';
 import { generarReportePdf } from '../utils/pdfReport.js';
+import bitacoraFacturacionService from './bitacoraFacturacionService.js';
 
 const construirWhereClientes = (buscar = '') => {
   const where = {};
@@ -16,6 +17,23 @@ const construirWhereClientes = (buscar = '') => {
   }
 
   return where;
+};
+
+const CAMPOS_AUDITABLES_CLIENTE = [
+  'nombre',
+  'apellido',
+  'dni',
+  'rtn',
+  'empresa',
+  'telefono',
+  'correo',
+  'direccion'
+];
+
+const normalizarValorAuditoria = (valor) => {
+  if (valor === undefined || valor === '') return null;
+  if (valor === null) return null;
+  return String(valor);
 };
 
 class ClienteService {
@@ -120,10 +138,41 @@ class ClienteService {
     return resultado;
   }
 
-  async actualizar(id, datos) {
+  async actualizar(id, datos, auditoria = {}) {
     const payload = this.normalizarDatos(datos);
     const cliente = await this.obtenerPorId(id);
+    const cambios = [];
+
+    for (const campo of CAMPOS_AUDITABLES_CLIENTE) {
+      if (!(campo in payload)) continue;
+      const antes = normalizarValorAuditoria(cliente[campo]);
+      const despues = normalizarValorAuditoria(payload[campo]);
+      if (antes !== despues) {
+        cambios.push({ campo, antes, despues });
+      }
+    }
+
     await cliente.update(payload);
+
+    if (cambios.length > 0) {
+      try {
+        await bitacoraFacturacionService.registrar({
+          evento: 'CLIENTE_ACTUALIZADO',
+          entidad: 'CLIENTE',
+          cod_usuario: auditoria.cod_usuario || null,
+          nombre_usuario: auditoria.nombre_usuario || null,
+          ip: auditoria.ip || null,
+          detalle: {
+            cod_cliente: parseInt(id, 10),
+            cliente: `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim(),
+            cambios
+          }
+        });
+      } catch (logErr) {
+        console.error('Error al registrar bitacora (cliente actualizado):', logErr.message);
+      }
+    }
+
     return cliente;
   }
 

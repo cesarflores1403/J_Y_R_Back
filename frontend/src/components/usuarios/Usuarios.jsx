@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { usuarioService, notificacionSuperAdminService } from '../../services/serviceIndex.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
@@ -22,6 +22,7 @@ const Usuarios = () => {
   const [usuarios, setUsuarios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [buscar, setBuscar] = useState('');
+  const [buscarAplicado, setBuscarAplicado] = useState('');
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [roles, setRoles] = useState([]);
@@ -33,11 +34,15 @@ const Usuarios = () => {
   const [verConfirm, setVerConfirm] = useState(false);
   const [solicitudesPendientes, setSolicitudesPendientes] = useState([]);
   const [cargandoPendientes, setCargandoPendientes] = useState(false);
+  const ultimaConsultaRef = useRef(0);
 
   const cargar = useCallback(async () => {
+    const consultaId = ultimaConsultaRef.current + 1;
+    ultimaConsultaRef.current = consultaId;
     setCargando(true);
     try {
-      const { data } = await usuarioService.listar({ pagina, limite: 15, buscar });
+      const { data } = await usuarioService.listar({ pagina, limite: 15, buscar: buscarAplicado.trim() });
+      if (consultaId !== ultimaConsultaRef.current) return;
       if (data.ok) {
         setUsuarios(data.datos);
         setTotalPaginas(data.totalPaginas);
@@ -45,11 +50,22 @@ const Usuarios = () => {
     } catch {
       toast.error('Error al cargar usuarios');
     } finally {
-      setCargando(false);
+      if (consultaId === ultimaConsultaRef.current) {
+        setCargando(false);
+      }
     }
-  }, [pagina, buscar]);
+  }, [pagina, buscarAplicado]);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBuscarAplicado(buscar.trim());
+      setPagina(1);
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [buscar]);
 
   useEffect(() => {
     if (!esSuperAdmin) return;

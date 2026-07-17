@@ -48,6 +48,40 @@ const normalizeEstado = (v) => {
   return Boolean(v);
 };
 
+const MOTIVOS_ANULACION_GENERICOS = new Set([
+  'anular',
+  'anulacion',
+  'anulacion factura',
+  'cancelar',
+  'cancelacion',
+  'cancelacion factura',
+  'motivo',
+  'justificacion',
+  'error',
+  'prueba',
+  'test',
+  'n/a',
+  'na',
+  'ninguno',
+  'sin motivo',
+  'no aplica'
+]);
+
+const validarMotivoAnulacionFactura = (motivo = '') => {
+  const texto = String(motivo || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  const textoPlano = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const letras = textoPlano.replace(/[^a-z0-9]/g, '');
+  const palabrasConSentido = textoPlano.split(/\s+/).filter((p) => p.length >= 3);
+
+  if (!texto) return 'El motivo de anulacion es obligatorio';
+  if (texto.length < 15) return 'Debe tener al menos 15 caracteres';
+  if (palabrasConSentido.length < 3) return 'Explique la causa con al menos 3 palabras';
+  if (/^\d+$/.test(letras)) return 'No puede contener solo numeros';
+  if (/(.)\1{4,}/i.test(letras) || new Set(letras).size < 5) return 'No parece una justificacion valida';
+  if (MOTIVOS_ANULACION_GENERICOS.has(textoPlano)) return 'El motivo es demasiado generico';
+  return '';
+};
+
 // ==========================================
 // VISTA LISTA DE FACTURAS
 // ==========================================
@@ -79,6 +113,7 @@ const ListaFacturas = ({ onNuevaProductos, onNuevaReparacion, onVer }) => {
 
   const [modalAnular, setModalAnular] = useState(null); // { id, numero, estado }
   const [motivoAnulacion, setMotivoAnulacion] = useState('');
+  const errorMotivoAnulacion = validarMotivoAnulacionFactura(motivoAnulacion);
 
   const abrirModalAnular = (f) => {
     setModalAnular({ id: f.cod_factura, numero: `FAC-${String(f.cod_factura).padStart(6, '0')}`, estado: f.estado });
@@ -87,8 +122,8 @@ const ListaFacturas = ({ onNuevaProductos, onNuevaReparacion, onVer }) => {
 
   const anular = async () => {
     if (!modalAnular) return;
-    if (!motivoAnulacion.trim()) {
-      toast.warn('Debes ingresar el motivo de anulación');
+    if (errorMotivoAnulacion) {
+      toast.warn(errorMotivoAnulacion);
       return;
     }
     try {
@@ -210,21 +245,26 @@ const ListaFacturas = ({ onNuevaProductos, onNuevaReparacion, onVer }) => {
                 <div className="mb-2">
                   <label className="form-label fw-bold">Motivo de anulación <span className="text-danger">*</span></label>
                   <textarea
-                    className="form-control"
+                    className={`form-control ${motivoAnulacion && errorMotivoAnulacion ? 'is-invalid' : ''}`}
                     rows="3"
-                    placeholder="Ingrese el motivo de anulación (obligatorio)..."
+                    placeholder="Ej: Cliente solicito cancelar por datos de facturacion incorrectos"
                     value={motivoAnulacion}
                     onChange={(e) => setMotivoAnulacion(e.target.value)}
                     maxLength={500}
                   />
-                  <small className="text-muted">{motivoAnulacion.length}/500</small>
+                  {motivoAnulacion && errorMotivoAnulacion && (
+                    <div className="invalid-feedback">{errorMotivoAnulacion}</div>
+                  )}
+                  <small className="text-muted">
+                    {motivoAnulacion.length}/500 - Minimo 15 caracteres y 3 palabras con sentido.
+                  </small>
                 </div>
               </div>
               <div className="modal-footer justify-content-between">
                 <button className="btn btn-secondary" onClick={() => { setModalAnular(null); setMotivoAnulacion(''); }}>
                   Cancelar
                 </button>
-                <button className="btn btn-warning" onClick={anular} disabled={!motivoAnulacion.trim()}>
+                <button className="btn btn-warning" onClick={anular} disabled={Boolean(errorMotivoAnulacion)}>
                   <FiXCircle className="me-1" />Anular
                 </button>
               </div>

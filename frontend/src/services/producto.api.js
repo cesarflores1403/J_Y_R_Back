@@ -9,7 +9,12 @@ const construirUrlApi = (ruta) => {
 };
 
 export const productoApi = {
-  getAll: () => apiFetch('/api/producto', { method: 'GET' }), // // GET lista
+  getAll: ({ buscar = '' } = {}) => {
+    const params = new URLSearchParams();
+    if (buscar) params.set('buscar', buscar);
+    const query = params.toString();
+    return apiFetch(`/api/producto${query ? `?${query}` : ''}`, { method: 'GET' });
+  }, // // GET lista
 
   exportarPdf: async ({ buscar = '', estado = '' } = {}) => {
     const params = new URLSearchParams();

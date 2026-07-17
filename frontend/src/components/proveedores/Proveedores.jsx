@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { proveedorService } from '../../services/serviceIndex.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { toast } from 'react-toastify';
-import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight, FiTrash2 } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight, FiTrash2, FiDownload } from 'react-icons/fi';
 import { confirmDialog, alertDialog } from '../../utils/notifications.js';
 import ModalProveedor from './ModalProveedor.jsx';
 
@@ -19,6 +19,7 @@ const Proveedores = () => {
   const [buscar, setBuscar] = useState('');
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
+  const [exportandoPdf, setExportandoPdf] = useState(false);
 
   // Estados de modal
   const [modal, setModal] = useState(false);
@@ -158,6 +159,28 @@ const Proveedores = () => {
     cargar();
   };
 
+  const exportarPdf = async () => {
+    setExportandoPdf(true);
+
+    try {
+      const response = await proveedorService.exportarPdf({ buscar });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'reporte-proveedores.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Reporte de proveedores exportado');
+    } catch (err) {
+      toast.error(err.response?.data?.mensaje || 'Error al exportar proveedores en PDF');
+    } finally {
+      setExportandoPdf(false);
+    }
+  };
+
   return (
     <div>
 
@@ -175,6 +198,16 @@ const Proveedores = () => {
           )}
 
           {/* Botón crear */}
+          <button
+            type="button"
+            className="jyr-btn jyr-btn-primary"
+            onClick={exportarPdf}
+            disabled={exportandoPdf || cargando}
+          >
+            {exportandoPdf ? <span className="spinner-border spinner-border-sm me-2" /> : <FiDownload className="me-2" />}
+            Exportar PDF
+          </button>
+
           <button className="btn jyr-btn-primary" onClick={abrirCrear}>
             <FiPlus className="me-2" />Nuevo Proveedor
           </button>

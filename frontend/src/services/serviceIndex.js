@@ -27,6 +27,7 @@ export const proveedorService = {
   actualizar: (id, data) => api.put(`/proveedores/${id}`, data),
   toggleEstado: (id) => api.patch(`/proveedores/${id}/toggle-estado`),
   eliminar: (id) => api.delete(`/proveedores/${id}`),
+  exportarPdf: (params) => api.get('/proveedores/reporte/pdf', { params, responseType: 'blob' }),
 };
 
 // ==================== UBICACIONES ====================
@@ -110,6 +111,7 @@ export const carruselService = {
 export const auditoriaFacturacionService = {
   listar: (params) => api.get('/auditoria-facturacion', { params }),
   tiposEvento: () => api.get('/auditoria-facturacion/tipos-evento'),
+  tiposEntidad: () => api.get('/auditoria-facturacion/tipos-entidad'),
   exportarExcel: (params) => api.get('/auditoria-facturacion/exportar-excel', { params, responseType: 'blob' }),
   eliminar: (id) => api.delete(`/auditoria-facturacion/${id}`),
 };
@@ -124,7 +126,13 @@ export const notaCreditoService = {
 };
 
 export const usuarioService = {
-  listar:       (params) => api.get('/usuarios', { params }),
+  listar:       (params = {}) => api.get('/usuarios', {
+    params: { ...params, _t: Date.now() },
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache'
+    }
+  }),
   listarRoles:  ()       => api.get('/usuarios/roles'),
   crear:        (data)   => api.post('/usuarios', data),
   actualizar:   (id, data) => api.put(`/usuarios/${id}`, data),
@@ -141,6 +149,7 @@ export const comprasService = {
   historial:     (id)     => api.get(`/compras/${id}/historial`),
   listarEstados: ()       => api.get('/compras/estados'),
   productosDisponibles: (params) => api.get('/compras/productos-disponibles', { params }),
+  exportarPdf:   (params) => api.get('/compras/reporte/pdf', { params, responseType: 'blob' }),
 };
 
 // ==================== EMPRESA CONFIG (Super Admin) ====================

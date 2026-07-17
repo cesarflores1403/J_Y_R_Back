@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { autenticar, autorizar } from '../middlewares/auth.js';
 import { validarCampos } from '../middlewares/validar.js';
 import { listar, obtener, crear, anular, productosDisponibles, clientesDisponibles } from '../controllers/facturaController.js';
+import { validarMotivoAnulacion } from '../utils/motivoAnulacion.js';
 
 const router = Router();
 const SOLO_LETRAS_ESPACIOS_REGEX = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/;
@@ -103,7 +104,13 @@ router.post('/', autorizar('Administrador', 'Cajero'), validarCrearFactura, crea
 
 // Solo Administrador puede anular (HU-FAC-07: motivo obligatorio)
 const validarAnularFactura = [
-  body('motivo').notEmpty().withMessage('El motivo de anulación es obligatorio'),
+  body('motivo').custom((value) => {
+    const resultado = validarMotivoAnulacion(value);
+    if (!resultado.valido) {
+      throw new Error(resultado.motivo);
+    }
+    return true;
+  }),
   validarCampos
 ];
 router.patch('/:id/anular', autorizar('Administrador'), validarAnularFactura, anular);

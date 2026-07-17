@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'; // // Hooks
+import { useCallback, useEffect, useState } from 'react'; // // Hooks
 import { productoApi } from '../services/producto.api.js'; // // API producto
 import { toast } from 'react-toastify';
 
@@ -9,18 +9,19 @@ export const useProducto = () => {
   const [exportandoPdf, setExportandoPdf] = useState(false);
   const [error, setError] = useState(''); // // Error general
   const [success, setSuccess] = useState(''); // // Mensaje éxito
+  const [buscar, setBuscar] = useState('');
 
   const limpiarMensajes = () => {
     setError(''); // // Limpia error
     setSuccess(''); // // Limpia success
   };
 
-  const cargar = async () => {
+  const cargar = useCallback(async (buscarActual = buscar) => {
     try {
       setLoading(true); // // Inicia carga
       limpiarMensajes(); // // Limpia mensajes
 
-      const data = await productoApi.getAll(); // // GET (apiFetch retorna solo data)
+      const data = await productoApi.getAll({ buscar: buscarActual }); // // GET (apiFetch retorna solo data)
       setProducto(Array.isArray(data) ? data : []); // // Set lista segura
     } catch (e) {
       setProducto([]); // // Evita datos viejos si falla
@@ -28,7 +29,7 @@ export const useProducto = () => {
     } finally {
       setLoading(false); // // Fin
     }
-  };
+  }, [buscar]);
 
   const crear = async (payload) => {
     try {
@@ -238,8 +239,12 @@ export const useProducto = () => {
   };
 
   useEffect(() => {
-    cargar(); // // Carga inicial
-  }, []);
+    const timer = setTimeout(() => {
+      cargar(buscar); // // Carga inicial y recarga por busqueda
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [buscar, cargar]);
 
   return {
     producto, // // Lista
@@ -248,6 +253,8 @@ export const useProducto = () => {
     exportandoPdf,
     error, // // Mensaje error
     success, // // Mensaje éxito
+    buscar,
+    setBuscar,
     setError, // // Setter error
     setSuccess, // // Setter success
     cargar, // // Recargar lista

@@ -1,4 +1,5 @@
 import authService from '../services/authService.js';
+import { registrarEventoSeguridad } from '../utils/auditoriaSeguridad.js';
 
 const respuestaAuthError = (res, error) => {
   const status = error.statusCode || error.status || 500;
@@ -13,11 +14,27 @@ const respuestaAuthError = (res, error) => {
 };
 
 export const login = async (req, res) => {
+  const { nombre_usuario, password } = req.body;
   try {
-    const { nombre_usuario, password } = req.body;
     const resultado = await authService.login(nombre_usuario, password);
+    await registrarEventoSeguridad(req, {
+      evento: 'LOGIN_EXITOSO',
+      cod_usuario: resultado.usuario?.cod_usuario || null,
+      nombre_usuario: resultado.usuario?.nombre_usuario || nombre_usuario,
+      detalle: {
+        rol: resultado.usuario?.rol || null
+      }
+    });
     res.json({ ok: true, ...resultado });
   } catch (error) {
+    await registrarEventoSeguridad(req, {
+      evento: 'LOGIN_FALLIDO',
+      nombre_usuario,
+      detalle: {
+        motivo: error.statusCode === 401 ? 'Credenciales invalidas' : error.message,
+        status: error.statusCode || error.status || 500
+      }
+    });
     return respuestaAuthError(res, error);
   }
 };

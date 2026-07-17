@@ -1,18 +1,25 @@
 import {Op,ForeignKeyConstraintError} from 'sequelize';
 import Proveedor from '../models/ProveedorModel.js';
+import { generarReportePdf } from '../utils/pdfReport.js';
+
+const construirWhereProveedores=(buscar='')=>{
+  const where={};
+
+  if(buscar){
+    where[Op.or]=[
+      {nombre_proveedor:{[Op.iLike]:`%${buscar}%`}},
+      {correo:{[Op.iLike]:`%${buscar}%`}},
+      {pais:{[Op.iLike]:`%${buscar}%`}}
+    ];
+  }
+
+  return where;
+};
 
 class ProveedorService{
   // Lista proveedores con búsqueda y ordena del más nuevo al más viejo
   async listar({pagina=1,limite=15,buscar=''}) {
-    const where={};
-
-    if(buscar){
-      where[Op.or]=[
-        {nombre_proveedor:{[Op.iLike]:`%${buscar}%`}},
-        {correo:{[Op.iLike]:`%${buscar}%`}},
-        {pais:{[Op.iLike]:`%${buscar}%`}}
-      ];
-    }
+    const where=construirWhereProveedores(buscar);
 
     const {count,rows}=await Proveedor.findAndCountAll({
       where,
@@ -28,6 +35,55 @@ class ProveedorService{
       pagina:parseInt(pagina),
       totalPaginas:Math.ceil(count/parseInt(limite))
     };
+  }
+
+  async exportarReportePdf({buscar=''}={}) {
+    const proveedores=await Proveedor.findAll({
+      where:construirWhereProveedores(buscar),
+      attributes:[
+        'cod_proveedor',
+        'nombre_proveedor',
+        'telefono',
+        'correo',
+        'pais',
+        'es_internacional',
+        'validado',
+        'estado_proveedor'
+      ],
+      order:[['cod_proveedor','DESC']]
+    });
+
+    return generarReportePdf({
+      titulo:'Reporte de proveedores',
+      filtros:[
+        {label:'Busqueda',value:buscar||'Todos'}
+      ],
+      metricas:[
+        {label:'Total de proveedores',value:proveedores.length}
+      ],
+      columnas:[
+        {header:'#',key:'numero',width:28,align:'center'},
+        {header:'ID',key:'id',width:42,align:'center'},
+        {header:'Proveedor',key:'nombre',width:150},
+        {header:'Telefono',key:'telefono',width:64},
+        {header:'Correo',key:'correo',width:140},
+        {header:'Pais',key:'pais',width:82},
+        {header:'Internacional',key:'internacional',width:82},
+        {header:'Validado',key:'validado',width:106},
+        {header:'Estado',key:'estado',width:72}
+      ],
+      filas:proveedores.map((proveedor,index)=>({
+        numero:index+1,
+        id:proveedor.cod_proveedor,
+        nombre:proveedor.nombre_proveedor,
+        telefono:proveedor.telefono,
+        correo:proveedor.correo,
+        pais:proveedor.pais,
+        internacional:proveedor.es_internacional?'Si':'No',
+        validado:proveedor.validado||'-',
+        estado:proveedor.estado_proveedor?'Activo':'Inactivo'
+      }))
+    });
   }
 
   // Obtiene un proveedor por id
