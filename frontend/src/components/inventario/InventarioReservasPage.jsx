@@ -8,6 +8,7 @@ import ReservasHeader from './ReservasHeader.jsx';
 import ReservasFiltrosCard from './ReservasFiltrosCard.jsx';
 import ReservasTablaCard from './ReservasTablaCard.jsx';
 import BootstrapPagination from '../common/BootstrapPagination.jsx';
+import ErrorBoundary from '../common/ErrorBoundary.jsx';
 
 const LIMITE_PAGINA = 10;
 
@@ -332,6 +333,7 @@ const InventarioReservasPage = () => {
   const inicioMostrado = meta.total > 0 ? ((meta.pagina - 1) * meta.limite) + 1 : 0;
   const finMostrado = meta.total > 0 ? Math.min(meta.pagina * meta.limite, meta.total) : 0;
   return (
+    <ErrorBoundary titulo="Módulo de Reservas de Inventario">
     <section className="kdx-shell mt-4">
       <ReservasHeader
         total={meta.total}
@@ -389,6 +391,7 @@ const InventarioReservasPage = () => {
         onConfirm={confirmarAccion}
       />
     </section>
+    </ErrorBoundary>
   );
 };
 

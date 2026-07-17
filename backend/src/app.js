@@ -15,33 +15,43 @@ import { errorHandler } from './middlewares/errorHandler.js'; // // Error global
 
 const app = express();
 
-const cspDirectives = {
-  defaultSrc: ["'self'"],
-  baseUri: ["'self'"],
-  fontSrc: ["'self'", 'https:', 'data:'],
-  formAction: ["'self'"],
-  frameAncestors: ["'self'"],
-  imgSrc: ["'self'", 'data:', 'blob:'],
-  objectSrc: ["'none'"],
-  scriptSrc: ["'self'"],
-  scriptSrcAttr: ["'none'"],
-  styleSrc: ["'self'", 'https:', "'unsafe-inline'"],
-  upgradeInsecureRequests: []
-};
-
 // =======================
 // MIDDLEWARES GLOBALES
 // =======================
 
+// =======================
+// CABECERAS DE SEGURIDAD HTTP (helmet)
+// CSP + Anti-Clickjacking (X-Frame-Options) + nosniff + HSTS
+// =======================
 app.use(helmet({
+  // Content-Security-Policy: restringe de dónde se puede cargar contenido.
   contentSecurityPolicy: {
     useDefaults: true,
-    directives: cspDirectives
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],                 // anti-clickjacking (nadie puede embeber en iframe)
+      imgSrc: ["'self'", 'data:', 'blob:'],       // logos e imágenes en base64/blob
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],     // estilos inline de Bootstrap
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'", 'data:']
+    }
   },
-  xFrameOptions: {
-    action: 'sameorigin'
+  // X-Frame-Options: DENY (refuerza el anti-clickjacking en navegadores viejos)
+  frameguard: { action: 'deny' },
+  // Strict-Transport-Security: fuerza HTTPS por 1 año.
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
   },
-  xContentTypeOptions: true
+  // X-Content-Type-Options: nosniff (helmet lo activa por defecto; explícito aquí)
+  // Referrer-Policy endurecida
+  referrerPolicy: { policy: 'no-referrer' },
+  // Permite que /uploads (imágenes) se consuman desde el frontend en otro origen.
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
 })); // // Seguridad HTTP
 app.use(morgan('dev')); // // Log de requests en desarrollo
 app.use(express.json()); // // Permite recibir JSON

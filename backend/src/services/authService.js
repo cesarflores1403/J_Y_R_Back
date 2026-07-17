@@ -86,7 +86,7 @@ class AuthService {
 
   async solicitarRecuperacion(nombreUsuario) {
     const nombreUsuarioLimpio = (nombreUsuario || '').trim();
-    
+
     if (!nombreUsuarioLimpio) {
       throw Object.assign(new Error('El nombre de usuario es requerido'), { statusCode: 400 });
     }

@@ -11,12 +11,56 @@ import { confirmDialog } from '../../utils/notifications.js';
 import logoClean from '../../assets/img/logo2.jpeg';
 import logoFull from '../../assets/img/logo1.jpeg';
 import { resolveApiBase } from '../../utils/runtimeApi.js';
+import ErrorBoundary from '../common/ErrorBoundary.jsx';
 
 const API_BASE = resolveApiBase();
 
+// ==========================================
+// Límites y saneamiento de entrada
+// Evitan que textos/números exagerados congelen la interfaz.
+// ==========================================
+const MAX_LEN_BUSQUEDA = 60;      // texto de buscadores
+const MAX_CANTIDAD = 9999;        // unidades por línea
+const MAX_VIGENCIA = 90;          // días de vigencia
+const MIN_VIGENCIA = 1;
+const MAX_DESC_MONTO = 9999999;   // tope de descuento global en L
+
+// Convierte a entero acotado dentro de [min, max]; cadena vacía -> ''
+const enteroAcotado = (valor, min, max) => {
+  const limpio = String(valor).replace(/[^\d]/g, '');
+  if (limpio === '') return '';
+  const n = parseInt(limpio, 10);
+  if (!Number.isFinite(n)) return '';
+  return Math.min(max, Math.max(min, n));
+};
+
+// ==========================================
+// Saneadores para inputs de texto (type="text" + inputMode).
+// Conservan estados intermedios de escritura (p. ej. "0." o "") para que el
+// ingreso MANUAL por teclado funcione igual en todas las filas. Solo acotan
+// el tope máximo; el valor se guarda como cadena y se convierte a número al
+// calcular/enviar. Así se evita que un decimal a medio escribir sea descartado.
+// ==========================================
+const sanearEnteroTexto = (valor, max) => {
+  const limpio = String(valor).replace(/[^\d]/g, '');
+  if (limpio === '') return '';
+  const n = parseInt(limpio, 10);
+  return n > max ? String(max) : limpio;
+};
+
+const sanearDecimalTexto = (valor, max) => {
+  let limpio = String(valor).replace(/[^\d.]/g, '');
+  const partes = limpio.split('.');
+  if (partes.length > 2) limpio = `${partes[0]}.${partes.slice(1).join('')}`;
+  if (limpio === '' || limpio === '.') return limpio; // conserva estado intermedio
+  const n = parseFloat(limpio);
+  return Number.isFinite(n) && n > max ? String(max) : limpio;
+};
+
 const formatMoney = (v) => {
-  const n = parseFloat(v) || 0;
-  return `L ${n.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const n = parseFloat(v);
+  const seguro = Number.isFinite(n) ? n : 0;
+  return `L ${seguro.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const resolveAssetSrc = (url) => {
@@ -34,6 +78,139 @@ const estadoBadge = (est) => {
   };
   const m = map[est] || { bg: 'bg-secondary', text: est || '-' };
   return <span className={`badge ${m.bg}`}>{m.text}</span>;
+};
+
+const fmtFechaCorta = (f) => f ? new Date(f).toLocaleDateString('es-HN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
+
+// ==========================================
+// MODAL HISTORIAL DE COTIZACIONES POR CLIENTE (trazabilidad comercial)
+// ==========================================
+const HistorialClienteModal = ({ cliente, onCerrar, onVer }) => {
+  const [datos, setDatos] = useState([]);
+  const [resumen, setResumen] = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+
+  const cargar = useCallback(async (paginaHist = 1) => {
+    setCargando(true);
+    try {
+      const { data } = await cotizacionService.historialCliente(cliente.cod_cliente, { pagina: paginaHist, limite: 5 });
+      if (data.ok) {
+        setDatos(data.datos || []);
+        setResumen(data.resumen || null);
+        setTotalPaginas(data.totalPaginas || 1);
+        setPagina(data.pagina || paginaHist);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.mensaje || 'Error al cargar el historial de cotizaciones');
+    } finally {
+      setCargando(false);
+    }
+  }, [cliente.cod_cliente]);
+
+  useEffect(() => { cargar(1); }, [cargar]);
+
+  return (
+    <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+      <div className="modal-dialog modal-xl modal-dialog-scrollable">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">
+              <FiClipboard className="me-2" />
+              Historial de Cotizaciones — {cliente.nombre} {cliente.apellido || ''}
+            </h5>
+            <button className="btn-close" onClick={onCerrar} />
+          </div>
+
+          <div className="modal-body">
+            {resumen && (
+              <div className="row g-2 mb-3">
+                <div className="col-6 col-md-3">
+                  <div className="jyr-card h-100"><div className="jyr-card-body py-2 text-center">
+                    <div className="text-muted small">Total</div>
+                    <div className="fw-bold fs-5">{resumen.total}</div>
+                  </div></div>
+                </div>
+                <div className="col-6 col-md-3">
+                  <div className="jyr-card h-100"><div className="jyr-card-body py-2 text-center">
+                    <div className="text-muted small">Vigentes</div>
+                    <div className="fw-bold fs-5 text-success">{resumen.vigentes}</div>
+                  </div></div>
+                </div>
+                <div className="col-6 col-md-3">
+                  <div className="jyr-card h-100"><div className="jyr-card-body py-2 text-center">
+                    <div className="text-muted small">Convertidas</div>
+                    <div className="fw-bold fs-5 text-info">{resumen.convertidas}</div>
+                  </div></div>
+                </div>
+                <div className="col-6 col-md-3">
+                  <div className="jyr-card h-100"><div className="jyr-card-body py-2 text-center">
+                    <div className="text-muted small">Monto total</div>
+                    <div className="fw-bold fs-6">{formatMoney(resumen.montoTotal)}</div>
+                  </div></div>
+                </div>
+              </div>
+            )}
+
+            <div className="table-responsive">
+              <table className="table table-hover table-sm mb-0 align-middle">
+                <thead className="table-light">
+                  <tr>
+                    <th>N° Cotización</th>
+                    <th>Fecha</th>
+                    <th>Vendedor</th>
+                    <th className="text-end">Total</th>
+                    <th>Vigencia</th>
+                    <th>Estado</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cargando ? (
+                    <tr><td colSpan="7" className="text-center py-4"><div className="spinner-border spinner-border-sm" /></td></tr>
+                  ) : datos.length === 0 ? (
+                    <tr><td colSpan="7" className="text-center text-muted py-4">Este cliente no tiene cotizaciones registradas</td></tr>
+                  ) : datos.map((c) => (
+                    <tr key={c.cod_cotizacion}>
+                      <td><strong>COT-{String(c.cod_cotizacion).padStart(6, '0')}</strong></td>
+                      <td>{fmtFechaCorta(c.createdAt)}</td>
+                      <td>{c.usuario?.nombre_usuario || '-'}</td>
+                      <td className="text-end"><strong>{formatMoney(c.total)}</strong></td>
+                      <td><small>{fmtFechaCorta(c.fecha_vencimiento)}</small></td>
+                      <td>{estadoBadge(c.estado_cotizacion)}</td>
+                      <td className="text-end">
+                        {onVer && (
+                          <button className="btn btn-sm btn-outline-primary" title="Ver detalle"
+                            onClick={() => { onCerrar(); onVer(c.cod_cotizacion); }}>
+                            <FiEye />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPaginas > 1 && (
+              <div className="d-flex justify-content-center mt-3 align-items-center gap-2">
+                <button className="btn btn-sm btn-outline-secondary" disabled={pagina <= 1 || cargando}
+                  onClick={() => cargar(pagina - 1)}>Anterior</button>
+                <span className="text-muted small">Página {pagina} de {totalPaginas}</span>
+                <button className="btn btn-sm btn-outline-secondary" disabled={pagina >= totalPaginas || cargando}
+                  onClick={() => cargar(pagina + 1)}>Siguiente</button>
+              </div>
+            )}
+          </div>
+
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={onCerrar}>Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 // ==========================================
@@ -68,6 +245,7 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
 
   /* ---- Modales / Acciones ---- */
   const [modalGestion, setModalGestion] = useState(null);
+  const [historialCliente, setHistorialCliente] = useState(null); // cliente cuyo historial se ve
 
   const anular = async (id) => {
     const ok = await confirmDialog({
@@ -139,7 +317,8 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
               <div className="input-group">
                 <span className="input-group-text"><FiSearch /></span>
                 <input type="text" className="form-control" placeholder="Buscar por cliente, DNI..."
-                  value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1); }} />
+                  maxLength={MAX_LEN_BUSQUEDA}
+                  value={buscar} onChange={(e) => { setBuscar(e.target.value.slice(0, MAX_LEN_BUSQUEDA)); setPagina(1); }} />
                 {buscar && <button className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}><FiX /></button>}
               </div>
             </div>
@@ -186,6 +365,12 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
                           <button className="btn btn-sm btn-outline-primary" title="Ver detalle" onClick={() => onVer(c.cod_cotizacion)}>
                             <FiEye />
                           </button>
+                          {c.cliente && (
+                            <button className="btn btn-sm btn-outline-info" title="Historial de cotizaciones del cliente"
+                              onClick={() => setHistorialCliente(c.cliente)}>
+                              <FiClipboard />
+                            </button>
+                          )}
                           {c.estado_cotizacion === 'VIGENTE' && ['Administrador', 'Cajero'].includes(usuario?.rol) && (
                             <button className="btn btn-sm btn-outline-success" title="Convertir a Factura" onClick={() => convertir(c.cod_cotizacion)}>
                               <FiRefreshCw />
@@ -229,6 +414,15 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
             </li>
           </ul></nav>
         </div>
+      )}
+
+      {/* Modal historial de cotizaciones del cliente */}
+      {historialCliente && (
+        <HistorialClienteModal
+          cliente={historialCliente}
+          onCerrar={() => setHistorialCliente(null)}
+          onVer={onVer}
+        />
       )}
     </div>
   );
@@ -509,6 +703,8 @@ const BuscadorProductoCot = ({ onAgregar, itemsActuales = [] }) => {
   const [indiceActivo, setIndiceActivo] = useState(-1);
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
+  const { usuario } = useAuth();
+  const esAdmin = usuario?.rol === 'Administrador';
 
   useEffect(() => {
     const handler = (e) => { if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setAbierto(false); };
@@ -530,11 +726,30 @@ const BuscadorProductoCot = ({ onAgregar, itemsActuales = [] }) => {
     return () => clearTimeout(t);
   }, [query, buscar]);
 
-  const seleccionar = (p) => {
+  const seleccionar = async (p) => {
     if (itemsActuales.some(i => i.cod_producto === p.cod_producto)) {
       toast.warning(`"${p.nombre_producto}" ya está en la cotización`);
       return;
     }
+
+    // Bloqueo de productos sin existencias en inventario.
+    const sinStock = Number(p.stock) <= 0;
+    if (sinStock) {
+      if (!esAdmin) {
+        // Usuario sin permiso: no se puede cotizar un artículo sin existencias.
+        toast.error(`"${p.nombre_producto}" no tiene stock disponible y no puede agregarse a la cotización.`);
+        return;
+      }
+      // Administrador: venta bajo pedido — exige autorización/advertencia obligatoria.
+      const ok = await confirmDialog({
+        variant: 'stock',
+        title: 'Producto sin stock — Autorización requerida',
+        text: `"${p.nombre_producto}" no tiene existencias en el inventario. Como Administrador puedes incluirlo bajo tu autorización (venta bajo pedido). ¿Deseas continuar?`,
+        confirmText: 'Sí, autorizar e incluir'
+      });
+      if (!ok) return;
+    }
+
     onAgregar({
       cod_producto: p.cod_producto,
       nombre_producto: p.nombre_producto,
@@ -563,7 +778,8 @@ const BuscadorProductoCot = ({ onAgregar, itemsActuales = [] }) => {
       <div className="prod-search-input-wrapper">
         <FiSearch className="prod-search-icon" />
         <input ref={inputRef} type="text" className="prod-search-input" placeholder="Ej: 101 ó Filtro de aceite..."
-          value={query} onChange={(e) => setQuery(e.target.value)}
+          maxLength={MAX_LEN_BUSQUEDA}
+          value={query} onChange={(e) => setQuery(e.target.value.slice(0, MAX_LEN_BUSQUEDA))}
           onFocus={() => { if (resultados.length > 0) setAbierto(true); }}
           onKeyDown={keyDown} autoComplete="off" />
         {query && <button className="prod-search-clear" onClick={() => { setQuery(''); setResultados([]); setAbierto(false); inputRef.current?.focus(); }} type="button"><FiX /></button>}
@@ -575,20 +791,28 @@ const BuscadorProductoCot = ({ onAgregar, itemsActuales = [] }) => {
             <div className="prod-search-empty"><FiSearch className="me-2" />No se encontraron productos para "<strong>{query}</strong>"</div>
           ) : resultados.map((p, idx) => {
             const yaEn = itemsActuales.some(i => i.cod_producto === p.cod_producto);
+            const sinStock = Number(p.stock) <= 0;
+            // Bloqueado si ya está en la cotización, o si no hay stock y no es Administrador.
+            const bloqueado = yaEn || (sinStock && !esAdmin);
             return (
               <div key={p.cod_producto}
-                className={`prod-search-item ${idx === indiceActivo ? 'active' : ''} ${yaEn ? 'disabled' : ''}`}
-                onClick={() => !yaEn && seleccionar(p)} onMouseEnter={() => setIndiceActivo(idx)}>
+                className={`prod-search-item ${idx === indiceActivo ? 'active' : ''} ${bloqueado ? 'disabled' : ''}`}
+                onClick={() => !bloqueado && seleccionar(p)} onMouseEnter={() => setIndiceActivo(idx)}>
                 <div className="prod-search-item-code">#{p.cod_producto}</div>
                 <div className="prod-search-item-info">
-                  <div className="prod-search-item-name">{p.nombre_producto} {yaEn && <span className="badge bg-info ms-2" style={{ fontSize: '10px' }}>Ya agregado</span>}</div>
+                  <div className="prod-search-item-name">
+                    {p.nombre_producto}
+                    {yaEn && <span className="badge bg-info ms-2" style={{ fontSize: '10px' }}>Ya agregado</span>}
+                    {sinStock && !yaEn && !esAdmin && <span className="badge bg-danger ms-2" style={{ fontSize: '10px' }}>No disponible</span>}
+                    {sinStock && !yaEn && esAdmin && <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '10px' }}>Requiere autorización</span>}
+                  </div>
                   <div className="prod-search-item-meta"><span>{p.unidad_medida || 'UND'}</span>{p.isv > 0 && <span className="ms-2">ISV: {p.isv}%</span>}</div>
                 </div>
                 <div className="prod-search-item-price">{formatMoney(p.precio_venta)}</div>
-                <div className={`prod-search-item-stock ${p.stock <= 0 ? 'out' : p.stock <= 5 ? 'low' : 'ok'}`}>
-                  {p.stock <= 0 ? <><FiAlertTriangle className="me-1" />Sin Stock</> : <>Stock: {p.stock}</>}
+                <div className={`prod-search-item-stock ${sinStock ? 'out' : p.stock <= 5 ? 'low' : 'ok'}`}>
+                  {sinStock ? <><FiAlertTriangle className="me-1" />Sin Stock</> : <>Stock: {p.stock}</>}
                 </div>
-                {!yaEn && <div className="prod-search-item-add"><FiPlus /></div>}
+                {!bloqueado && <div className="prod-search-item-add"><FiPlus /></div>}
               </div>
             );
           })}
@@ -631,19 +855,29 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
   const agregarProducto = (producto) => {
     setItems(prev => [...prev, { ...producto, descuento: 0 }]);
   };
-  const cambiarCantidad = (index, cantidad) => { const n = [...items]; n[index].cantidad = parseInt(cantidad) || 0; setItems(n); };
-  const cambiarDescuento = (index, valor) => { const n = [...items]; n[index].descuento = Math.min(100, Math.max(0, parseFloat(valor) || 0)); setItems(n); };
+  const cambiarCantidad = (index, cantidad) => {
+    const limpio = sanearEnteroTexto(cantidad, MAX_CANTIDAD);
+    setItems(prev => prev.map((it, i) => (i === index ? { ...it, cantidad: limpio } : it)));
+  };
+  const cambiarDescuento = (index, valor) => {
+    const limpio = sanearDecimalTexto(valor, 100);
+    setItems(prev => prev.map((it, i) => (i === index ? { ...it, descuento: limpio } : it)));
+  };
   const eliminarItem = (index) => setItems(items.filter((_, i) => i !== index));
 
   const round2 = (n) => Math.round((parseFloat(n) + Number.EPSILON) * 100) / 100;
 
   const calcularItem = (item) => {
-    const precio = round2(item.precio_venta);
-    const descuento = round2(item.descuento || 0);
-    const subtotalBruto = round2(precio * item.cantidad);
+    // Todos los valores se acotan aquí para que los totales nunca se corrompan
+    // (sin NaN ni montos gigantes), aunque el estado tuviera un valor extremo.
+    const precio = round2(parseFloat(item.precio_venta) || 0);
+    const cantidad = Math.min(MAX_CANTIDAD, Math.max(0, parseInt(item.cantidad, 10) || 0));
+    const descuento = Math.min(100, Math.max(0, parseFloat(item.descuento) || 0));
+    const isvPct = Math.min(100, Math.max(0, parseFloat(item.isv_pct) || 0));
+    const subtotalBruto = round2(precio * cantidad);
     const montoDescuento = round2((descuento / 100) * subtotalBruto);
     const subtotal = round2(subtotalBruto - montoDescuento);
-    const isv = round2((item.isv_pct / 100) * subtotal);
+    const isv = round2((isvPct / 100) * subtotal);
     const total = round2(subtotal + isv);
     return { subtotalBruto, montoDescuento, subtotal, isv, total };
   };
@@ -660,8 +894,9 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
     };
   }, { subtotalBruto: 0, descuento: 0, subtotal: 0, isv: 0, total: 0 });
 
-  // Aplicar descuento global
-  const dg = parseFloat(descuentoGlobal) || 0;
+  // Aplicar descuento global (acotado a su límite: 100% o el tope de monto)
+  const maxDescGlobal = tipoDescGlobal === 'PORCENTAJE' ? 100 : MAX_DESC_MONTO;
+  const dg = Math.min(maxDescGlobal, Math.max(0, parseFloat(descuentoGlobal) || 0));
   let montoDescGlobal = 0;
   let subtotalFinal = totalesLineas.subtotal;
   let isvFinal = totalesLineas.isv;
@@ -680,18 +915,66 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
   const descuentoTotal = round2(totalesLineas.descuento + montoDescGlobal);
   const totalFinal = round2(subtotalFinal + isvFinal);
 
+  // ==========================================
+  // Regla de negocio: el total acumulado de descuentos (por línea + global)
+  // no puede llegar ni superar el 100% de la venta, ni dejar un total <= 0.
+  // ==========================================
+  const hayItems = items.length > 0;
+  const porcentajeDescuentos = totalesLineas.subtotalBruto > 0
+    ? round2((descuentoTotal / totalesLineas.subtotalBruto) * 100)
+    : 0;
+  const descuentosExcedidos = hayItems && (porcentajeDescuentos >= 100 || totalFinal <= 0);
+
+  // ==========================================
+  // Campos obligatorios: la cotización no tiene valor comercial sin cliente,
+  // sin productos, o con total <= 0. Se bloquea el guardado en esos casos.
+  // ==========================================
+  const faltaCliente = !clienteSeleccionado;
+  const sinProductos = !hayItems;
+  const totalSinValor = hayItems && totalFinal <= 0;
+
+  // ==========================================
+  // Validación de límites: si algún campo excede sus rangos permitidos, se
+  // bloquea de inmediato el procesamiento del formulario. Así los totales de
+  // dinero se mantienen siempre matemáticamente consistentes.
+  // ==========================================
+  const vigenciaNum = parseInt(vigenciaDias, 10);
+  const vigenciaFueraDeLimite = !Number.isInteger(vigenciaNum) || vigenciaNum < MIN_VIGENCIA || vigenciaNum > MAX_VIGENCIA;
+  const descGlobalNum = parseFloat(descuentoGlobal) || 0;
+  const descGlobalFueraDeLimite = descGlobalNum < 0 || descGlobalNum > maxDescGlobal;
+  const itemsFueraDeLimite = items.some((it) => {
+    const c = parseInt(it.cantidad, 10);
+    const d = parseFloat(it.descuento);
+    const cantidadMal = !Number.isInteger(c) || c < 1 || c > MAX_CANTIDAD;
+    const descuentoMal = it.descuento !== '' && it.descuento != null && (Number.isNaN(d) || d < 0 || d > 100);
+    return cantidadMal || descuentoMal;
+  });
+  const camposFueraDeLimite = vigenciaFueraDeLimite || descGlobalFueraDeLimite || (hayItems && itemsFueraDeLimite);
+
+  const formularioInvalido = faltaCliente || sinProductos || totalSinValor || descuentosExcedidos || camposFueraDeLimite;
+
   const guardar = async () => {
-    if (!clienteSeleccionado) { toast.error('Selecciona un cliente'); return; }
-    if (items.length === 0) { toast.error('Agrega al menos un producto'); return; }
+    if (faltaCliente) { toast.error('Debes seleccionar un cliente'); return; }
+    if (sinProductos) { toast.error('Debes agregar al menos un producto'); return; }
+    // Bloquea inmediatamente si algún campo excede sus límites.
+    if (vigenciaFueraDeLimite) { toast.error(`La vigencia debe ser un número entero entre ${MIN_VIGENCIA} y ${MAX_VIGENCIA} días`); return; }
+    if (descGlobalFueraDeLimite) { toast.error('El descuento global excede el límite permitido'); return; }
+    if (itemsFueraDeLimite) { toast.error('Hay cantidades o descuentos fuera de los límites permitidos'); return; }
     for (const item of items) {
-      if (item.cantidad <= 0) { toast.error('La cantidad de cada producto debe ser mayor a 0'); return; }
+      if ((parseInt(item.cantidad, 10) || 0) <= 0) { toast.error('La cantidad de cada producto debe ser mayor a 0'); return; }
+    }
+    if (totalSinValor) { toast.error('El total de la cotización debe ser mayor a L 0.00'); return; }
+    // Bloquea saldos negativos o descuentos que consumen el 100% de la venta.
+    if (descuentosExcedidos) {
+      toast.error('Los descuentos no pueden ser iguales o mayores al 100% de la venta. El total final debe ser mayor a L 0.00.');
+      return;
     }
 
     setGuardando(true);
     try {
       const payload = {
         cod_cliente: clienteSeleccionado.cod_cliente,
-        items: items.map(i => ({ cod_producto: i.cod_producto, cantidad: i.cantidad, descuento: i.descuento || 0 })),
+        items: items.map(i => ({ cod_producto: i.cod_producto, cantidad: parseInt(i.cantidad, 10) || 0, descuento: parseFloat(i.descuento) || 0 })),
         vigencia_dias: parseInt(vigenciaDias) || 15,
         observaciones: observaciones || null,
         descuento_global: dg > 0 ? dg : undefined,
@@ -735,8 +1018,9 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                   <div className="input-group">
                     <span className="input-group-text"><FiSearch /></span>
                     <input type="text" className="form-control" placeholder="Buscar cliente por nombre, DNI..."
+                      maxLength={MAX_LEN_BUSQUEDA}
                       value={buscarCliente}
-                      onChange={(e) => { setBuscarCliente(e.target.value); setShowClienteDropdown(true); }}
+                      onChange={(e) => { setBuscarCliente(e.target.value.slice(0, MAX_LEN_BUSQUEDA)); setShowClienteDropdown(true); }}
                       onFocus={() => setShowClienteDropdown(true)} />
                   </div>
                   {showClienteDropdown && clientes.length > 0 && (
@@ -809,13 +1093,13 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                           </td>
                           <td>{formatMoney(item.precio_venta)}</td>
                           <td>
-                            <input type="number" className="form-control form-control-sm"
-                              min="1" value={item.cantidad}
+                            <input type="text" inputMode="numeric" className="form-control form-control-sm"
+                              value={item.cantidad ?? ''}
                               onChange={(e) => cambiarCantidad(index, e.target.value)} />
                           </td>
                           <td>
-                            <input type="number" className="form-control form-control-sm"
-                              min="0" max="100" step="0.5" value={item.descuento || 0}
+                            <input type="text" inputMode="decimal" className="form-control form-control-sm"
+                              value={item.descuento ?? ''}
                               onChange={(e) => cambiarDescuento(index, e.target.value)} />
                           </td>
                           <td>{formatMoney(calc.subtotal)}</td>
@@ -846,8 +1130,10 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                 <div className="jyr-card-body">
                   <h6 className="mb-3">Opciones de Cotización</h6>
                   <label className="form-label small">Vigencia (días)</label>
-                  <input type="number" className="form-control form-control-sm mb-2" min="1" max="90"
-                    value={vigenciaDias} onChange={(e) => setVigenciaDias(e.target.value)} />
+                  <input type="number" className={`form-control form-control-sm mb-2 ${vigenciaFueraDeLimite ? 'is-invalid' : ''}`} min={MIN_VIGENCIA} max={MAX_VIGENCIA}
+                    value={vigenciaDias}
+                    onChange={(e) => setVigenciaDias(enteroAcotado(e.target.value, MIN_VIGENCIA, MAX_VIGENCIA))} />
+                  {vigenciaFueraDeLimite && <div className="invalid-feedback d-block">Debe ser un entero entre {MIN_VIGENCIA} y {MAX_VIGENCIA} días.</div>}
                   <label className="form-label small">Observaciones</label>
                   <textarea className="form-control form-control-sm mb-2" rows="3" placeholder="Notas adicionales..."
                     value={observaciones} onChange={(e) => setObservaciones(e.target.value)} maxLength={500} />
@@ -863,9 +1149,11 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                   <h6 className="mb-3">Descuento Global</h6>
                   <div className="row g-2">
                     <div className="col-7">
-                      <input type="number" className="form-control form-control-sm" min="0" step="0.5"
+                      <input type="text" inputMode="decimal" className="form-control form-control-sm"
                         placeholder="Monto o %" value={descuentoGlobal}
-                        onChange={(e) => setDescuentoGlobal(e.target.value)} />
+                        onChange={(e) => setDescuentoGlobal(
+                          sanearDecimalTexto(e.target.value, tipoDescGlobal === 'PORCENTAJE' ? 100 : MAX_DESC_MONTO)
+                        )} />
                     </div>
                     <div className="col-5">
                       <select className="form-select form-select-sm" value={tipoDescGlobal} onChange={(e) => setTipoDescGlobal(e.target.value)}>
@@ -908,10 +1196,48 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                   <hr />
                   <div className="d-flex justify-content-between mb-3">
                     <span className="fs-5 fw-bold">Total:</span>
-                    <span className="fs-5 fw-bold text-success">{formatMoney(totalFinal)}</span>
+                    <span className={`fs-5 fw-bold ${descuentosExcedidos ? 'text-danger' : 'text-success'}`}>{formatMoney(totalFinal)}</span>
                   </div>
 
-                  <button className="btn jyr-btn-primary w-100" disabled={guardando || items.length === 0 || !clienteSeleccionado}
+                  {camposFueraDeLimite && (
+                    <div className="alert alert-danger d-flex align-items-start gap-2 py-2 px-3 mb-3" role="alert" style={{ fontSize: '0.85rem' }}>
+                      <FiAlertTriangle className="mt-1 flex-shrink-0" />
+                      <span>
+                        Hay campos con valores fuera de los límites permitidos. Corrígelos para continuar:
+                        <ul className="mb-0 ps-3 mt-1">
+                          {vigenciaFueraDeLimite && <li>Vigencia: entero entre {MIN_VIGENCIA} y {MAX_VIGENCIA} días</li>}
+                          {descGlobalFueraDeLimite && <li>Descuento global fuera de rango</li>}
+                          {hayItems && itemsFueraDeLimite && <li>Cantidad o descuento de algún producto fuera de rango</li>}
+                        </ul>
+                      </span>
+                    </div>
+                  )}
+
+                  {!camposFueraDeLimite && descuentosExcedidos && (
+                    <div className="alert alert-danger d-flex align-items-start gap-2 py-2 px-3 mb-3" role="alert" style={{ fontSize: '0.85rem' }}>
+                      <FiAlertTriangle className="mt-1 flex-shrink-0" />
+                      <span>
+                        Los descuentos ({porcentajeDescuentos}%) igualan o superan el 100% de la venta.
+                        El total no puede ser menor o igual a L 0.00. Reduce los descuentos para continuar.
+                      </span>
+                    </div>
+                  )}
+
+                  {!camposFueraDeLimite && !descuentosExcedidos && (faltaCliente || sinProductos || totalSinValor) && (
+                    <div className="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 mb-3" role="alert" style={{ fontSize: '0.85rem' }}>
+                      <FiAlertTriangle className="mt-1 flex-shrink-0" />
+                      <span>
+                        Para crear la cotización es obligatorio:
+                        <ul className="mb-0 ps-3 mt-1">
+                          {faltaCliente && <li>Seleccionar un cliente</li>}
+                          {sinProductos && <li>Agregar al menos un producto</li>}
+                          {totalSinValor && <li>Que el total sea mayor a L 0.00</li>}
+                        </ul>
+                      </span>
+                    </div>
+                  )}
+
+                  <button className="btn jyr-btn-primary w-100" disabled={guardando || formularioInvalido}
                     onClick={guardar}>
                     {guardando ? <span className="spinner-border spinner-border-sm me-2" /> : <FiClipboard className="me-2" />}
                     Crear Cotización
@@ -937,14 +1263,24 @@ const Cotizaciones = () => {
   const irALista = () => { setVista('lista'); setCotizacionDetalle(null); };
   const verDetalle = (id) => { setCotizacionDetalle(id); setVista('detalle'); };
 
-  switch (vista) {
-    case 'nueva':
-      return <NuevaCotizacion onVolver={irALista} onCreada={(id) => { if (id) verDetalle(id); else irALista(); }} />;
-    case 'detalle':
-      return <DetalleCotizacion codCotizacion={cotizacionDetalle} onVolver={irALista} onConvertida={irALista} />;
-    default:
-      return <ListaCotizaciones onNueva={irANueva} onVer={verDetalle} />;
-  }
+  const renderVista = () => {
+    switch (vista) {
+      case 'nueva':
+        return <NuevaCotizacion onVolver={irALista} onCreada={(id) => { if (id) verDetalle(id); else irALista(); }} />;
+      case 'detalle':
+        return <DetalleCotizacion codCotizacion={cotizacionDetalle} onVolver={irALista} onConvertida={irALista} />;
+      default:
+        return <ListaCotizaciones onNueva={irANueva} onVer={verDetalle} />;
+    }
+  };
+
+  // Escudo de errores: si una vista lanza una excepción al renderizar, se
+  // muestra una advertencia controlada en lugar de congelar la pantalla.
+  return (
+    <ErrorBoundary titulo="Módulo de Cotizaciones y Reservas">
+      {renderVista()}
+    </ErrorBoundary>
+  );
 };
 
 export default Cotizaciones;

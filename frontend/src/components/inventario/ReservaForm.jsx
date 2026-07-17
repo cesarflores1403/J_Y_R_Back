@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { inventarioReservasApi } from './inventarioReservas.api.js';
+import { REFERENCIAS_RESERVA } from './referenciasReserva.js';
+import { sanitizarTexto } from '../../utils/sanitizarTexto.js';
 
 const estadoInicial = {
   cod_producto: '',
@@ -8,6 +10,9 @@ const estadoInicial = {
   referencia: '',
   observaciones: ''
 };
+
+// Tope de cantidad para evitar que un número exagerado bloquee la interfaz.
+const MAX_CANTIDAD_RESERVA = 999999;
 
 const formatearCodigoProducto = (producto) => {
   const codigo = String(producto?.codigo_producto || '').trim().toUpperCase();
@@ -228,10 +233,17 @@ const ReservaForm = ({
                   <input
                     type="number"
                     min="1"
+                    max={MAX_CANTIDAD_RESERVA}
                     step="1"
                     className="form-control"
                     value={form.cantidad}
-                    onChange={(event) => actualizarCampo('cantidad', event.target.value)}
+                    onChange={(event) => {
+                      // Solo dígitos y acotado al tope; evita valores exagerados.
+                      const limpio = String(event.target.value).replace(/[^\d]/g, '');
+                      if (limpio === '') { actualizarCampo('cantidad', ''); return; }
+                      const n = Math.min(MAX_CANTIDAD_RESERVA, parseInt(limpio, 10));
+                      actualizarCampo('cantidad', String(n));
+                    }}
                     placeholder="Ej: 5"
                     required
                   />
@@ -239,14 +251,17 @@ const ReservaForm = ({
 
                 <div className="col-12 col-md-8">
                   <label className="form-label">Referencia (opcional)</label>
-                  <input
-                    type="text"
-                    className="form-control"
+                  <select
+                    className="form-select"
                     value={form.referencia}
                     onChange={(event) => actualizarCampo('referencia', event.target.value)}
-                    placeholder="Pedido, cotizacion o ticket"
-                    maxLength={200}
-                  />
+                  >
+                    <option value="">Sin referencia</option>
+                    {REFERENCIAS_RESERVA.map((ref) => (
+                      <option key={ref} value={ref}>{ref}</option>
+                    ))}
+                  </select>
+                  <small className="text-muted">Selecciona una referencia estandarizada del catálogo.</small>
                 </div>
 
                 <div className="col-12">
@@ -255,7 +270,7 @@ const ReservaForm = ({
                     className="form-control"
                     rows="3"
                     value={form.observaciones}
-                    onChange={(event) => actualizarCampo('observaciones', event.target.value)}
+                    onChange={(event) => actualizarCampo('observaciones', sanitizarTexto(event.target.value))}
                     placeholder="Notas de la reserva"
                     maxLength={500}
                   />

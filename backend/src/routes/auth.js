@@ -53,7 +53,7 @@ router.post('/solicitar-recuperacion', [
     .trim()
     .notEmpty().withMessage('El nombre de usuario es requerido')
     .isLength({ max: 50 }).withMessage('El nombre de usuario excede el máximo permitido')
-        .matches(USUARIO_PERMITIDO).withMessage('El usuario solo admite letras, números y los símbolos . _ - @')
+    .matches(USUARIO_PERMITIDO).withMessage('El usuario solo admite letras, números y los símbolos . _ - @')
     .matches(SIN_PATRON_SQL).withMessage('Se ingresaron caracteres no permitidos')
     .matches(SIN_HTML).withMessage('Se ingresaron caracteres no permitidos'),
   validarCampos

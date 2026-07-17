@@ -71,3 +71,12 @@ export const clientesDisponibles = async (req, res) => {
     res.status(500).json({ ok: false, mensaje: error.message });
   }
 };
+
+export const historialCliente = async (req, res) => {
+  try {
+    const resultado = await cotizacionService.historialPorCliente(req.params.codCliente, req.query);
+    res.json({ ok: true, ...resultado });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ ok: false, mensaje: error.message });
+  }
+};

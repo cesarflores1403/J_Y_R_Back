@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { sanitizarTexto } from '../../utils/sanitizarTexto.js';
 
 const ReservaAccionModal = ({
   abierto = false,
@@ -76,7 +77,7 @@ const ReservaAccionModal = ({
                     type="text"
                     className="form-control"
                     value={form.motivo}
-                    onChange={(event) => setForm((prev) => ({ ...prev, motivo: event.target.value }))}
+                    onChange={(event) => setForm((prev) => ({ ...prev, motivo: sanitizarTexto(event.target.value) }))}
                     maxLength={200}
                     placeholder="Motivo de liberacion"
                   />
@@ -88,7 +89,7 @@ const ReservaAccionModal = ({
                     type="text"
                     className="form-control"
                     value={form.referencia}
-                    onChange={(event) => setForm((prev) => ({ ...prev, referencia: event.target.value }))}
+                    onChange={(event) => setForm((prev) => ({ ...prev, referencia: sanitizarTexto(event.target.value) }))}
                     maxLength={200}
                     placeholder="Referencia de consumo"
                   />
@@ -101,7 +102,7 @@ const ReservaAccionModal = ({
                   className="form-control"
                   rows="3"
                   value={form.observaciones}
-                  onChange={(event) => setForm((prev) => ({ ...prev, observaciones: event.target.value }))}
+                  onChange={(event) => setForm((prev) => ({ ...prev, observaciones: sanitizarTexto(event.target.value) }))}
                   maxLength={500}
                   placeholder="Notas de la operacion"
                 />

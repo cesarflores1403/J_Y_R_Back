@@ -4,7 +4,7 @@ import { autenticar, autorizar } from '../middlewares/auth.js';
 import { validarCampos } from '../middlewares/validar.js';
 import {
   listar, obtener, crear, anular, convertirAFactura, eliminar,
-  productosDisponibles, clientesDisponibles
+  productosDisponibles, clientesDisponibles, historialCliente
 } from '../controllers/cotizacionController.js';
 
 const router = Router();
@@ -15,6 +15,9 @@ router.use(autenticar);
 // Endpoints auxiliares
 router.get('/productos-disponibles', productosDisponibles);
 router.get('/clientes-disponibles', clientesDisponibles);
+
+// Historial de cotizaciones de un cliente (trazabilidad comercial)
+router.get('/cliente/:codCliente', historialCliente);
 
 // CRUD cotizaciones
 router.get('/', listar);

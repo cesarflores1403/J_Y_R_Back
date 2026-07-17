@@ -11,11 +11,12 @@
     "dev:public": "npm run build:frontend && concurrently -n BACK,PREVIEW,TUNNEL -c blue,green,magenta \"npm run dev:backend\" \"npm run preview --prefix frontend -- --host --port 4173\" \"npm run dev:tunnel:preview\"",
     "dev:public:fast": "npm run dev:public",
     "dev:public:hmr": "concurrently -n BACK,FRONT,TUNNEL -c blue,green,magenta \"npm run dev:backend\" \"npx wait-on tcp:5000 && npm run dev:frontend\" \"npm run dev:tunnel\"",
-        "start:backend": "npm start --prefix backend",
+    "start:backend": "npm start --prefix backend",
     "start:frontend": "npm run dev --prefix frontend",
     "install:backend": "npm install --prefix backend",
     "install:frontend": "npm install --prefix frontend",
     "install:all": "npm run install:backend && npm run install:frontend",
+    
     "dev": "npm run dev:public",
     "build:frontend": "npm run build --prefix frontend",
     "test": "npm test --prefix backend",

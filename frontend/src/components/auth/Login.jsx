@@ -18,7 +18,6 @@ const MSG_NO_PERMITIDO = 'Se ingresaron caracteres no permitidos.';
 
 const API_BASE = resolveApiBase();
 
-
 // Máximo de intentos antes del bloqueo (debe coincidir con el backend).
 const MAX_INTENTOS_LOGIN = 10;
 
@@ -50,6 +49,7 @@ const formatearTiempo = (segundos) => {
   const s = segundos % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
 };
+
 const precargarCarrusel = (items = []) => {
   if (!items.length) return;
 
@@ -75,50 +75,51 @@ const Login = () => {
   const [currentSlide, setCurrentSlide]   = useState(0);
   const [marcas, setMarcas]               = useState([]);
   // Estado de bloqueo por intentos fallidos (persistido para sobrevivir refrescos).
-    const [bloqueadoHasta, setBloqueadoHasta] = useState(() => {
-      const { bloqueadoHasta: hasta } = leerEstadoLogin();
-      return hasta && hasta > Date.now() ? hasta : null;
-    });
-    const [restanteSeg, setRestanteSeg]     = useState(() => {
-      const { bloqueadoHasta: hasta } = leerEstadoLogin();
-      return hasta && hasta > Date.now() ? Math.ceil((hasta - Date.now()) / 1000) : 0;
-    });
-    // Guard síncrono contra doble envío (más fiable que el estado, que es asíncrono).
-    const enviandoRef = useRef(false);
-    const { iniciarSesion } = useAuth();
+  const [bloqueadoHasta, setBloqueadoHasta] = useState(() => {
+    const { bloqueadoHasta: hasta } = leerEstadoLogin();
+    return hasta && hasta > Date.now() ? hasta : null;
+  });
+  const [restanteSeg, setRestanteSeg]     = useState(() => {
+    const { bloqueadoHasta: hasta } = leerEstadoLogin();
+    return hasta && hasta > Date.now() ? Math.ceil((hasta - Date.now()) / 1000) : 0;
+  });
+  // Guard síncrono contra doble envío (más fiable que el estado, que es asíncrono).
+  const enviandoRef = useRef(false);
+  const { iniciarSesion } = useAuth();
   const navigate = useNavigate();
-  
-    const bloqueado = Boolean(bloqueadoHasta && restanteSeg > 0);
-  
-    /* ── Cuenta regresiva del bloqueo (se reevalúa aunque se refresque) ── */
-    useEffect(() => {
-      if (!bloqueadoHasta) { setRestanteSeg(0); return; }
-  
-      const actualizar = () => {
-        const seg = Math.max(0, Math.ceil((bloqueadoHasta - Date.now()) / 1000));
-        setRestanteSeg(seg);
-        if (seg <= 0) {
-          // Expiró el bloqueo: se limpia y se vuelve a permitir el acceso.
-          limpiarEstadoLogin();
-          setBloqueadoHasta(null);
-          setError('');
-        }
-      };
-  
-      actualizar();
-      const id = setInterval(actualizar, 1000);
-      return () => clearInterval(id);
-    }, [bloqueadoHasta]);
-  
-    /* ── Al montar: si hay intentos previos registrados, se avisa al usuario ── */
-    useEffect(() => {
-      const { bloqueadoHasta: hasta, intentosRestantes } = leerEstadoLogin();
-      if (hasta && hasta > Date.now()) return; // el bloqueo se muestra por la cuenta regresiva
-      if (typeof intentosRestantes === 'number' && intentosRestantes < MAX_INTENTOS_LOGIN) {
-        setError(`Te quedan ${intentosRestantes} intento(s) antes del bloqueo temporal.`);
+
+  const bloqueado = Boolean(bloqueadoHasta && restanteSeg > 0);
+
+  /* ── Cuenta regresiva del bloqueo (se reevalúa aunque se refresque) ── */
+  useEffect(() => {
+    if (!bloqueadoHasta) { setRestanteSeg(0); return; }
+
+    const actualizar = () => {
+      const seg = Math.max(0, Math.ceil((bloqueadoHasta - Date.now()) / 1000));
+      setRestanteSeg(seg);
+      if (seg <= 0) {
+        // Expiró el bloqueo: se limpia y se vuelve a permitir el acceso.
+        limpiarEstadoLogin();
+        setBloqueadoHasta(null);
+        setError('');
       }
-    }, []);
-    /* ── Cargar imágenes del carrusel desde la BD ── */
+    };
+
+    actualizar();
+    const id = setInterval(actualizar, 1000);
+    return () => clearInterval(id);
+  }, [bloqueadoHasta]);
+
+  /* ── Al montar: si hay intentos previos registrados, se avisa al usuario ── */
+  useEffect(() => {
+    const { bloqueadoHasta: hasta, intentosRestantes } = leerEstadoLogin();
+    if (hasta && hasta > Date.now()) return; // el bloqueo se muestra por la cuenta regresiva
+    if (typeof intentosRestantes === 'number' && intentosRestantes < MAX_INTENTOS_LOGIN) {
+      setError(`Te quedan ${intentosRestantes} intento(s) antes del bloqueo temporal.`);
+    }
+  }, []);
+
+  /* ── Cargar imágenes del carrusel desde la BD ── */
   useEffect(() => {
     const cargar = async () => {
       try {
@@ -147,7 +148,8 @@ const Login = () => {
     }, 3500);
     return () => clearInterval(timer);
   }, [marcas.length]);
-// ── Bloquea la escritura/pegado de emojis y caracteres no permitidos ──
+
+  // ── Bloquea la escritura/pegado de emojis y caracteres no permitidos ──
   const handleUsuarioChange = (e) => {
     const original = e.target.value;
     const limpio = sanitizarUsuario(original).slice(0, MAX_USUARIO);
@@ -173,9 +175,10 @@ const Login = () => {
     }
     setPassword(limpio);
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Evita múltiples envíos por clics seguidos mientras una solicitud está en curso.
     if (enviandoRef.current || cargando) return;
 
@@ -186,6 +189,7 @@ const Login = () => {
     }
 
     setError('');
+
     // ── Validaciones previas: evitan enviar campos vacíos o con solo espacios ──
     const usuarioLimpio = nombreUsuario.trim();
     if (!usuarioLimpio) {
@@ -304,7 +308,7 @@ const Login = () => {
             <p className="login-subtitle">Ingresa tus credenciales para acceder</p>
           </div>
 
-        {bloqueado ? (
+          {bloqueado ? (
             <div className="alert alert-danger d-flex align-items-center" role="alert">
               <span>
                 Acceso bloqueado por demasiados intentos fallidos.
@@ -330,6 +334,8 @@ const Login = () => {
                   autoCorrect="off"
                   spellCheck={false}
                   autoComplete="username"
+                  maxLength={MAX_USUARIO}
+                  disabled={bloqueado}
                   required autoFocus />
               </div>
             </div>
@@ -346,9 +352,9 @@ const Login = () => {
                   autoCorrect="off"
                   spellCheck={false}
                   autoComplete="current-password"
-                 maxLength={MAX_PASSWORD}
-                 disabled={bloqueado} 
-                 required />
+                  maxLength={MAX_PASSWORD}
+                  disabled={bloqueado}
+                  required />
                 <button
                   type="button"
                   className="input-group-text login-input-icon"
@@ -369,7 +375,7 @@ const Login = () => {
               </button>
             </div>
 
-            <button type="submit" className="btn w-100 login-btn" disabled={cargando}>
+            <button type="submit" className="btn w-100 login-btn" disabled={cargando || bloqueado}>
               {cargando
                 ? <span className="spinner-border spinner-border-sm me-2" />
                 : <FiLogIn className="me-2" />}
