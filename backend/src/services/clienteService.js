@@ -195,7 +195,7 @@ class ClienteService {
       if (esViolacionFK) {
         console.error(`[clienteService.eliminar] No se pudo eliminar el cliente ${id}:`, error);
         throw Object.assign(
-          new Error('No es posible eliminar el cliente porque tiene registros asociados'),
+          new Error('No es posible eliminar el cliente porque tiene facturas asociadas'),
           { statusCode: 409 }
         );
       }

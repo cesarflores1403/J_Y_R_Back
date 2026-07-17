@@ -1,4 +1,5 @@
 import React from 'react';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 const UbicacionFormModal = ({
   abierto = false,
@@ -31,6 +32,7 @@ const UbicacionFormModal = ({
                     className="form-control"
                     value={form.pasillo}
                     onChange={(e) => onChange('pasillo', e.target.value)}
+                    maxLength={80}
                     required
                   />
                 </div>
@@ -41,6 +43,7 @@ const UbicacionFormModal = ({
                     className="form-control"
                     value={form.estanteria}
                     onChange={(e) => onChange('estanteria', e.target.value)}
+                    maxLength={80}
                     required
                   />
                 </div>
@@ -51,6 +54,7 @@ const UbicacionFormModal = ({
                     className="form-control"
                     value={form.nivel_1}
                     onChange={(e) => onChange('nivel_1', e.target.value)}
+                    maxLength={80}
                     required
                   />
                 </div>
@@ -61,6 +65,7 @@ const UbicacionFormModal = ({
                     className="form-control"
                     value={form.nivel_2}
                     onChange={(e) => onChange('nivel_2', e.target.value)}
+                    maxLength={80}
                   />
                 </div>
                 <div className="col-md-12">
@@ -90,9 +95,11 @@ const UbicacionFormModal = ({
                   <textarea
                     className="form-control"
                     rows="2"
+                    maxLength={500}
                     value={form.descripcion}
                     onChange={(e) => onChange('descripcion', e.target.value)}
                   />
+                  <ContadorLimite value={form.descripcion} max={500} />
                 </div>
               </div>
             </div>

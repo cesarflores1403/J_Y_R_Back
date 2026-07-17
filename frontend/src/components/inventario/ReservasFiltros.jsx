@@ -1,6 +1,7 @@
 import React from 'react';
 import { FiCalendar, FiFilter, FiMapPin, FiPackage, FiRefreshCw, FiTag } from 'react-icons/fi';
 import { REFERENCIAS_RESERVA } from './referenciasReserva.js';
+import { sanitizarFiltro } from '../../utils/filtroSanitizar.js';
 
 const formatearCodigoProducto = (producto) => {
   const codigo = String(producto?.codigo_producto || '').trim().toUpperCase();
@@ -45,7 +46,7 @@ const ReservasFiltros = ({
   onLimpiar
 }) => {
   const handleInput = (event) => {
-    onChange(event.target.name, event.target.value);
+    onChange(event.target.name, sanitizarFiltro(event.target.value));
   };
 
   return (

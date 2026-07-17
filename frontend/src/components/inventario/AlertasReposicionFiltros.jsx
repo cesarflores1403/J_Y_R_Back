@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiFilter, FiRefreshCw } from 'react-icons/fi';
+import { sanitizarFiltro } from '../../utils/filtroSanitizar.js';
 
 const AlertasReposicionFiltros = ({
   filtros,
@@ -10,7 +11,7 @@ const AlertasReposicionFiltros = ({
 }) => {
   // // Handler unificado para los inputs de filtros
   const handleInput = (event) => {
-    onChange(event.target.name, event.target.value);
+    onChange(event.target.name, sanitizarFiltro(event.target.value));
   };
 
   return (

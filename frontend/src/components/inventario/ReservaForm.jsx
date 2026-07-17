@@ -14,6 +14,9 @@ const estadoInicial = {
 // Tope de cantidad para evitar que un número exagerado bloquee la interfaz.
 const MAX_CANTIDAD_RESERVA = 999999;
 
+// Tope de caracteres del campo Observaciones (con contador y alerta al usuario).
+const MAX_OBSERVACIONES = 500;
+
 const formatearCodigoProducto = (producto) => {
   const codigo = String(producto?.codigo_producto || '').trim().toUpperCase();
   if (codigo) return codigo;
@@ -74,7 +77,6 @@ const ReservaForm = ({
   abierto = false,
   onClose,
   onReservaRegistrada,
-  productos = [],
   ubicaciones = [],
   loadingUbicaciones = false
 }) => {
@@ -82,28 +84,95 @@ const ReservaForm = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const opcionesProducto = useMemo(() => (
-    (Array.isArray(productos) ? productos : [])
-      .filter((item) => String(item?.estado_producto || '').toLowerCase() === 'activo')
-      .map((item) => ({
-        cod_producto: item.cod_producto,
-        nombre_producto: item.nombre_producto || 'Sin nombre',
-        codigo_producto: formatearCodigoProducto(item)
-      }))
-      .filter((item) => Number.isInteger(Number(item.cod_producto)) && Number(item.cod_producto) > 0)
-  ), [productos]);
+  // // Catalogo de productos SIEMPRE condicionado a la ubicacion seleccionada.
+  // // No se muestran productos globales: solo los que tienen stock disponible
+  // // en la ubicacion elegida (fuente de verdad: backend /reservas/disponibles).
+  const [productosDisponibles, setProductosDisponibles] = useState([]);
+  const [loadingProductos, setLoadingProductos] = useState(false);
+  const [avisoProductos, setAvisoProductos] = useState('');
 
   const opcionesUbicacion = useMemo(() => (
     (Array.isArray(ubicaciones) ? ubicaciones : [])
       .filter((item) => Number.isInteger(Number(item?.cod_ubicacion)) && Number(item.cod_ubicacion) > 0)
   ), [ubicaciones]);
 
+  const opcionesProducto = useMemo(() => (
+    (Array.isArray(productosDisponibles) ? productosDisponibles : [])
+      .filter((item) => Number.isInteger(Number(item?.cod_producto)) && Number(item.cod_producto) > 0)
+      .map((item) => ({
+        cod_producto: Number(item.cod_producto),
+        nombre_producto: item.nombre_producto || 'Sin nombre',
+        codigo_producto: formatearCodigoProducto(item),
+        stock_disponible: Number(item.stock_disponible || 0)
+      }))
+  ), [productosDisponibles]);
+
+  const ubicacionSeleccionada = Number.isInteger(Number(form.cod_ubicacion)) && Number(form.cod_ubicacion) > 0;
+
+  // // Producto elegido dentro del catalogo condicionado (para topar la cantidad)
+  const productoSeleccionado = useMemo(() => (
+    opcionesProducto.find((item) => String(item.cod_producto) === String(form.cod_producto)) || null
+  ), [opcionesProducto, form.cod_producto]);
+
+  const maxDisponible = productoSeleccionado
+    ? Math.max(0, Math.min(MAX_CANTIDAD_RESERVA, productoSeleccionado.stock_disponible))
+    : MAX_CANTIDAD_RESERVA;
+
   useEffect(() => {
     if (!abierto) {
       setForm(estadoInicial);
       setError('');
+      setProductosDisponibles([]);
+      setAvisoProductos('');
     }
   }, [abierto]);
+
+  // // Cada vez que cambia la ubicacion, recargamos el catalogo de productos
+  // // disponibles y descartamos cualquier producto previamente elegido.
+  useEffect(() => {
+    if (!abierto) return undefined;
+
+    const codUbicacion = Number(form.cod_ubicacion);
+    if (!Number.isInteger(codUbicacion) || codUbicacion <= 0) {
+      setProductosDisponibles([]);
+      setAvisoProductos('');
+      return undefined;
+    }
+
+    let cancelado = false;
+    const cargarDisponibles = async () => {
+      try {
+        setLoadingProductos(true);
+        setAvisoProductos('');
+        const { data } = await inventarioReservasApi.disponiblesPorUbicacion(codUbicacion);
+        if (cancelado) return;
+        const lista = Array.isArray(data?.data) ? data.data : [];
+        setProductosDisponibles(lista);
+        if (lista.length === 0) {
+          setAvisoProductos('La ubicacion seleccionada no tiene productos con stock disponible para reservar.');
+        }
+      } catch (err) {
+        if (cancelado) return;
+        setProductosDisponibles([]);
+        setAvisoProductos(obtenerMensajeError(err));
+      } finally {
+        if (!cancelado) setLoadingProductos(false);
+      }
+    };
+
+    cargarDisponibles();
+    return () => { cancelado = true; };
+  }, [abierto, form.cod_ubicacion]);
+
+  // // Cambio de ubicacion: resetea el producto elegido para no arrastrar
+  // // una seleccion que ya no corresponde a la nueva ubicacion.
+  const cambiarUbicacion = (valor) => {
+    setForm((prev) => ({
+      ...prev,
+      cod_ubicacion: valor,
+      cod_producto: ''
+    }));
+  };
 
   const cerrarModal = () => {
     if (saving) return;
@@ -124,15 +193,40 @@ const ReservaForm = ({
       setSaving(true);
       setError('');
 
+      const codUbicacion = Number(form.cod_ubicacion);
+      if (!Number.isInteger(codUbicacion) || codUbicacion <= 0) {
+        setError('Seleccione una ubicacion valida');
+        return;
+      }
+
+      const codProducto = Number(form.cod_producto);
+      if (!Number.isInteger(codProducto) || codProducto <= 0) {
+        setError('Seleccione un producto disponible en la ubicacion');
+        return;
+      }
+
+      // // Defensa en profundidad: el producto DEBE pertenecer al catalogo
+      // // disponible de la ubicacion elegida (coherente con la validacion del backend).
+      const disponible = opcionesProducto.find((item) => item.cod_producto === codProducto);
+      if (!disponible) {
+        setError('El producto seleccionado no pertenece a la ubicacion elegida o ya no tiene stock disponible');
+        return;
+      }
+
       const cantidad = Number(form.cantidad);
       if (!Number.isInteger(cantidad) || cantidad <= 0) {
         setError('cantidad debe ser un entero mayor a 0');
         return;
       }
 
+      if (cantidad > disponible.stock_disponible) {
+        setError(`La cantidad supera el stock disponible (${disponible.stock_disponible}) en la ubicacion seleccionada`);
+        return;
+      }
+
       const payload = {
-        cod_producto: Number(form.cod_producto),
-        cod_ubicacion: Number(form.cod_ubicacion),
+        cod_producto: codProducto,
+        cod_ubicacion: codUbicacion,
         cantidad,
         referencia: String(form.referencia || '').trim(),
         observaciones: String(form.observaciones || '').trim()
@@ -183,34 +277,11 @@ const ReservaForm = ({
 
               <div className="row g-3">
                 <div className="col-12 col-md-6">
-                  <label className="form-label">Codigo de producto *</label>
-                  <select
-                    className="form-select"
-                    value={form.cod_producto}
-                    onChange={(event) => actualizarCampo('cod_producto', event.target.value)}
-                    disabled={saving || opcionesProducto.length === 0}
-                    required
-                  >
-                    <option value="">
-                      {opcionesProducto.length === 0 ? 'Cargando productos...' : 'Seleccione un producto activo'}
-                    </option>
-                    {opcionesProducto.map((item) => (
-                      <option key={item.cod_producto} value={String(item.cod_producto)}>
-                        {item.codigo_producto} - {item.nombre_producto}
-                      </option>
-                    ))}
-                  </select>
-                  <small className="text-muted">
-                    Este campo se toma del listado real de productos activos.
-                  </small>
-                </div>
-
-                <div className="col-12 col-md-6">
                   <label className="form-label">Cod. Ubicacion *</label>
                   <select
                     className="form-select"
                     value={form.cod_ubicacion}
-                    onChange={(event) => actualizarCampo('cod_ubicacion', event.target.value)}
+                    onChange={(event) => cambiarUbicacion(event.target.value)}
                     disabled={saving || loadingUbicaciones || opcionesUbicacion.length === 0}
                     required
                   >
@@ -224,8 +295,41 @@ const ReservaForm = ({
                     ))}
                   </select>
                   <small className="text-muted">
-                    Este campo se toma del catalogo real de ubicaciones activas.
+                    Selecciona primero la ubicacion: define que productos pueden reservarse.
                   </small>
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <label className="form-label">Codigo de producto *</label>
+                  <select
+                    className="form-select"
+                    value={form.cod_producto}
+                    onChange={(event) => actualizarCampo('cod_producto', event.target.value)}
+                    disabled={saving || !ubicacionSeleccionada || loadingProductos || opcionesProducto.length === 0}
+                    required
+                  >
+                    <option value="">
+                      {!ubicacionSeleccionada
+                        ? 'Seleccione primero una ubicacion'
+                        : loadingProductos
+                          ? 'Cargando productos de la ubicacion...'
+                          : opcionesProducto.length === 0
+                            ? 'Sin productos disponibles en esta ubicacion'
+                            : 'Seleccione un producto disponible'}
+                    </option>
+                    {opcionesProducto.map((item) => (
+                      <option key={item.cod_producto} value={String(item.cod_producto)}>
+                        {item.codigo_producto} - {item.nombre_producto} (Disp: {item.stock_disponible})
+                      </option>
+                    ))}
+                  </select>
+                  {avisoProductos ? (
+                    <small className="text-danger">{avisoProductos}</small>
+                  ) : (
+                    <small className="text-muted">
+                      Solo se muestran productos con stock disponible en la ubicacion elegida.
+                    </small>
+                  )}
                 </div>
 
                 <div className="col-12 col-md-4">
@@ -233,20 +337,26 @@ const ReservaForm = ({
                   <input
                     type="number"
                     min="1"
-                    max={MAX_CANTIDAD_RESERVA}
+                    max={maxDisponible}
                     step="1"
                     className="form-control"
                     value={form.cantidad}
                     onChange={(event) => {
-                      // Solo dígitos y acotado al tope; evita valores exagerados.
+                      // Solo dígitos y acotado al stock disponible del producto elegido.
                       const limpio = String(event.target.value).replace(/[^\d]/g, '');
                       if (limpio === '') { actualizarCampo('cantidad', ''); return; }
-                      const n = Math.min(MAX_CANTIDAD_RESERVA, parseInt(limpio, 10));
+                      const n = Math.min(maxDisponible, parseInt(limpio, 10));
                       actualizarCampo('cantidad', String(n));
                     }}
                     placeholder="Ej: 5"
+                    disabled={saving || !productoSeleccionado}
                     required
                   />
+                  {productoSeleccionado && (
+                    <small className="text-muted">
+                      Stock disponible en la ubicacion: {productoSeleccionado.stock_disponible}
+                    </small>
+                  )}
                 </div>
 
                 <div className="col-12 col-md-8">
@@ -267,13 +377,27 @@ const ReservaForm = ({
                 <div className="col-12">
                   <label className="form-label">Observaciones (opcional)</label>
                   <textarea
-                    className="form-control"
+                    className={`form-control ${form.observaciones.length >= MAX_OBSERVACIONES ? 'is-invalid' : ''}`}
                     rows="3"
                     value={form.observaciones}
-                    onChange={(event) => actualizarCampo('observaciones', sanitizarTexto(event.target.value))}
+                    onChange={(event) => actualizarCampo('observaciones', sanitizarTexto(event.target.value).slice(0, MAX_OBSERVACIONES))}
                     placeholder="Notas de la reserva"
-                    maxLength={500}
+                    maxLength={MAX_OBSERVACIONES}
+                    aria-describedby="reserva-obs-contador reserva-obs-limite"
                   />
+                  <div className="d-flex justify-content-end">
+                    <small
+                      id="reserva-obs-contador"
+                      className={form.observaciones.length >= MAX_OBSERVACIONES ? 'text-danger fw-semibold' : 'text-muted'}
+                    >
+                      {form.observaciones.length}/{MAX_OBSERVACIONES}
+                    </small>
+                  </div>
+                  {form.observaciones.length >= MAX_OBSERVACIONES && (
+                    <div id="reserva-obs-limite" className="alert alert-warning py-1 px-2 mb-0 mt-1" role="alert" style={{ fontSize: 12 }}>
+                      Ha alcanzado el límite máximo de {MAX_OBSERVACIONES} caracteres permitidos.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,5 +1,7 @@
 import React from 'react';
 import { FiCalendar, FiFilter, FiHash, FiRefreshCw } from 'react-icons/fi';
+import { sanitizarEntero } from '../../utils/numero.js';
+import { sanitizarFiltro } from '../../utils/filtroSanitizar.js';
 
 const ConteosFiltros = ({
   filtros,
@@ -9,7 +11,7 @@ const ConteosFiltros = ({
   onLimpiar
 }) => {
   const handleInput = (event) => {
-    onChange(event.target.name, event.target.value);
+    onChange(event.target.name, sanitizarFiltro(event.target.value));
   };
 
   return (
@@ -54,10 +56,11 @@ const ConteosFiltros = ({
           <input
             type="number"
             min="1"
+            max={9999999}
             className="form-control kdx-control"
             name="cod_conteo"
             value={filtros.cod_conteo}
-            onChange={handleInput}
+            onChange={(event) => onChange('cod_conteo', sanitizarEntero(event.target.value, 9999999))}
             placeholder="Ej: 9"
           />
         </div>

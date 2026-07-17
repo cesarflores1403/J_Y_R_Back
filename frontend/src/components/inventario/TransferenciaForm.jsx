@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { sanitizarEntero, MAX_CANTIDAD } from '../../utils/numero.js';
 import { inventarioTransferenciasApi } from './inventarioTransferencias.api.js';
 import { inventarioExistenciasApi } from './inventarioExistencias.api.js';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 const estadoInicial = {
   cod_producto: '',
@@ -334,10 +336,11 @@ const TransferenciaForm = ({
                   <input
                     type="number"
                     min="1"
+                    max={MAX_CANTIDAD}
                     step="1"
                     className="form-control"
                     value={form.cantidad}
-                    onChange={(event) => actualizarCampo('cantidad', event.target.value)}
+                    onChange={(event) => actualizarCampo('cantidad', sanitizarEntero(event.target.value))}
                     placeholder="Ej: 4"
                     required
                   />
@@ -410,6 +413,7 @@ const TransferenciaForm = ({
                     maxLength={200}
                     required
                   />
+                  <ContadorLimite value={form.referencia} max={200} />
                 </div>
 
                 <div className="col-12 col-md-4">
@@ -422,6 +426,7 @@ const TransferenciaForm = ({
                     placeholder="Reubicacion interna"
                     maxLength={120}
                   />
+                  <ContadorLimite value={form.motivo} max={120} />
                 </div>
 
                 <div className="col-12">
@@ -434,6 +439,7 @@ const TransferenciaForm = ({
                     placeholder="Notas del traslado interno"
                     maxLength={500}
                   />
+                  <ContadorLimite value={form.observaciones} max={500} />
                 </div>
               </div>
             </div>

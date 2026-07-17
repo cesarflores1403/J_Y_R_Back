@@ -8,6 +8,8 @@ import {
 } from 'react-icons/fi';
 import { notaCreditoService, facturaService } from '../../services/serviceIndex.js';
 import { confirmDialog } from '../../utils/notifications.js';
+import SearchInput from '../common/SearchInput.jsx';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 // =====================================================
 // COMPONENTE: Notas de Crédito (HU-FAC-12)
@@ -56,10 +58,10 @@ const ListaNotasCredito = ({ onVer, onNueva }) => {
         <div className="jyr-card-body py-2">
           <div className="input-group">
             <span className="input-group-text"><FiSearch /></span>
-            <input
+            <SearchInput
               id="nc-input-buscar"
-              type="text" className="form-control" placeholder="Buscar por motivo o cliente..."
-              value={buscar} onChange={e => { setBuscar(e.target.value); setPagina(1); }}
+              className="form-control" placeholder="Buscar por motivo o cliente..."
+              value={buscar} onChange={val => { setBuscar(val); setPagina(1); }}
             />
             {buscar && (
               <button id="nc-btn-limpiar-buscar" className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}>
@@ -432,10 +434,10 @@ const NuevaNotaCredito = ({ onVolver, onCreada }) => {
 
             <div className="input-group mb-3" style={{ maxWidth: 500 }}>
               <span className="input-group-text"><FiSearch /></span>
-              <input
+              <SearchInput
                 id="nc-input-buscar-factura"
-                type="text" className="form-control" placeholder="Buscar por nombre, apellido o DNI del cliente..."
-                value={buscarFactura} onChange={e => setBuscarFactura(e.target.value)}
+                className="form-control" placeholder="Buscar por nombre, apellido o DNI del cliente..."
+                value={buscarFactura} onChange={val => setBuscarFactura(val)}
                 onKeyDown={e => e.key === 'Enter' && buscarFacturas()}
               />
               <button id="nc-btn-buscar-factura" className="btn jyr-btn-primary" onClick={buscarFacturas} disabled={buscandoFact}>
@@ -514,8 +516,10 @@ const NuevaNotaCredito = ({ onVolver, onCreada }) => {
               <textarea
                 id="nc-input-motivo"
                 className="form-control" rows={2} placeholder="Ej: Producto defectuoso, error en facturación, devolución del cliente..."
-                value={motivo} onChange={e => setMotivo(e.target.value)}
+                value={motivo} onChange={e => setMotivo(e.target.value.slice(0, 500))}
+                maxLength={500}
               />
+              <ContadorLimite value={motivo} max={500} />
               <div className="form-check mt-2">
                 <input
                   type="checkbox" className="form-check-input" id="chkDevolverInv"

@@ -4,6 +4,8 @@ import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight, FiTrash2, FiTag, FiDownload } from 'react-icons/fi';
 import { confirmDialog } from '../../utils/notifications.js';
+import SearchInput from '../common/SearchInput.jsx';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 const camposIniciales = { nombre_categoria: '', descripcion: '' };
 
@@ -148,8 +150,8 @@ const Categorias = () => {
         <div className="jyr-card-body py-2">
           <div className="input-group">
             <span className="input-group-text"><FiSearch /></span>
-            <input type="text" className="form-control" placeholder="Buscar por nombre o descripción..."
-              value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1); }} />
+            <SearchInput className="form-control" placeholder="Buscar por nombre o descripción..."
+              value={buscar} onChange={(val) => { setBuscar(val); setPagina(1); }} />
             {buscar && <button className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}><FiX /></button>}
           </div>
         </div>
@@ -236,6 +238,7 @@ const Categorias = () => {
                       <textarea className="form-control" rows="3" value={form.descripcion}
                         onChange={(e) => setForm({...form, descripcion: e.target.value})}
                         maxLength={255} placeholder="Descripción opcional de la categoría..." />
+                      <ContadorLimite value={form.descripcion} max={255} />
                     </div>
                   </div>
                 </div>

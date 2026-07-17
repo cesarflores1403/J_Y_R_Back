@@ -5,13 +5,15 @@ import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import {
   FiPlus, FiSearch, FiX, FiTrash2, FiEye, FiClipboard, FiArrowLeft,
-  FiPrinter, FiAlertTriangle, FiXCircle, FiRefreshCw, FiPackage, FiCheckCircle
+  FiPrinter, FiAlertTriangle, FiXCircle, FiRefreshCw, FiPackage, FiCheckCircle,
+  FiChevronUp, FiChevronDown
 } from 'react-icons/fi';
 import { confirmDialog } from '../../utils/notifications.js';
 import logoClean from '../../assets/img/logo2.jpeg';
 import logoFull from '../../assets/img/logo1.jpeg';
 import { resolveApiBase } from '../../utils/runtimeApi.js';
 import ErrorBoundary from '../common/ErrorBoundary.jsx';
+import SearchInput from '../common/SearchInput.jsx';
 
 const API_BASE = resolveApiBase();
 
@@ -19,11 +21,11 @@ const API_BASE = resolveApiBase();
 // Límites y saneamiento de entrada
 // Evitan que textos/números exagerados congelen la interfaz.
 // ==========================================
-const MAX_LEN_BUSQUEDA = 60;      // texto de buscadores
 const MAX_CANTIDAD = 9999;        // unidades por línea
 const MAX_VIGENCIA = 90;          // días de vigencia
 const MIN_VIGENCIA = 1;
 const MAX_DESC_MONTO = 9999999;   // tope de descuento global en L
+const MAX_OBSERVACIONES = 500;    // caracteres del campo Observaciones
 
 // Convierte a entero acotado dentro de [min, max]; cadena vacía -> ''
 const enteroAcotado = (valor, min, max) => {
@@ -61,6 +63,77 @@ const formatMoney = (v) => {
   const n = parseFloat(v);
   const seguro = Number.isFinite(n) ? n : 0;
   return `L ${seguro.toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+// ==========================================
+// Input numérico moderno con control tipo spinner (flechas arriba/abajo).
+// Permite escritura MANUAL por teclado (reutiliza los saneadores de arriba para
+// conservar estados intermedios como "0." o "") y, además, incrementar/reducir
+// el valor con las flechas del lado derecho. Todo se acota a [min, max].
+// ==========================================
+const NumericStepper = ({
+  value,
+  onChange,
+  max,
+  min = 0,
+  step = 1,
+  decimals = true,
+  placeholder,
+  invalid = false,
+}) => {
+  const sanear = decimals ? sanearDecimalTexto : sanearEnteroTexto;
+
+  const stepBy = (dir) => {
+    const actual = parseFloat(value);
+    const base = Number.isFinite(actual) ? actual : 0;
+    let siguiente = base + dir * step;
+    siguiente = Math.min(max, Math.max(min, siguiente));
+    // Redondea a 2 decimales para evitar arrastres tipo 0.30000000000000004.
+    siguiente = Math.round((siguiente + Number.EPSILON) * 100) / 100;
+    onChange(String(siguiente));
+  };
+
+  const onKeyDown = (e) => {
+    // Las flechas del teclado replican el comportamiento del spinner.
+    if (e.key === 'ArrowUp') { e.preventDefault(); stepBy(1); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); stepBy(-1); }
+  };
+
+  return (
+    <div className={`jyr-stepper${invalid ? ' is-invalid' : ''}`}>
+      <input
+        type="text"
+        inputMode={decimals ? 'decimal' : 'numeric'}
+        className={`form-control form-control-sm jyr-stepper__input${invalid ? ' is-invalid' : ''}`}
+        value={value ?? ''}
+        placeholder={placeholder}
+        onChange={(e) => onChange(sanear(e.target.value, max))}
+        onKeyDown={onKeyDown}
+      />
+      <div className="jyr-stepper__btns">
+        <button
+          type="button"
+          tabIndex={-1}
+          className="jyr-stepper__btn jyr-stepper__btn--up"
+          aria-label="Incrementar"
+          disabled={parseFloat(value) >= max}
+          onClick={() => stepBy(1)}
+        >
+          <FiChevronUp />
+        </button>
+        <button
+          type="button"
+          tabIndex={-1}
+          className="jyr-stepper__btn jyr-stepper__btn--down"
+          aria-label="Reducir"
+          disabled={(parseFloat(value) || 0) <= min}
+          onClick={() => stepBy(-1)}
+        >
+          <FiChevronDown />
+        </button>
+      </div>
+    </div>
+  );
 };
 
 const resolveAssetSrc = (url) => {
@@ -316,9 +389,8 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
             <div className="col-md-8">
               <div className="input-group">
                 <span className="input-group-text"><FiSearch /></span>
-                <input type="text" className="form-control" placeholder="Buscar por cliente, DNI..."
-                  maxLength={MAX_LEN_BUSQUEDA}
-                  value={buscar} onChange={(e) => { setBuscar(e.target.value.slice(0, MAX_LEN_BUSQUEDA)); setPagina(1); }} />
+                <SearchInput className="form-control" placeholder="Buscar por cliente, DNI..."
+                  value={buscar} onChange={(val) => { setBuscar(val); setPagina(1); }} />
                 {buscar && <button className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}><FiX /></button>}
               </div>
             </div>
@@ -777,11 +849,10 @@ const BuscadorProductoCot = ({ onAgregar, itemsActuales = [] }) => {
       <label className="prod-search-label"><FiPackage className="me-1" />Buscar Producto <span className="text-muted">(código o nombre)</span></label>
       <div className="prod-search-input-wrapper">
         <FiSearch className="prod-search-icon" />
-        <input ref={inputRef} type="text" className="prod-search-input" placeholder="Ej: 101 ó Filtro de aceite..."
-          maxLength={MAX_LEN_BUSQUEDA}
-          value={query} onChange={(e) => setQuery(e.target.value.slice(0, MAX_LEN_BUSQUEDA))}
+        <SearchInput ref={inputRef} className="prod-search-input" placeholder="Ej: 101 ó Filtro de aceite..."
+          value={query} onChange={(val) => setQuery(val)}
           onFocus={() => { if (resultados.length > 0) setAbierto(true); }}
-          onKeyDown={keyDown} autoComplete="off" />
+          onKeyDown={keyDown} />
         {query && <button className="prod-search-clear" onClick={() => { setQuery(''); setResultados([]); setAbierto(false); inputRef.current?.focus(); }} type="button"><FiX /></button>}
         {cargando && <div className="prod-search-spinner" />}
       </div>
@@ -1017,10 +1088,9 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                 <div className="position-relative">
                   <div className="input-group">
                     <span className="input-group-text"><FiSearch /></span>
-                    <input type="text" className="form-control" placeholder="Buscar cliente por nombre, DNI..."
-                      maxLength={MAX_LEN_BUSQUEDA}
+                    <SearchInput className="form-control" placeholder="Buscar cliente por nombre, DNI..."
                       value={buscarCliente}
-                      onChange={(e) => { setBuscarCliente(e.target.value.slice(0, MAX_LEN_BUSQUEDA)); setShowClienteDropdown(true); }}
+                      onChange={(val) => { setBuscarCliente(val); setShowClienteDropdown(true); }}
                       onFocus={() => setShowClienteDropdown(true)} />
                   </div>
                   {showClienteDropdown && clientes.length > 0 && (
@@ -1098,9 +1168,13 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                               onChange={(e) => cambiarCantidad(index, e.target.value)} />
                           </td>
                           <td>
-                            <input type="text" inputMode="decimal" className="form-control form-control-sm"
+                            <NumericStepper
                               value={item.descuento ?? ''}
-                              onChange={(e) => cambiarDescuento(index, e.target.value)} />
+                              onChange={(val) => cambiarDescuento(index, val)}
+                              max={100}
+                              min={0}
+                              step={0.5}
+                            />
                           </td>
                           <td>{formatMoney(calc.subtotal)}</td>
                           <td className="text-center">{item.isv_pct}%</td>
@@ -1135,9 +1209,27 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                     onChange={(e) => setVigenciaDias(enteroAcotado(e.target.value, MIN_VIGENCIA, MAX_VIGENCIA))} />
                   {vigenciaFueraDeLimite && <div className="invalid-feedback d-block">Debe ser un entero entre {MIN_VIGENCIA} y {MAX_VIGENCIA} días.</div>}
                   <label className="form-label small">Observaciones</label>
-                  <textarea className="form-control form-control-sm mb-2" rows="3" placeholder="Notas adicionales..."
-                    value={observaciones} onChange={(e) => setObservaciones(e.target.value)} maxLength={500} />
-                  <small className="text-muted">{observaciones.length}/500</small>
+                  <textarea
+                    className={`form-control form-control-sm mb-1 ${observaciones.length >= MAX_OBSERVACIONES ? 'is-invalid' : ''}`}
+                    rows="3"
+                    placeholder="Notas adicionales..."
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value.slice(0, MAX_OBSERVACIONES))}
+                    maxLength={MAX_OBSERVACIONES}
+                    aria-describedby="obs-contador obs-limite" />
+                  <div className="d-flex justify-content-end">
+                    <small
+                      id="obs-contador"
+                      className={observaciones.length >= MAX_OBSERVACIONES ? 'text-danger fw-semibold' : 'text-muted'}>
+                      {observaciones.length}/{MAX_OBSERVACIONES}
+                    </small>
+                  </div>
+                  {observaciones.length >= MAX_OBSERVACIONES && (
+                    <div id="obs-limite" className="alert alert-warning py-1 px-2 mb-0 mt-1 d-flex align-items-center gap-2" role="alert" style={{ fontSize: 12 }}>
+                      <FiAlertTriangle className="flex-shrink-0" />
+                      <span>Ha alcanzado el límite máximo de {MAX_OBSERVACIONES} caracteres permitidos.</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1149,11 +1241,14 @@ const NuevaCotizacion = ({ onVolver, onCreada }) => {
                   <h6 className="mb-3">Descuento Global</h6>
                   <div className="row g-2">
                     <div className="col-7">
-                      <input type="text" inputMode="decimal" className="form-control form-control-sm"
-                        placeholder="Monto o %" value={descuentoGlobal}
-                        onChange={(e) => setDescuentoGlobal(
-                          sanearDecimalTexto(e.target.value, tipoDescGlobal === 'PORCENTAJE' ? 100 : MAX_DESC_MONTO)
-                        )} />
+                      <NumericStepper
+                        value={descuentoGlobal}
+                        onChange={setDescuentoGlobal}
+                        max={tipoDescGlobal === 'PORCENTAJE' ? 100 : MAX_DESC_MONTO}
+                        min={0}
+                        step={0.5}
+                        placeholder="Monto o %"
+                      />
                     </div>
                     <div className="col-5">
                       <select className="form-select form-select-sm" value={tipoDescGlobal} onChange={(e) => setTipoDescGlobal(e.target.value)}>

@@ -377,7 +377,6 @@ const InventarioReservasPage = () => {
         abierto={modalReservaAbierto}
         onClose={() => setModalReservaAbierto(false)}
         onReservaRegistrada={manejarReservaRegistrada}
-        productos={productos}
         ubicaciones={ubicaciones}
         loadingUbicaciones={loadingUbicaciones}
       />

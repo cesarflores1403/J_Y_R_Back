@@ -4,6 +4,7 @@ import { FiSearch, FiDownload, FiFilter, FiX, FiClock, FiUser, FiFileText, FiAle
 import { auditoriaFacturacionService } from '../../services/serviceIndex.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { confirmDialog } from '../../utils/notifications.js';
+import SearchInput from '../common/SearchInput.jsx';
 
 // ==========================================
 // ICONOS Y COLORES POR TIPO DE EVENTO
@@ -346,8 +347,8 @@ const AuditoriaFacturacion = () => {
                 <label className="form-label small">Buscar</label>
                 <div className="input-group input-group-sm">
                   <span className="input-group-text"><FiSearch /></span>
-                  <input type="text" className="form-control" placeholder="Usuario, evento, módulo, detalle..."
-                    value={filtroBuscar} onChange={e => setFiltroBuscar(e.target.value)} />
+                  <SearchInput className="form-control" placeholder="Usuario, evento, módulo, detalle..."
+                    value={filtroBuscar} onChange={val => setFiltroBuscar(val)} />
                 </div>
               </div>
               <div className="col-md-2 d-flex gap-1">

@@ -13,12 +13,12 @@ const validarCliente = [
   body('nombre')
     .trim()
     .notEmpty().withMessage('El nombre es requerido')
-    .isLength({ max: 10 }).withMessage('El nombre no puede exceder 10 caracteres')
+    .isLength({ max: 20 }).withMessage('El nombre no puede exceder 20 caracteres')
     .matches(REGEX_SOLO_LETRAS).withMessage('El nombre solo permite letras y espacios'),
   body('apellido')
     .trim()
     .notEmpty().withMessage('El apellido es requerido')
-    .isLength({ max: 10 }).withMessage('El apellido no puede exceder 10 caracteres')
+    .isLength({ max: 20 }).withMessage('El apellido no puede exceder 20 caracteres')
     .matches(REGEX_SOLO_LETRAS).withMessage('El apellido solo permite letras y espacios'),
   body('dni')
     .trim()

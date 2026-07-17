@@ -1,5 +1,6 @@
 import React from 'react';
 import Alert from '../common/Alert.jsx';
+import SearchInput from '../common/SearchInput.jsx';
 
 const UbicacionesFiltrosPanel = ({
   error = '',
@@ -27,11 +28,10 @@ const UbicacionesFiltrosPanel = ({
           <div className="col-12 col-md-4">
             <label className="form-label mb-1 kdx-label">Busqueda unica</label>
             <div className="input-group">
-              <input
-                type="text"
+              <SearchInput
                 className="form-control kdx-control"
                 value={searchValue}
-                onChange={(e) => onSearchChange(e.target.value)}
+                onChange={(val) => onSearchChange(val)}
                 placeholder="Codigo, pasillo, estanteria, nivel, descripcion, estado"
               />
               {searchValue && (

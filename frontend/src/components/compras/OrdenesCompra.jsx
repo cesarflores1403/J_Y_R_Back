@@ -7,6 +7,8 @@ import {FiPlus,FiSearch,FiX,FiEye,FiShoppingCart,FiTrash2,FiCheck,FiEdit2,FiDown
 import {confirmDialog} from '../../utils/notifications.js';
 import ModalProveedor from '../proveedores/ModalProveedor.jsx';
 import ProductoForm from '../producto/ProductoForm.jsx';
+import SearchInput from '../common/SearchInput.jsx';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 // Formatos auxiliares
 const fmtFecha=f=>f?new Date(f).toLocaleDateString('es-HN'):'-';
@@ -87,15 +89,14 @@ const BuscadorProveedor=({valor,proveedores=[],onSeleccionar})=>{
     <div ref={ref} style={{position:'relative',width:'100%'}}>
       <div className="input-group">
         <span className="input-group-text"><FiSearch size={14}/></span>
-        <input
-          type="text"
+        <SearchInput
           className="form-control"
           placeholder="Buscar proveedor..."
           value={texto}
-          onChange={e=>{
-            setTexto(e.target.value);
+          onChange={val=>{
+            setTexto(val);
             onSeleccionar(null);
-            setAbierto(e.target.value.trim().length>0);
+            setAbierto(val.trim().length>0);
           }}
           autoComplete="off"
         />
@@ -187,17 +188,15 @@ const BuscadorProducto=({onAgregar,idsUsados})=>{
           }
         </span>
 
-        <input
-          type="text"
+        <SearchInput
           className={`form-control ${error?'is-invalid':''}`}
           placeholder={placeholder}
           value={texto}
           disabled={cargando||error}
-          onChange={e=>{
-            setTexto(e.target.value);
-            setAbierto(e.target.value.trim().length>0);
+          onChange={val=>{
+            setTexto(val);
+            setAbierto(val.trim().length>0);
           }}
-          autoComplete="off"
         />
       </div>
 
@@ -369,10 +368,12 @@ const FormOrden=({titulo,ocNumero,lineasIniciales=[],formInicial,onClose,onGuard
                   <input
                     type="text"
                     className="form-control"
+                    maxLength={500}
                     value={form.observaciones}
                     onChange={e=>setForm({...form,observaciones:e.target.value})}
                     placeholder="Notas adicionales..."
                   />
+                  <ContadorLimite value={form.observaciones} max={500} />
                 </div>
               </div>
 
@@ -820,13 +821,12 @@ const OrdenesCompra=()=>{
             <div className="col-md-6">
               <div className="input-group">
                 <span className="input-group-text"><FiSearch/></span>
-                <input
-                  type="text"
+                <SearchInput
                   className="form-control"
                   placeholder="Buscar por proveedor..."
                   value={buscar}
-                  onChange={e=>{
-                    setBuscar(e.target.value);
+                  onChange={val=>{
+                    setBuscar(val);
                     setPagina(1);
                   }}
                 />

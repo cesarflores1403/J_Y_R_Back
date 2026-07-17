@@ -8,6 +8,7 @@ import {
   FiToggleLeft, FiToggleRight, FiUser, FiEye, FiEyeOff
 } from 'react-icons/fi';
 import { confirmDialog } from '../../utils/notifications.js';
+import SearchInput from '../common/SearchInput.jsx';
 
 const camposIniciales = { nombre_usuario: '', contrasena: '', confirmar: '', cod_rol: '' };
 
@@ -275,8 +276,8 @@ const Usuarios = () => {
         <div className="jyr-card-body py-2">
           <div className="input-group">
             <span className="input-group-text"><FiSearch /></span>
-            <input type="text" className="form-control" placeholder="Buscar por nombre de usuario..."
-              value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1); }} />
+            <SearchInput className="form-control" placeholder="Buscar por nombre de usuario..."
+              value={buscar} onChange={(val) => { setBuscar(val); setPagina(1); }} />
             {buscar && (
               <button className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}>
                 <FiX />

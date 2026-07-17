@@ -4,6 +4,7 @@ import { carruselService } from '../../services/serviceIndex.js';
 import { toast } from 'react-toastify';
 import { FiPlus, FiTrash2, FiChevronLeft, FiChevronRight, FiImage, FiX } from 'react-icons/fi';
 import { resolveApiBase } from '../../utils/runtimeApi.js';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 // Marcas de carros (mismas del Login)
 import marcaToyota from '../../assets/img/marca_toyota.png';
@@ -240,6 +241,7 @@ const Carrusel = () => {
                   placeholder="Ej: 20% de descuento en rines"
                   maxLength={255}
                 />
+                <ContadorLimite value={descripcion} max={255} />
               </div>
             </div>
 

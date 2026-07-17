@@ -1061,12 +1061,14 @@ class InventarioTransferenciasService {
       replacements.referencia = `%${referencia}%`;
     }
     if (fechaDesde) {
-      whereParts.push('CAST(t.fecha AS DATE) >= :fechaDesde');
-      replacements.fechaDesde = fechaDesde;
+      // Comparación fecha-contra-fecha (string YYYY-MM-DD) para no depender de la
+      // zona horaria y no excluir registros del propio día del rango.
+      whereParts.push('CAST(t.fecha AS DATE) >= CAST(:fechaDesde AS DATE)');
+      replacements.fechaDesde = fechaDesde.toISOString().slice(0, 10);
     }
     if (fechaHasta) {
-      whereParts.push('CAST(t.fecha AS DATE) <= :fechaHasta');
-      replacements.fechaHasta = fechaHasta;
+      whereParts.push('CAST(t.fecha AS DATE) <= CAST(:fechaHasta AS DATE)');
+      replacements.fechaHasta = fechaHasta.toISOString().slice(0, 10);
     }
 
     const whereSql = whereParts.join(' AND ');

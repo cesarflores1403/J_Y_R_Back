@@ -4,6 +4,7 @@ import { useConfirm } from '../../contexts/ConfirmDialogContext.jsx';
 import { toast } from 'react-toastify';
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiDownload } from 'react-icons/fi';
 import { confirmDialog } from '../../utils/notifications.js';
+import SearchInput from '../common/SearchInput.jsx';
 
 const camposIniciales = { nombre: '', apellido: '', dni: '', rtn: '', empresa: '', telefono: '', correo: '', direccion: '' };
 const REGEX_TEXTO_CON_PUNTO = /^[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ.\s]+$/;
@@ -97,10 +98,10 @@ const Clientes = () => {
     e.preventDefault();
 
     if (!form.nombre.trim()) return toast.warn('El nombre es obligatorio');
-    if (form.nombre.trim().length > 10) return toast.warn('El nombre no puede exceder 10 caracteres');
+    if (form.nombre.trim().length > 20) return toast.warn('El nombre no puede exceder 20 caracteres');
     if (!REGEX_SOLO_LETRAS.test(form.nombre.trim())) return toast.warn('El nombre solo permite letras y espacios');
     if (!form.apellido.trim()) return toast.warn('El apellido es obligatorio');
-    if (form.apellido.trim().length > 10) return toast.warn('El apellido no puede exceder 10 caracteres');
+    if (form.apellido.trim().length > 20) return toast.warn('El apellido no puede exceder 20 caracteres');
     if (!REGEX_SOLO_LETRAS.test(form.apellido.trim())) return toast.warn('El apellido solo permite letras y espacios');
     if (!form.dni.trim()) return toast.warn('El DNI es obligatorio');
     if (!/^\d{13}$/.test(form.dni.trim())) return toast.warn('El DNI debe tener exactamente 13 dígitos numéricos');
@@ -263,13 +264,12 @@ const Clientes = () => {
         <div className="jyr-card-body py-2">
           <div className="input-group">
             <span className="input-group-text"><FiSearch /></span>
-            <input
-              type="text"
+            <SearchInput
               className="form-control"
               placeholder="Buscar por nombre, DNI, empresa, correo..."
               value={buscar}
-              onChange={(e) => {
-                setBuscar(e.target.value);
+              onChange={(val) => {
+                setBuscar(val);
                 setPagina(1);
               }}
             />
@@ -443,11 +443,11 @@ const Clientes = () => {
                         type="text"
                         className="form-control"
                         value={form.nombre}
-                        onChange={(e) => setForm({ ...form, nombre: sanitizarSoloLetras(e.target.value, 10) })}
+                        onChange={(e) => setForm({ ...form, nombre: sanitizarSoloLetras(e.target.value, 20) })}
                         required
-                        maxLength={10}
+                        maxLength={20}
                       />
-                      <small className="text-muted">{form.nombre.length}/10</small>
+                      <small className="text-muted">{form.nombre.length}/20</small>
                     </div>
 
                     <div className="col-md-6">
@@ -456,11 +456,11 @@ const Clientes = () => {
                         type="text"
                         className="form-control"
                         value={form.apellido}
-                        onChange={(e) => setForm({ ...form, apellido: sanitizarSoloLetras(e.target.value, 10) })}
+                        onChange={(e) => setForm({ ...form, apellido: sanitizarSoloLetras(e.target.value, 20) })}
                         required
-                        maxLength={10}
+                        maxLength={20}
                       />
-                      <small className="text-muted">{form.apellido.length}/10</small>
+                      <small className="text-muted">{form.apellido.length}/20</small>
                     </div>
 
                     <div className="col-md-3">

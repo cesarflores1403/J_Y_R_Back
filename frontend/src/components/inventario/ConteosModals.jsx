@@ -1,4 +1,6 @@
 import React from 'react';
+import ContadorLimite from '../common/ContadorLimite.jsx';
+import { sanitizarEntero, MAX_CANTIDAD } from '../../utils/numero.js';
 
 export const ConteoAperturaModal = ({
   abierto = false,
@@ -36,6 +38,7 @@ export const ConteoAperturaModal = ({
                 value={observaciones}
                 onChange={(event) => onChangeObservaciones(event.target.value)}
               />
+              <ContadorLimite value={observaciones} max={500} />
             </div>
             <div className="modal-footer">
               <button
@@ -138,11 +141,12 @@ export const ConteoDetalleModal = ({
                   <input
                     type="number"
                     min="0"
+                    max={MAX_CANTIDAD}
                     step="1"
                     className="form-control"
                     placeholder="Ej: 18"
                     value={formDetalle.stock_fisico}
-                    onChange={(event) => onChangeFormDetalle('stock_fisico', event.target.value)}
+                    onChange={(event) => onChangeFormDetalle('stock_fisico', sanitizarEntero(event.target.value))}
                     required
                   />
                 </div>
@@ -157,6 +161,7 @@ export const ConteoDetalleModal = ({
                     value={formDetalle.observaciones}
                     onChange={(event) => onChangeFormDetalle('observaciones', event.target.value)}
                   />
+                  <ContadorLimite value={formDetalle.observaciones} max={500} />
                 </div>
               </div>
             </div>
@@ -223,6 +228,7 @@ export const ConteoCierreModal = ({
                 value={observaciones}
                 onChange={(event) => onChangeObservaciones(event.target.value)}
               />
+              <ContadorLimite value={observaciones} max={500} />
             </div>
             <div className="modal-footer">
               <button

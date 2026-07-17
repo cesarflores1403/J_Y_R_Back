@@ -12,6 +12,7 @@ import {
   FiSearch,
   FiFilter,
 } from 'react-icons/fi';
+import SearchInput from '../common/SearchInput.jsx';
 
 const TABS = [
   { key: 'ventas', label: 'Ventas', icon: <FiDollarSign /> },
@@ -377,12 +378,11 @@ const Reportes = () => {
                           <span className="input-group-text bg-white">
                             <FiSearch />
                           </span>
-                          <input
-                            type="text"
+                          <SearchInput
                             className="form-control rounded-end-3"
                             placeholder="Cliente, vendedor, método de pago..."
                             value={busquedaVentas}
-                            onChange={(e) => setBusquedaVentas(e.target.value)}
+                            onChange={(val) => setBusquedaVentas(val)}
                           />
                         </div>
                       </div>
@@ -500,12 +500,11 @@ const Reportes = () => {
                           <span className="input-group-text bg-white">
                             <FiSearch />
                           </span>
-                          <input
-                            type="text"
+                          <SearchInput
                             className="form-control rounded-end-3"
                             placeholder="Nombre del producto..."
                             value={busquedaProducto}
-                            onChange={(e) => setBusquedaProducto(e.target.value)}
+                            onChange={(val) => setBusquedaProducto(val)}
                           />
                         </div>
                       </div>
@@ -585,12 +584,11 @@ const Reportes = () => {
                           <span className="input-group-text bg-white">
                             <FiSearch />
                           </span>
-                          <input
-                            type="text"
+                          <SearchInput
                             className="form-control rounded-end-3"
                             placeholder="Ej. filtro, lubricantes..."
                             value={busquedaProducto}
-                            onChange={(e) => setBusquedaProducto(e.target.value)}
+                            onChange={(val) => setBusquedaProducto(val)}
                           />
                         </div>
                       </div>

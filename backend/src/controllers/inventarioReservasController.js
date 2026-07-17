@@ -18,6 +18,23 @@ export const listarReservas = async (req, res, next) => {
   }
 };
 
+// // GET /api/inventario/reservas/disponibles?cod_ubicacion=X
+// // Lista productos con stock disponible dentro de la ubicacion indicada.
+// // Alimenta el catalogo de productos condicionado por ubicacion en el front.
+export const listarProductosDisponibles = async (req, res, next) => {
+  try {
+    const data = await inventarioReservasService.listarProductosDisponiblesPorUbicacion(req.query.cod_ubicacion);
+
+    return sendOk(res, {
+      status: 200,
+      message: 'Productos disponibles por ubicacion obtenidos correctamente',
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // // GET /api/inventario/reservas/reporte/pdf
 // // Exporta reservas de inventario en PDF profesional
 export const exportarReservasPdf = async (req, res, next) => {

@@ -179,12 +179,14 @@ class InventarioConteosService {
       replacements.codUsuarioCierre = codUsuarioCierre;
     }
     if (fechaDesde && schemaHeader.fechaApertura) {
-      whereParts.push(`CAST(h.${schemaHeader.fechaApertura} AS DATE) >= :fechaDesde`);
-      replacements.fechaDesde = fechaDesde;
+      // Comparación fecha-contra-fecha (string YYYY-MM-DD) para no depender de la
+      // zona horaria y no excluir registros del propio día del rango.
+      whereParts.push(`CAST(h.${schemaHeader.fechaApertura} AS DATE) >= CAST(:fechaDesde AS DATE)`);
+      replacements.fechaDesde = fechaDesde.toISOString().slice(0, 10);
     }
     if (fechaHasta && schemaHeader.fechaApertura) {
-      whereParts.push(`CAST(h.${schemaHeader.fechaApertura} AS DATE) <= :fechaHasta`);
-      replacements.fechaHasta = fechaHasta;
+      whereParts.push(`CAST(h.${schemaHeader.fechaApertura} AS DATE) <= CAST(:fechaHasta AS DATE)`);
+      replacements.fechaHasta = fechaHasta.toISOString().slice(0, 10);
     }
 
     const whereSql = whereParts.join(' AND ');

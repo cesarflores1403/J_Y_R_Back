@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { sanitizarEntero, MAX_CANTIDAD } from '../../utils/numero.js';
 import { inventarioBajasApi } from './inventarioBajas.api.js';
 import { useUbicaciones } from '../../hooks/useUbicaciones.js';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 const estadoInicial = {
   cod_producto: '',
@@ -224,10 +226,11 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
                   <input
                     type="number"
                     min="1"
+                    max={MAX_CANTIDAD}
                     step="1"
                     className="form-control"
                     value={form.cantidad}
-                    onChange={(event) => actualizarCampo('cantidad', event.target.value)}
+                    onChange={(event) => actualizarCampo('cantidad', sanitizarEntero(event.target.value))}
                     placeholder="Ej: 1"
                     required
                   />
@@ -243,6 +246,7 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
                     placeholder="Ej: Daño en almacenamiento"
                     maxLength={120}
                   />
+                  <ContadorLimite value={form.motivo} max={120} />
                 </div>
 
                 <div className="col-12">
@@ -255,6 +259,7 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
                     placeholder="Detalle de la baja (si aplica)"
                     maxLength={500}
                   />
+                  <ContadorLimite value={form.descripcion} max={500} />
                 </div>
 
                 <div className="col-12">
@@ -267,6 +272,7 @@ const BajaForm = ({ abierto = false, onClose, onBajaRegistrada, productos = [] }
                     placeholder="Acta o reporte interno"
                     maxLength={200}
                   />
+                  <ContadorLimite value={form.referencia} max={200} />
                 </div>
               </div>
             </div>

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { sanitizarEntero, MAX_CANTIDAD } from '../../utils/numero.js';
 import { inventarioEntradasApi } from './inventarioEntradas.api.js';
 import { useUbicaciones } from '../../hooks/useUbicaciones.js';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 // // Estado inicial del formulario de entradas (HU4)
 const estadoInicial = {
@@ -231,10 +233,11 @@ const EntradaForm = ({ abierto = false, onClose, onEntradaRegistrada, productos 
                     // // Cantidad de unidades ingresadas (entero > 0)
                     type="number"
                     min="1"
+                    max={MAX_CANTIDAD}
                     step="1"
                     className="form-control"
                     value={form.cantidad}
-                    onChange={(event) => actualizarCampo('cantidad', event.target.value)}
+                    onChange={(event) => actualizarCampo('cantidad', sanitizarEntero(event.target.value))}
                     placeholder="Ej: 10"
                     required
                   />
@@ -252,6 +255,7 @@ const EntradaForm = ({ abierto = false, onClose, onEntradaRegistrada, productos 
                     maxLength={200}
                     required
                   />
+                  <ContadorLimite value={form.referencia_documento} max={200} />
                 </div>
 
                 <div className="col-12">
@@ -265,6 +269,7 @@ const EntradaForm = ({ abierto = false, onClose, onEntradaRegistrada, productos 
                     placeholder="Notas de la recepcion"
                     maxLength={500}
                   />
+                  <ContadorLimite value={form.observaciones} max={500} />
                 </div>
               </div>
             </div>

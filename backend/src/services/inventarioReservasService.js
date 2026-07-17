@@ -5,6 +5,7 @@ import inventarioMovimientosSchemaService from './inventarioMovimientosSchemaSer
 import inventarioReservasSchemaService from './inventarioReservasSchemaService.js';
 import { generarReportePdf } from '../utils/pdfReport.js';
 import {
+  obtenerSelectProductosDisponiblesPorUbicacion,
   obtenerSelectInventarioPorProductoUbicacion,
   obtenerSelectInventarioPorId,
   obtenerUpdateReservarStockSeguro,
@@ -121,6 +122,50 @@ class InventarioReservasService {
       );
     }
     return schemaReserva;
+  }
+
+  // // Lista productos con stock disponible en una ubicacion concreta.
+  // // Condiciona el catalogo de productos a la ubicacion seleccionada para que
+  // // el front nunca ofrezca combinaciones producto-ubicacion inexistentes.
+  async listarProductosDisponiblesPorUbicacion(codUbicacionRaw) {
+    const codUbicacion = Number(codUbicacionRaw);
+    if (!Number.isInteger(codUbicacion) || codUbicacion <= 0) {
+      throw Object.assign(new Error('cod_ubicacion debe ser un entero mayor a 0'), { status: 400 });
+    }
+
+    // // Misma regla de negocio que crearReserva: la ubicacion debe existir y estar activa
+    const ubicacion = await Ubicacion.findByPk(codUbicacion);
+    if (!ubicacion) {
+      throw Object.assign(new Error('Ubicacion no encontrada'), { status: 404 });
+    }
+    if (!ubicacionActiva(ubicacion.estado_ubi)) {
+      throw Object.assign(new Error('La ubicacion no esta activa para reservas'), { status: 400 });
+    }
+
+    try {
+      const filas = await sequelize.query(obtenerSelectProductosDisponiblesPorUbicacion(), {
+        replacements: { codUbicacion },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      return (Array.isArray(filas) ? filas : []).map((fila) => ({
+        cod_producto: Number(fila.cod_producto),
+        nombre_producto: fila.nombre_producto,
+        cod_ubicacion: Number(fila.cod_ubicacion),
+        stock: Number(fila.stock || 0),
+        stock_reservado: Number(fila.stock_reservado || 0),
+        stock_disponible: Number(fila.stock_disponible || 0)
+      }));
+    } catch (error) {
+      // // Sin stock_reservado no hay reservas posibles: error explicito y accionable
+      if (esErrorColumnaNoExiste(error, 'stock_reservado')) {
+        throw Object.assign(
+          new Error('La columna stock_reservado no existe en inventario. Pendiente manual: agregar columna para habilitar reservas.'),
+          { status: 500 }
+        );
+      }
+      throw error;
+    }
   }
 
   // // Lee inventario por producto+ubicacion con lock y valida presencia de stock_reservado
@@ -243,12 +288,14 @@ class InventarioReservasService {
       replacements.referencia = `%${referencia}%`;
     }
     if (fechaDesde && schemaReserva.fechaCreacion) {
-      whereParts.push(`CAST(r.${schemaReserva.fechaCreacion} AS DATE) >= :fechaDesde`);
-      replacements.fechaDesde = fechaDesde;
+      // Comparación fecha-contra-fecha (string YYYY-MM-DD) para no depender de la
+      // zona horaria y no excluir registros del propio día del rango.
+      whereParts.push(`CAST(r.${schemaReserva.fechaCreacion} AS DATE) >= CAST(:fechaDesde AS DATE)`);
+      replacements.fechaDesde = fechaDesde.toISOString().slice(0, 10);
     }
     if (fechaHasta && schemaReserva.fechaCreacion) {
-      whereParts.push(`CAST(r.${schemaReserva.fechaCreacion} AS DATE) <= :fechaHasta`);
-      replacements.fechaHasta = fechaHasta;
+      whereParts.push(`CAST(r.${schemaReserva.fechaCreacion} AS DATE) <= CAST(:fechaHasta AS DATE)`);
+      replacements.fechaHasta = fechaHasta.toISOString().slice(0, 10);
     }
 
     const whereSql = whereParts.join(' AND ');

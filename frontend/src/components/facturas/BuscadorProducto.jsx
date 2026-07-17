@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { FiSearch, FiPackage, FiAlertTriangle, FiX, FiPlus } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { confirmDialog } from '../../utils/notifications.js';
+import SearchInput from '../common/SearchInput.jsx';
 
 const formatMoney = (v) => {
   const n = parseFloat(v) || 0;
@@ -38,9 +39,13 @@ const BuscadorProducto = ({ onAgregar, itemsActuales = [] }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Búsqueda con debounce
+  // Búsqueda con debounce.
+  // Endurecida contra entradas extremas: exige un mínimo, acota la respuesta a
+  // un número seguro de resultados (evita renders masivos) y nunca deja que una
+  // excepción rompa la UI.
+  const MAX_RESULTADOS = 50;
   const buscar = useCallback(async (texto) => {
-    if (texto.length < 1) {
+    if (!texto || texto.length < 1) {
       setResultados([]);
       setAbierto(false);
       return;
@@ -48,13 +53,15 @@ const BuscadorProducto = ({ onAgregar, itemsActuales = [] }) => {
     setCargando(true);
     try {
       const { data } = await facturaService.productosDisponibles({ buscar: texto });
-      if (data.ok) {
-        setResultados(data.datos);
-        setAbierto(true);
-        setIndiceActivo(-1);
-      }
+      // Defensa: la respuesta podría no traer un arreglo; nunca renderizamos más
+      // de MAX_RESULTADOS para no congelar el navegador con listas enormes.
+      const lista = data?.ok && Array.isArray(data.datos) ? data.datos.slice(0, MAX_RESULTADOS) : [];
+      setResultados(lista);
+      setAbierto(true);
+      setIndiceActivo(-1);
     } catch {
       setResultados([]);
+      setAbierto(true);
     } finally {
       setCargando(false);
     }
@@ -151,16 +158,14 @@ const BuscadorProducto = ({ onAgregar, itemsActuales = [] }) => {
       {/* Campo de búsqueda */}
       <div className="prod-search-input-wrapper">
         <FiSearch className="prod-search-icon" />
-        <input
+        <SearchInput
           ref={inputRef}
-          type="text"
           className="prod-search-input"
           placeholder="Ej: 101 ó Filtro de aceite..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(val) => setQuery(val)}
           onFocus={() => { if (resultados.length > 0) setAbierto(true); }}
           onKeyDown={handleKeyDown}
-          autoComplete="off"
         />
         {query && (
           <button className="prod-search-clear" onClick={limpiar} type="button">

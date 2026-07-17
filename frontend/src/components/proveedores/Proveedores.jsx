@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { FiPlus, FiEdit2, FiSearch, FiX, FiToggleLeft, FiToggleRight, FiTrash2, FiDownload } from 'react-icons/fi';
 import { confirmDialog, alertDialog } from '../../utils/notifications.js';
 import ModalProveedor from './ModalProveedor.jsx';
+import SearchInput from '../common/SearchInput.jsx';
 
 const LIMITE = 10;
 
@@ -220,13 +221,12 @@ const Proveedores = () => {
         <div className="jyr-card-body py-2">
           <div className="input-group">
             <span className="input-group-text"><FiSearch /></span>
-            <input
-              type="text"
+            <SearchInput
               className="form-control"
               placeholder="Buscar..."
               value={buscar}
-              onChange={(e) => {
-                setBuscar(e.target.value);
+              onChange={(val) => {
+                setBuscar(val);
                 setPagina(1);
               }}
             />

@@ -3801,3 +3801,75 @@ a {
   background: var(--jyr-gray-100) !important;
   border-color: var(--jyr-gray-400) !important;
 }
+
+/* ==========================================
+   Input numérico con spinner (flechas arriba/abajo)
+   Usado en los campos de descuento de cotizaciones.
+   ========================================== */
+.jyr-stepper {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.jyr-stepper__input.form-control {
+  /* Espacio a la derecha para no solapar las flechas */
+  padding-right: 30px;
+  width: 100%;
+}
+
+.jyr-stepper__btns {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 26px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--jyr-gray-300);
+  border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+  overflow: hidden;
+}
+
+.jyr-stepper__btn {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: var(--jyr-gray-100);
+  color: var(--jyr-gray-600, #525252);
+  cursor: pointer;
+  line-height: 0;
+  font-size: 12px;
+  transition: background var(--transition-base, 0.15s ease), color var(--transition-base, 0.15s ease);
+}
+
+.jyr-stepper__btn--up {
+  border-bottom: 1px solid var(--jyr-gray-300);
+}
+
+.jyr-stepper__btn:hover:not(:disabled) {
+  background: var(--jyr-red);
+  color: #fff;
+}
+
+.jyr-stepper__btn:active:not(:disabled) {
+  background: var(--jyr-red-dark);
+}
+
+.jyr-stepper__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.jyr-stepper__btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Estado inválido: reutiliza el rojo de validación de Bootstrap */
+.jyr-stepper.is-invalid .jyr-stepper__btns {
+  border-left-color: var(--jyr-danger, #dc2626);
+}

@@ -4,6 +4,7 @@ import { useCategorias } from '../../hooks/useCategorias.js'; // // Hook catálo
 import { useUbicaciones } from '../../hooks/useUbicaciones.js'; // // HU-10: Hook ubicaciones
 import { FiCamera, FiX } from 'react-icons/fi';
 import { resolveApiBase } from '../../utils/runtimeApi.js';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 const PRODUCT_NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N}\s.,#()\/&+\-]*$/u;
 const PRODUCT_NAME_FORMAT_MESSAGE = 'El nombre solo puede contener letras, números, espacios y los símbolos . , - / # ( ) & +.';
@@ -185,8 +186,30 @@ const ProductoForm = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Campos de stock enteros: se acotan a 6 dígitos (máx 999,999) para evitar
+  // que cadenas numéricas excesivas desborden la caja o lleguen valores irreales.
+  const CAMPOS_STOCK_ENTERO = ['stock_inicial', 'stock_agregar', 'stock_minimo', 'punto_reorden'];
+  const MAX_STOCK_PRODUCTO = 999999;
+
+  // Precios (venta y costo): tope de 100,000 L. para evitar valores irreales.
+  const CAMPOS_PRECIO = ['precio_venta', 'precio_costo'];
+  const MAX_PRECIO_PRODUCTO = 100000;
+
   const onChange = (e) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    let { value } = e.target;
+
+    if (CAMPOS_STOCK_ENTERO.includes(name)) {
+      const soloDigitos = String(value).replace(/\D/g, '').slice(0, 6);
+      value = soloDigitos === '' ? '' : String(Math.min(MAX_STOCK_PRODUCTO, Number.parseInt(soloDigitos, 10)));
+    } else if (CAMPOS_PRECIO.includes(name)) {
+      // Clampa al tope sin reformatear, para no romper la escritura de decimales.
+      if (value !== '' && value !== '.') {
+        const n = Number.parseFloat(value);
+        if (Number.isFinite(n) && n > MAX_PRECIO_PRODUCTO) value = String(MAX_PRECIO_PRODUCTO);
+      }
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }));
     // Limpiar error del campo al escribir
     if (fieldErrors[name]) {
@@ -337,8 +360,8 @@ const ProductoForm = ({
       errors.precio_venta = 'No se permiten números negativos.';
     } else if (precio <= 0) {
       errors.precio_venta = 'El precio de venta debe ser mayor a 0.';
-    } else if (precio > 999999.99) {
-      errors.precio_venta = 'El precio no puede exceder L. 999,999.99';
+    } else if (precio > 100000) {
+      errors.precio_venta = 'El precio de venta no puede exceder L. 100,000.00';
     }
 
     if (mostrarPrecioCosto && form.precio_costo !== '') {
@@ -347,8 +370,8 @@ const ProductoForm = ({
         errors.precio_costo = 'El precio de costo debe ser un número válido.';
       } else if (costo < 0) {
         errors.precio_costo = 'El precio de costo debe ser mayor o igual a 0.';
-      } else if (costo > 999999.99) {
-        errors.precio_costo = 'El precio de costo no puede exceder L. 999,999.99';
+      } else if (costo > 100000) {
+        errors.precio_costo = 'El precio de costo no puede exceder L. 100,000.00';
       }
     }
 
@@ -647,9 +670,7 @@ const ProductoForm = ({
               style={{ resize: 'vertical' }}
             />
             {fieldErrors.descripcion && <span className="jyr-field-error">{fieldErrors.descripcion}</span>}
-            <span style={{ fontSize: 11, color: 'var(--jyr-gray-400)' }}>
-              {form.descripcion.trim().length}/500
-            </span>
+            <ContadorLimite value={form.descripcion} max={500} />
           </div>
 
           <div className="jyr-form-group">
@@ -733,7 +754,7 @@ const ProductoForm = ({
                 type="number"
                 step="0.01"
                 min="0"
-                max="999999.99"
+                max="100000"
                 onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                 placeholder="0.00"
                 value={form.precio_venta}
@@ -752,7 +773,7 @@ const ProductoForm = ({
                   type="number"
                   step="0.01"
                   min="0"
-                  max="999999.99"
+                  max="100000"
                   onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                   placeholder="Opcional"
                   value={form.precio_costo}

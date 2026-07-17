@@ -1,5 +1,7 @@
 import React from 'react';
 import { FiCalendar, FiFilter, FiMapPin, FiRefreshCw, FiRepeat, FiTag } from 'react-icons/fi';
+import ContadorLimite from '../common/ContadorLimite.jsx';
+import { sanitizarFiltro } from '../../utils/filtroSanitizar.js';
 
 const formatearCodigoProducto = (producto) => {
   const codigo = String(producto?.codigo_producto || '').trim().toUpperCase();
@@ -36,7 +38,7 @@ const TransferenciasFiltros = ({
   onLimpiar
 }) => {
   const handleInput = (event) => {
-    onChange(event.target.name, event.target.value);
+    onChange(event.target.name, sanitizarFiltro(event.target.value));
   };
 
   return (
@@ -189,6 +191,7 @@ const TransferenciasFiltros = ({
             placeholder="TRF-2026-0001"
             maxLength={200}
           />
+          <ContadorLimite value={filtros.referencia} max={200} />
         </div>
       </div>
     </form>

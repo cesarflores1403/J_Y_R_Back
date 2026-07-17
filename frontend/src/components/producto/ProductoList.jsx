@@ -1,6 +1,7 @@
 ﻿import { useState, useMemo, useRef, useEffect } from 'react';
 import { FiEdit2, FiTrash2, FiSearch, FiChevronUp, FiChevronDown, FiFilter, FiCamera, FiX, FiEye, FiCopy, FiPackage } from 'react-icons/fi';
 import Pagination from '../common/Pagination.jsx';
+import SearchInput from '../common/SearchInput.jsx';
 import { useCategorias } from '../../hooks/useCategorias.js'; // // HU-07: Categorias dinamicas
 import { alertDialog, confirmDialog } from '../../utils/notifications.js';
 
@@ -411,11 +412,11 @@ const ProductoList = ({ productos = [], busqueda: busquedaControlada = '', onBus
             position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
             color: 'var(--jyr-gray-400)'
           }} />
-          <input
+          <SearchInput
             className="jyr-form-control"
             placeholder="Buscar por código, nombre o descripción..."
             value={busqueda}
-            onChange={(e) => handleBusqueda(e.target.value)}
+            onChange={(val) => handleBusqueda(val)}
             style={{ paddingLeft: 32, fontSize: 13 }}
           />
         </div>

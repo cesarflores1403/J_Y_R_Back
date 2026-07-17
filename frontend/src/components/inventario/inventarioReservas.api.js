@@ -6,6 +6,9 @@ export const inventarioReservasApi = {
   listar: (params) => api.get('/inventario/reservas', { params }),
   // // Exporta reservas persistidas en PDF
   exportarPdf: (params) => api.get('/inventario/reservas/reporte/pdf', { params, responseType: 'blob' }),
+  // // Lista productos con stock disponible dentro de una ubicacion (catalogo condicionado)
+  disponiblesPorUbicacion: (codUbicacion) =>
+    api.get('/inventario/reservas/disponibles', { params: { cod_ubicacion: codUbicacion } }),
   // // Crea reserva activa sobre inventario disponible
   crear: (data) => api.post('/inventario/reservas', data),
   // // Libera reserva activa

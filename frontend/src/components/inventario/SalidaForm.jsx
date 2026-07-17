@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { sanitizarEntero, MAX_CANTIDAD } from '../../utils/numero.js';
 import { inventarioSalidasApi } from './inventarioSalidas.api.js';
 import { useUbicaciones } from '../../hooks/useUbicaciones.js';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 // // Estado inicial del formulario modal de salidas
 const estadoInicial = {
@@ -225,10 +227,11 @@ const SalidaForm = ({ abierto = false, onClose, onSalidaRegistrada, productos = 
                   <input
                     type="number"
                     min="1"
+                    max={MAX_CANTIDAD}
                     step="1"
                     className="form-control"
                     value={form.cantidad}
-                    onChange={(event) => actualizarCampo('cantidad', event.target.value)}
+                    onChange={(event) => actualizarCampo('cantidad', sanitizarEntero(event.target.value))}
                     placeholder="Ej: 5"
                     required
                   />
@@ -245,6 +248,7 @@ const SalidaForm = ({ abierto = false, onClose, onSalidaRegistrada, productos = 
                     maxLength={200}
                     required
                   />
+                  <ContadorLimite value={form.referencia} max={200} />
                 </div>
 
                 <div className="col-12">
@@ -257,6 +261,7 @@ const SalidaForm = ({ abierto = false, onClose, onSalidaRegistrada, productos = 
                     placeholder="Detalle adicional de la salida"
                     maxLength={500}
                   />
+                  <ContadorLimite value={form.observaciones} max={500} />
                 </div>
               </div>
             </div>

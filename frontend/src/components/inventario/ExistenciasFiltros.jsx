@@ -1,5 +1,7 @@
 import React from 'react';
 import { FiBox, FiMapPin } from 'react-icons/fi';
+import { sanitizarEntero } from '../../utils/numero.js';
+import { sanitizarFiltro } from '../../utils/filtroSanitizar.js';
 
 const ExistenciasFiltros = ({
   filtros,
@@ -8,7 +10,7 @@ const ExistenciasFiltros = ({
   alertasCriticas = 0
 }) => {
   const handleInput = (event) => {
-    onChange(event.target.name, event.target.value);
+    onChange(event.target.name, sanitizarFiltro(event.target.value));
   };
 
   return (
@@ -31,6 +33,7 @@ const ExistenciasFiltros = ({
             name="cod_producto"
             value={filtros.cod_producto}
             onChange={handleInput}
+            maxLength={20}
             placeholder="Ej: PROD-0023 o 23"
           />
         </div>
@@ -43,6 +46,7 @@ const ExistenciasFiltros = ({
             name="producto"
             value={filtros.producto}
             onChange={handleInput}
+            maxLength={100}
             placeholder="Nombre de producto"
           />
         </div>
@@ -55,10 +59,11 @@ const ExistenciasFiltros = ({
           <input
             type="number"
             min="1"
+            max={9999999}
             className="form-control kdx-control"
             name="cod_ubicacion"
             value={filtros.cod_ubicacion}
-            onChange={handleInput}
+            onChange={(event) => onChange('cod_ubicacion', sanitizarEntero(event.target.value, 9999999))}
             placeholder="Ej: 2"
           />
         </div>
@@ -71,6 +76,7 @@ const ExistenciasFiltros = ({
             name="ubicacion"
             value={filtros.ubicacion}
             onChange={handleInput}
+            maxLength={100}
             placeholder="Codigo prod, pasillo o nivel"
           />
         </div>

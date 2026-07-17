@@ -8,6 +8,8 @@ import logoClean from '../../assets/img/logo2.jpeg';
 import logoFull from '../../assets/img/logo1.jpeg';
 import BuscadorProducto from './BuscadorProducto.jsx';
 import ModalClienteRapido from './ModalClienteRapido.jsx';
+import SearchInput from '../common/SearchInput.jsx';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 import { resolveApiBase } from '../../utils/runtimeApi.js';
 
 const API_BASE = resolveApiBase();
@@ -158,8 +160,8 @@ const ListaFacturas = ({ onNuevaProductos, onNuevaReparacion, onVer }) => {
         <div className="jyr-card-body py-2">
           <div className="input-group">
             <span className="input-group-text"><FiSearch /></span>
-            <input type="text" className="form-control" placeholder="Buscar por cliente, DNI..."
-              value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1); }} />
+            <SearchInput className="form-control" placeholder="Buscar por cliente, DNI..."
+              value={buscar} onChange={(val) => { setBuscar(val); setPagina(1); }} />
             {buscar && <button className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}><FiX /></button>}
           </div>
         </div>
@@ -869,9 +871,9 @@ const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
                 <div className="position-relative">
                   <div className="input-group">
                     <span className="input-group-text"><FiSearch /></span>
-                    <input type="text" className="form-control" placeholder="Buscar cliente por nombre, DNI..."
+                    <SearchInput className="form-control" placeholder="Buscar cliente por nombre, DNI..."
                       value={buscarCliente}
-                      onChange={(e) => { setBuscarCliente(e.target.value); setShowClienteDropdown(true); }}
+                      onChange={(val) => { setBuscarCliente(val); setShowClienteDropdown(true); }}
                       onFocus={() => setShowClienteDropdown(true)} />
                     <button className="btn btn-outline-info btn-sm" type="button" title="Crear nuevo cliente"
                       onClick={() => { setClienteEditar(null); setModalCliente(true); }}>
@@ -918,6 +920,7 @@ const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
                       maxLength={140}
                       onChange={(e) => setReparacion((prev) => ({ ...prev, descripcion_item: limpiarSoloLetrasYEspacios(e.target.value) }))}
                     />
+                    <ContadorLimite value={reparacion.descripcion_item} max={140} />
                     <small className="text-muted">Solo letras y espacios.</small>
                   </div>
                   <div className="col-md-2">
@@ -938,6 +941,7 @@ const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
                       className="form-control form-control-sm compact-number-input"
                       inputMode="numeric"
                       pattern="[0-9]*"
+                      maxLength={6}
                       value={reparacion.cantidad}
                       onChange={(e) => {
                         const limpio = limpiarSoloDigitos(e.target.value);
@@ -1029,7 +1033,7 @@ const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
                           <td>{formatMoney(precioBase)}</td>
                           <td>
                             <input type="text" className={`form-control form-control-sm compact-number-input ${stockError ? 'is-invalid' : ''}`}
-                              inputMode="numeric" pattern="[0-9]*" value={item.cantidad}
+                              inputMode="numeric" pattern="[0-9]*" maxLength={6} value={item.cantidad}
                               onChange={(e) => cambiarCantidad(index, e.target.value)} />
                           </td>
                           <td>
@@ -1072,7 +1076,8 @@ const NuevaFactura = ({ onVolver, onCreada, tipoFactura = 'PRODUCTOS' }) => {
                   </select>
                   <label className="form-label small">Referencia</label>
                   <input type="text" className="form-control form-control-sm" placeholder="Nro. transacción, recibo..."
-                    value={refPago} onChange={(e) => setRefPago(e.target.value)} />
+                    maxLength={100}
+                    value={refPago} onChange={(e) => setRefPago(e.target.value.slice(0, 100))} />
                 </div>
               </div>
             </div>

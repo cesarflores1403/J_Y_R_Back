@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiCalendar, FiFilter, FiLayers, FiMapPin, FiPackage, FiRefreshCw } from 'react-icons/fi';
+import { sanitizarFiltro } from '../../utils/filtroSanitizar.js';
 
 const KardexFiltros = ({
   filtros,
@@ -11,7 +12,7 @@ const KardexFiltros = ({
 }) => {
   // // Handler generico para inputs de texto/numero/date del formulario
   const handleInput = (event) => {
-    onChange(event.target.name, event.target.value);
+    onChange(event.target.name, sanitizarFiltro(event.target.value));
   };
 
   return (

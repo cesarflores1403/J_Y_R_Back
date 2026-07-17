@@ -17,6 +17,25 @@ export const obtenerSelectInventarioPorProductoUbicacion = ({ usarStockReservado
   ${forUpdate ? 'FOR UPDATE' : ''}
 `;
 
+// // SQL para listar SOLO productos con stock disponible dentro de una ubicacion.
+// // Es la fuente de verdad que condiciona el catalogo de productos a la ubicacion
+// // seleccionada al crear una reserva (evita consultas cruzadas producto-ubicacion).
+export const obtenerSelectProductosDisponiblesPorUbicacion = () => `
+  SELECT
+    i.cod_producto,
+    p.nombre_producto,
+    i.cod_ubicacion,
+    i.stock,
+    COALESCE(i.stock_reservado, 0) AS stock_reservado,
+    (i.stock - COALESCE(i.stock_reservado, 0)) AS stock_disponible
+  FROM inventario i
+  JOIN producto p ON p.cod_producto = i.cod_producto
+  WHERE i.cod_ubicacion = :codUbicacion
+    AND p.estado_producto = 'Activo'
+    AND (i.stock - COALESCE(i.stock_reservado, 0)) > 0
+  ORDER BY p.nombre_producto ASC, i.cod_producto ASC
+`;
+
 // // SQL para leer inventario por id durante liberar/consumir reserva
 export const obtenerSelectInventarioPorId = ({ usarStockReservado = true, forUpdate = false } = {}) => `
   SELECT

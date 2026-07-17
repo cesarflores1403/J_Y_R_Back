@@ -9,7 +9,7 @@ import { registrarSalida, anularSalida } from '../controllers/inventarioSalidasC
 import { registrarBaja, anularBaja, exportarBajasPdf } from '../controllers/inventarioBajasController.js';
 import { listarTransferencias, registrarTransferencia, anularTransferencia } from '../controllers/inventarioTransferenciasController.js';
 import { listarConteos, listarDetallesConteo, abrirConteo, registrarDetalleConteo, cerrarConteo, exportarConteosPdf } from '../controllers/inventarioConteosController.js';
-import { listarReservas, crearReserva, liberarReserva, consumirReserva, exportarReservasPdf } from '../controllers/inventarioReservasController.js';
+import { listarReservas, crearReserva, liberarReserva, consumirReserva, exportarReservasPdf, listarProductosDisponibles } from '../controllers/inventarioReservasController.js';
 
 const router = Router();
 const ROLES_INVENTARIO = ['Administrador', 'Bodeguero'];
@@ -902,6 +902,20 @@ router.post('/conteos/:id/cerrar', autorizar(...ROLES_INVENTARIO), [
   // // Respuesta 400 estandar de validacion
   validarCampos
 ], cerrarConteo);
+
+// // GET /api/inventario/reservas/disponibles
+// // Lista productos con stock disponible para reservar dentro de una ubicacion.
+// // Condiciona el catalogo de productos a la ubicacion elegida (anti consulta cruzada).
+router.get('/reservas/disponibles', autorizar(...ROLES_RESERVAS), [
+  query('cod_ubicacion')
+    .exists()
+    .withMessage('cod_ubicacion es requerido')
+    .bail()
+    .isInt({ min: 1 })
+    .withMessage('cod_ubicacion debe ser un entero mayor a 0')
+    .toInt(),
+  validarCampos
+], listarProductosDisponibles);
 
 // // GET /api/inventario/reservas
 // // Lista reservas persistidas para seguimiento de estado

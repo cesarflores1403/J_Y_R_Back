@@ -10,6 +10,8 @@ import {
   FiCreditCard, FiCheckCircle, FiPrinter
 } from 'react-icons/fi';
 import ComprobanteFactura from './ComprobanteFactura.jsx';
+import SearchInput from '../common/SearchInput.jsx';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 import { confirmDialog } from '../../utils/notifications.js';
 
 const formatMoney = (v) => {
@@ -544,8 +546,8 @@ const Facturacion = () => {
         <div className="jyr-card-body py-2">
           <div className="input-group">
             <span className="input-group-text"><FiSearch /></span>
-            <input type="text" className="form-control" placeholder="Buscar por cliente, DNI..."
-              value={buscar} onChange={(e) => { setBuscar(e.target.value); setPagina(1); }} />
+            <SearchInput className="form-control" placeholder="Buscar por cliente, DNI..."
+              value={buscar} onChange={(val) => { setBuscar(val); setPagina(1); }} />
             {buscar && <button className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}><FiX /></button>}
           </div>
         </div>
@@ -660,9 +662,9 @@ const Facturacion = () => {
                     <div ref={clienteRef} style={{ position: 'relative' }}>
                       <div className="input-group">
                         <span className="input-group-text"><FiSearch /></span>
-                        <input type="text" className="form-control" placeholder="Buscar cliente..."
+                        <SearchInput className="form-control" placeholder="Buscar cliente..."
                           value={buscarCliente}
-                          onChange={(e) => { setBuscarCliente(e.target.value); setClienteSeleccionado(null); setShowClientes(true); }}
+                          onChange={(val) => { setBuscarCliente(val); setClienteSeleccionado(null); setShowClientes(true); }}
                           onFocus={() => setShowClientes(true)} />
                         {clienteSeleccionado && (
                           <button className="btn btn-outline-secondary" onClick={() => { setClienteSeleccionado(null); setBuscarCliente(''); }}>
@@ -701,7 +703,8 @@ const Facturacion = () => {
                   <div className="col-md-3">
                     <label className="form-label fw-bold">Ref. Pago</label>
                     <input type="text" className="form-control" placeholder="Nro. referencia"
-                      value={refPago} onChange={(e) => setRefPago(e.target.value)} />
+                      maxLength={100}
+                      value={refPago} onChange={(e) => setRefPago(e.target.value.slice(0, 100))} />
                   </div>
 
                   {/* ---------- AGREGAR PRODUCTOS ---------- */}
@@ -710,9 +713,9 @@ const Facturacion = () => {
                     <div ref={productoRef} style={{ position: 'relative' }}>
                       <div className="input-group">
                         <span className="input-group-text"><FiSearch /></span>
-                        <input type="text" className="form-control" placeholder="Buscar producto por nombre..."
+                        <SearchInput className="form-control" placeholder="Buscar producto por nombre..."
                           value={buscarProducto}
-                          onChange={(e) => { setBuscarProducto(e.target.value); setShowProductos(true); }}
+                          onChange={(val) => { setBuscarProducto(val); setShowProductos(true); }}
                           onFocus={() => setShowProductos(true)} />
                       </div>
                       {showProductos && (
@@ -1144,7 +1147,9 @@ const Facturacion = () => {
                           <label className="form-label form-label-sm mb-1">Nota</label>
                           <input type="text" className="form-control form-control-sm" placeholder="Observación"
                             value={nuevoPago.observacion}
+                            maxLength={500}
                             onChange={(e) => setNuevoPago({ ...nuevoPago, observacion: e.target.value })} />
+                          <ContadorLimite value={nuevoPago.observacion} max={500} />
                         </div>
                         <div className="col-md-2">
                           <button className="btn btn-success btn-sm w-100" disabled={guardandoPago}

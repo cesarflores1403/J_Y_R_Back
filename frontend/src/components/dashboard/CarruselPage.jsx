@@ -3,6 +3,7 @@ import { carruselService } from '../../services/serviceIndex.js';
 import { toast } from 'react-toastify';
 import { FiPlus, FiTrash2, FiImage, FiX, FiEdit2, FiCheck, FiArrowUp, FiArrowDown } from 'react-icons/fi';
 import { resolveApiBase } from '../../utils/runtimeApi.js';
+import ContadorLimite from '../common/ContadorLimite.jsx';
 
 const API_BASE = resolveApiBase();
 
@@ -199,7 +200,9 @@ const CarruselPage = () => {
                         value={editDescripcion}
                         onChange={(e) => setEditDescripcion(e.target.value)}
                         placeholder="Descripción"
+                        maxLength={500}
                       />
+                      <ContadorLimite value={editDescripcion} max={500} />
                       <div className="d-flex gap-2">
                         <button className="btn btn-sm jyr-btn-primary" onClick={() => guardarEdicion(img.cod_imagen)}>
                           <FiCheck className="me-1" /> Guardar
@@ -304,6 +307,7 @@ const CarruselPage = () => {
                     placeholder="Ej: 20% de descuento en rines"
                     maxLength={255}
                   />
+                  <ContadorLimite value={descripcion} max={255} />
                 </div>
               </div>
 
