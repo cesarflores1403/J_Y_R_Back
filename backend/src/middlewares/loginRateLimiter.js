@@ -1,113 +1,72 @@
 import logger from '../config/logger.js';
 
 // =============================================================
-// Limitador de intentos de inicio de sesión
-// Bloquea la combinación IP + usuario durante 10 minutos tras
-// 10 intentos fallidos consecutivos. Un inicio de sesión exitoso
-// reinicia el contador. No requiere dependencias externas.
+// Limitador de intentos de inicio de sesion por IP.
+// Protege el endpoint de login contra fuerza bruta y credential stuffing
+// sin registrar credenciales ni usuarios enviados por el cliente.
 // =============================================================
 
-const MAX_INTENTOS = 10;                 // Intentos fallidos antes del bloqueo
-const BLOQUEO_MS = 10 * 60 * 1000;       // Duración del bloqueo: 10 minutos
-const LIMPIEZA_UMBRAL = 5000;            // Sweep de entradas viejas al superar este tamaño
-
-// Registro en memoria: clave -> { fallidos, bloqueadoHasta }
-const registros = new Map();
-
-const construirClave = (req) => {
-  const ip = req.ip || req.socket?.remoteAddress || 'ip-desconocida';
-  const usuario = String(req.body?.nombre_usuario || '').trim().toLowerCase();
-  return `${ip}|${usuario}`;
+const leerEnteroPositivo = (valor, fallback) => {
+  const numero = Number.parseInt(valor, 10);
+  return Number.isInteger(numero) && numero > 0 ? numero : fallback;
 };
 
-// Elimina entradas ya expiradas para que el Map no crezca indefinidamente.
+const RATE_LIMIT_ENABLED = process.env.LOGIN_RATE_LIMIT_ENABLED !== 'false';
+const MAX_INTENTOS = leerEnteroPositivo(process.env.LOGIN_RATE_LIMIT_MAX_ATTEMPTS, 5);
+const VENTANA_MS = leerEnteroPositivo(process.env.LOGIN_RATE_LIMIT_WINDOW_SECONDS, 15 * 60) * 1000;
+const LIMPIEZA_UMBRAL = 5000;
+
+// Registro en memoria: ip -> { intentos, reiniciaEn }
+const registros = new Map();
+
+const construirClave = (req) => String(req.ip || req.socket?.remoteAddress || 'ip-desconocida');
+
 const limpiarExpirados = (ahora) => {
   for (const [clave, registro] of registros) {
-    const inactivo = !registro.bloqueadoHasta || registro.bloqueadoHasta <= ahora;
-    if (inactivo && registro.fallidos === 0) {
+    if (!registro.reiniciaEn || registro.reiniciaEn <= ahora) {
       registros.delete(clave);
     }
   }
 };
 
-const respuestaBloqueo = (res, bloqueadoHasta) => {
-  const retryAfter = Math.max(1, Math.ceil((bloqueadoHasta - Date.now()) / 1000));
-  const minutos = Math.ceil(retryAfter / 60);
+const respuestaBloqueo = (res, reiniciaEn) => {
+  const retryAfter = Math.max(1, Math.ceil((reiniciaEn - Date.now()) / 1000));
   res.setHeader('Retry-After', retryAfter);
   return res.status(429).json({
     ok: false,
-    mensaje: `Demasiados intentos fallidos. Acceso bloqueado temporalmente. Intenta de nuevo en ${minutos} minuto(s).`,
-    bloqueadoHasta,   // epoch ms: permite al cliente persistir el bloqueo aunque se refresque
-    retryAfter        // segundos restantes
+    mensaje: 'Demasiados intentos de inicio de sesion. Intenta nuevamente mas tarde.'
   });
 };
 
 export const loginRateLimiter = (req, res, next) => {
+  if (!RATE_LIMIT_ENABLED) {
+    return next();
+  }
+
   const ahora = Date.now();
   const clave = construirClave(req);
-  const registro = registros.get(clave);
 
-  // 1) ¿Está bloqueado actualmente? (se evalúa antes de tocar la BD)
-  if (registro?.bloqueadoHasta && registro.bloqueadoHasta > ahora) {
-    logger.warn('Intento de login sobre cuenta bloqueada', { clave });
-    return respuestaBloqueo(res, registro.bloqueadoHasta);
+  if (registros.size > LIMPIEZA_UMBRAL) {
+    limpiarExpirados(ahora);
   }
 
-  // El bloqueo expiró: se reinicia el registro para volver a permitir intentos.
-  if (registro?.bloqueadoHasta && registro.bloqueadoHasta <= ahora) {
-    registros.delete(clave);
+  let registro = registros.get(clave);
+  if (!registro || registro.reiniciaEn <= ahora) {
+    registro = {
+      intentos: 0,
+      reiniciaEn: ahora + VENTANA_MS
+    };
   }
 
-  // 2) Se intercepta la respuesta del login para contar el resultado y
-  //    devolver al cliente los intentos restantes / el estado de bloqueo.
-  const jsonOriginal = res.json.bind(res);
-  res.json = (body) => {
-    const exito = res.statusCode >= 200 && res.statusCode < 300;
-    const credencialesInvalidas = res.statusCode === 401;
+  registro.intentos += 1;
+  registros.set(clave, registro);
 
-    // Login correcto -> se reinicia el contador de esa clave.
-    if (exito) {
-      registros.delete(clave);
-      return jsonOriginal(body);
-    }
+  if (registro.intentos > MAX_INTENTOS) {
+    logger.warn('Rate limit de login excedido', { ip: clave });
+    return respuestaBloqueo(res, registro.reiniciaEn);
+  }
 
-    // Solo las credenciales inválidas (401) cuentan como intento fallido.
-    // Errores de validación (400) u otros no incrementan.
-    if (!credencialesInvalidas) {
-      return jsonOriginal(body);
-    }
-
-    const actual = registros.get(clave) || { fallidos: 0, bloqueadoHasta: 0 };
-    actual.fallidos += 1;
-
-    if (registros.size > LIMPIEZA_UMBRAL) {
-      limpiarExpirados(Date.now());
-    }
-
-    // Se alcanzó el máximo -> se activa el bloqueo y se responde 429.
-    if (actual.fallidos >= MAX_INTENTOS) {
-      actual.bloqueadoHasta = Date.now() + BLOQUEO_MS;
-      actual.fallidos = 0; // Se reinicia el conteo tras aplicar el bloqueo.
-      registros.set(clave, actual);
-      logger.warn('Cuenta/IP bloqueada por intentos fallidos', {
-        clave,
-        bloqueadoPorMinutos: BLOQUEO_MS / 60000
-      });
-      return respuestaBloqueo(res, actual.bloqueadoHasta);
-    }
-
-    // Fallo normal: se informan los intentos restantes antes del bloqueo.
-    registros.set(clave, actual);
-    const intentosRestantes = MAX_INTENTOS - actual.fallidos;
-    logger.warn('Intento de inicio de sesión fallido', {
-      clave,
-      intentosFallidos: actual.fallidos,
-      restantesAntesDeBloqueo: intentosRestantes
-    });
-    return jsonOriginal({ ...body, intentosRestantes });
-  };
-
-  next();
+  return next();
 };
 
 export default loginRateLimiter;
