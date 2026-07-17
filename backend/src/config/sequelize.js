@@ -34,6 +34,7 @@ const dbConfig = {
   password: dbCredentials.password
 };
 
+const dbTimezone = process.env.DB_TIMEZONE || '-06:00';
 const usarSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
 const dialectOptions = usarSsl ? {
   ssl: {
@@ -50,6 +51,7 @@ const sequelize = new Sequelize(
     port: dbConfig.port,
     dialect: 'postgres',
     logging: false,
+    timezone: dbTimezone,
     dialectOptions,
     pool: {
       max: 10,

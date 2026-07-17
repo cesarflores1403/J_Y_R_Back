@@ -17,7 +17,21 @@ export const formatCodProducto = (cod) => {
 // =======================
 // GET PRODUCTOS (con detalle ISV del catálogo)
 // =======================
-export const getProducto = async () => {
+export const getProducto = async ({ buscar = '' } = {}) => {
+  const params = [];
+  const condiciones = [];
+  const termino = String(buscar || '').trim();
+
+  if (termino) {
+    params.push(`%${termino}%`);
+    condiciones.push(`(
+      p.nombre_producto ILIKE $1
+      OR p.descripcion ILIKE $1
+      OR CAST(p.cod_producto AS TEXT) ILIKE $1
+      OR CONCAT('PROD-', LPAD(CAST(p.cod_producto AS TEXT), 4, '0')) ILIKE $1
+    )`);
+  }
+
   const query = `
     SELECT p.cod_producto, p.cod_categoria, p.nombre_producto, p.descripcion, p.especificaciones,
            p.unidad_medida, p.precio_venta, p.precio_costo, p.cod_isv,
@@ -47,9 +61,10 @@ export const getProducto = async () => {
       WHERE iv.cod_producto = p.cod_producto
     ) inv ON TRUE
     LEFT JOIN ubicacion u ON p.cod_ubicacion = u.cod_ubicacion
+    ${condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : ''}
     ORDER BY p.cod_producto
   `;
-  const result = await pool.query(query);
+  const result = await pool.query(query, params);
 
   // HU-04: Agregar codigo_producto formateado a cada fila
   return (result.rows || []).map(row => ({

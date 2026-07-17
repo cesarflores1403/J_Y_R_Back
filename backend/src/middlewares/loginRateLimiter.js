@@ -1,4 +1,5 @@
 import logger from '../config/logger.js';
+import { registrarEventoSeguridad } from '../utils/auditoriaSeguridad.js';
 
 // =============================================================
 // Limitador de intentos de inicio de sesión
@@ -50,6 +51,14 @@ export const loginRateLimiter = (req, res, next) => {
   // 1) ¿Está bloqueado actualmente? (se evalúa antes de tocar la BD)
   if (registro?.bloqueadoHasta && registro.bloqueadoHasta > ahora) {
     logger.warn('Intento de login sobre cuenta bloqueada', { clave });
+    registrarEventoSeguridad(req, {
+      evento: 'LOGIN_BLOQUEADO',
+      nombre_usuario: String(req.body?.nombre_usuario || '').trim() || null,
+      detalle: {
+        motivo: 'Intento durante bloqueo activo',
+        bloqueado_hasta: new Date(registro.bloqueadoHasta).toISOString()
+      }
+    });
     return respuestaBloqueo(res, registro.bloqueadoHasta);
   }
 
@@ -92,6 +101,16 @@ export const loginRateLimiter = (req, res, next) => {
       logger.warn('Cuenta/IP bloqueada por intentos fallidos', {
         clave,
         bloqueadoPorMinutos: BLOQUEO_MS / 60000
+      });
+      registrarEventoSeguridad(req, {
+        evento: 'LOGIN_BLOQUEADO',
+        nombre_usuario: String(req.body?.nombre_usuario || '').trim() || null,
+        detalle: {
+          motivo: 'Bloqueo por intentos fallidos',
+          max_intentos: MAX_INTENTOS,
+          bloqueado_por_minutos: BLOQUEO_MS / 60000,
+          bloqueado_hasta: new Date(actual.bloqueadoHasta).toISOString()
+        }
       });
       return respuestaBloqueo(res, actual.bloqueadoHasta);
     }

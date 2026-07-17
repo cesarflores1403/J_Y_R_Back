@@ -9,6 +9,7 @@ import BitacoraAnulacion from '../models/BitacoraAnulacion.js';
 import BitacoraExcepcionStock from '../models/BitacoraExcepcionStock.js';
 import bitacoraFacturacionService from './bitacoraFacturacionService.js';
 import empresaConfigService from './empresaConfigService.js';
+import { normalizarMotivoAnulacion, validarMotivoAnulacion } from '../utils/motivoAnulacion.js';
 import { Op } from 'sequelize';
 
 const crearErrorStockInsuficiente = ({ productosConDeficit, rol }) => {
@@ -284,6 +285,7 @@ class FacturaService {
 
           detallesCalculados.push({
             tipo_item: 'SERVICIO',
+            nombre_item: descripcionItem,
             descripcion_item: descripcionItem,
             cod_producto: null,
             cod_servicio: codServicio,
@@ -384,6 +386,7 @@ class FacturaService {
 
         detallesCalculados.push({
           tipo_item: 'PRODUCTO',
+          nombre_item: producto.nombre_producto,
           descripcion_item: null,
           cod_producto: item.cod_producto,
           cantidad: cantidadItem,
@@ -449,7 +452,7 @@ class FacturaService {
       }, { transaction: t });
 
       // Crear detalles
-      const detallesConFactura = detallesCalculados.map(d => ({
+      const detallesConFactura = detallesCalculados.map(({ nombre_item, ...d }) => ({
         ...d,
         cod_factura: factura.cod_factura
       }));
@@ -548,7 +551,33 @@ class FacturaService {
             items: items.length,
             cod_cliente,
             descuento: descuentoTotal,
-            forzado_sin_stock: forzar_sin_stock || false
+            forzado_sin_stock: forzar_sin_stock || false,
+            snapshot_factura: {
+              cod_factura: factura.cod_factura,
+              cod_cliente,
+              subtotal: subtotalGeneral,
+              descuento: descuentoTotal,
+              isv: isvGeneral,
+              total: totalGeneral,
+              estado: true,
+              estado_pago: 'PENDIENTE',
+              total_pagado: 0,
+              saldo: totalGeneral
+            },
+            detalles_factura: detallesCalculados.map((d, index) => ({
+              linea: index + 1,
+              tipo_item: d.tipo_item,
+              cod_producto: d.cod_producto || null,
+              nombre_item: d.nombre_item || d.descripcion_item || null,
+              cantidad: d.cantidad,
+              precio_unitario: d.precio_unitario,
+              tipo_descuento: d.tipo_descuento,
+              descuento: d.descuento,
+              monto_descuento: d.monto_descuento,
+              subtotal: d.subtotal,
+              isv: d.isv,
+              total: d.total
+            }))
           }
         });
         if (forzar_sin_stock) {
@@ -587,16 +616,22 @@ class FacturaService {
   // - Bitácora: usuario, fecha, motivo, factura
   // =============================================
   async anular(id, { motivo, cod_usuario }) {
-    if (!motivo || !motivo.trim()) {
-      throw Object.assign(new Error('El motivo de anulación es obligatorio'), { statusCode: 400 });
+    const validacionMotivo = validarMotivoAnulacion(motivo);
+    if (!validacionMotivo.valido) {
+      throw Object.assign(new Error(validacionMotivo.motivo), { statusCode: 400 });
     }
+    const motivoNormalizado = normalizarMotivoAnulacion(motivo);
     if (!cod_usuario) {
       throw Object.assign(new Error('Se requiere el usuario que anula'), { statusCode: 400 });
     }
 
     const factura = await Factura.findByPk(id, {
       include: [
-        { model: DetalleFactura, as: 'detalles' },
+        {
+          model: DetalleFactura,
+          as: 'detalles',
+          include: [{ model: ProductoSeq, as: 'producto', attributes: ['cod_producto', 'nombre_producto'] }]
+        },
         { model: Pago, as: 'pagos' }
       ]
     });
@@ -635,20 +670,41 @@ class FacturaService {
       // 2) Marcar pagos activos como reversados (nota interna)
       const pagosActivos = (factura.pagos || []).filter(p => p.estado);
       let montoPagosReversados = 0;
+      const pagosReversadosDetalle = [];
       for (const pago of pagosActivos) {
+        const observacionAnterior = pago.observacion || null;
+        const observacionNueva = `[REVERSADO por anulación FAC-${String(id).padStart(6, '0')}] ${pago.observacion || ''} | Motivo: ${motivoNormalizado}`;
         montoPagosReversados += parseFloat(pago.monto) || 0;
         await pago.update({
           estado: false,
-          observacion: `[REVERSADO por anulación FAC-${String(id).padStart(6, '0')}] ${pago.observacion || ''} | Motivo: ${motivo.trim()}`
+          observacion: observacionNueva
         }, { transaction: t });
+        pagosReversadosDetalle.push({
+          cod_pago: pago.cod_pago,
+          monto: parseFloat(pago.monto),
+          cambios: [
+            { campo: 'estado', antes: true, despues: false },
+            { campo: 'observacion', antes: observacionAnterior, despues: observacionNueva }
+          ]
+        });
       }
 
       // 3) Marcar factura como anulada con datos de auditoría
+      const fechaAnulacion = new Date();
+      const cambiosFactura = [
+        { campo: 'estado', antes: factura.estado, despues: false },
+        { campo: 'motivo_anulacion', antes: factura.motivo_anulacion || null, despues: motivoNormalizado },
+        { campo: 'anulada_por', antes: factura.anulada_por || null, despues: cod_usuario },
+        { campo: 'fecha_anulacion', antes: factura.fecha_anulacion || null, despues: fechaAnulacion.toISOString() },
+        { campo: 'estado_pago', antes: factura.estado_pago || 'PENDIENTE', despues: 'ANULADA' },
+        { campo: 'total_pagado', antes: parseFloat(factura.total_pagado || 0), despues: 0 },
+        { campo: 'saldo', antes: parseFloat(factura.saldo || factura.total || 0), despues: 0 }
+      ];
       await factura.update({
         estado: false,
-        motivo_anulacion: motivo.trim(),
+        motivo_anulacion: motivoNormalizado,
         anulada_por: cod_usuario,
-        fecha_anulacion: new Date(),
+        fecha_anulacion: fechaAnulacion,
         estado_pago: 'ANULADA',
         total_pagado: 0,
         saldo: 0
@@ -656,18 +712,24 @@ class FacturaService {
 
       // 4) Registrar en bitácora
       const snapshot = factura.detalles.map(d => ({
+        cod_detalle_factura: d.cod_detalle_factura,
+        tipo_item: d.tipo_item,
         cod_producto: d.cod_producto,
+        nombre_item: d.producto?.nombre_producto || d.descripcion_item || null,
         cantidad: d.cantidad,
-        precio_unitario: d.precio_unitario,
-        subtotal: d.subtotal,
-        isv: d.isv,
-        total: d.total
+        precio_unitario: parseFloat(d.precio_unitario || 0),
+        tipo_descuento: d.tipo_descuento,
+        descuento: parseFloat(d.descuento || 0),
+        monto_descuento: parseFloat(d.monto_descuento || 0),
+        subtotal: parseFloat(d.subtotal || 0),
+        isv: parseFloat(d.isv || 0),
+        total: parseFloat(d.total || 0)
       }));
 
       await BitacoraAnulacion.create({
         cod_factura: id,
         cod_usuario,
-        motivo: motivo.trim(),
+        motivo: motivoNormalizado,
         inventario_reversado: inventarioReversado,
         pagos_reversados: pagosActivos.length,
         monto_pagos_reversados: montoPagosReversados,
@@ -684,11 +746,14 @@ class FacturaService {
           cod_factura: parseInt(id),
           cod_usuario,
           detalle: {
-            motivo: motivo.trim(),
+            motivo: motivoNormalizado,
             inventario_reversado: inventarioReversado,
             pagos_reversados: pagosActivos.length,
             monto_pagos_reversados: montoPagosReversados,
-            total_factura: parseFloat(factura.total)
+            total_factura: parseFloat(factura.total),
+            cambios: cambiosFactura,
+            detalles_factura: snapshot,
+            pagos_reversados_detalle: pagosReversadosDetalle
           }
         });
       } catch (logErr) { console.error('⚠️ Error al registrar bitácora (anular):', logErr.message); }
@@ -697,7 +762,7 @@ class FacturaService {
         mensaje: 'Factura anulada correctamente',
         resumen: {
           factura: `FAC-${String(id).padStart(6, '0')}`,
-          motivo: motivo.trim(),
+          motivo: motivoNormalizado,
           inventario_reversado: inventarioReversado,
           pagos_reversados: pagosActivos.length,
           monto_pagos_reversados: montoPagosReversados
@@ -715,7 +780,11 @@ class FacturaService {
   // =============================================
   async eliminar(id) {
     const factura = await Factura.findByPk(id, {
-      include: [{ model: DetalleFactura, as: 'detalles' }]
+      include: [{
+        model: DetalleFactura,
+        as: 'detalles',
+        include: [{ model: ProductoSeq, as: 'producto', attributes: ['cod_producto', 'nombre_producto'] }]
+      }]
     });
     if (!factura) throw Object.assign(new Error('Factura no encontrada'), { statusCode: 404 });
 
@@ -751,7 +820,36 @@ class FacturaService {
           detalle: {
             estado_previo: factura.estado ? 'ACTIVA' : 'ANULADA',
             total: parseFloat(factura.total),
-            items: factura.detalles.length
+            items: factura.detalles.length,
+            snapshot_factura: {
+              cod_factura: parseInt(id),
+              cod_cliente: factura.cod_cliente,
+              subtotal: parseFloat(factura.subtotal || 0),
+              descuento: parseFloat(factura.descuento || 0),
+              isv: parseFloat(factura.isv || 0),
+              total: parseFloat(factura.total || 0),
+              estado: factura.estado,
+              estado_pago: factura.estado_pago,
+              total_pagado: parseFloat(factura.total_pagado || 0),
+              saldo: parseFloat(factura.saldo || 0),
+              motivo_anulacion: factura.motivo_anulacion || null,
+              fecha_anulacion: factura.fecha_anulacion || null
+            },
+            detalles_factura: factura.detalles.map((d, index) => ({
+              linea: index + 1,
+              cod_detalle_factura: d.cod_detalle_factura,
+              tipo_item: d.tipo_item,
+              cod_producto: d.cod_producto || null,
+              nombre_item: d.producto?.nombre_producto || d.descripcion_item || null,
+              cantidad: d.cantidad,
+              precio_unitario: parseFloat(d.precio_unitario || 0),
+              tipo_descuento: d.tipo_descuento,
+              descuento: parseFloat(d.descuento || 0),
+              monto_descuento: parseFloat(d.monto_descuento || 0),
+              subtotal: parseFloat(d.subtotal || 0),
+              isv: parseFloat(d.isv || 0),
+              total: parseFloat(d.total || 0)
+            }))
           }
         });
       } catch (logErr) { console.error('⚠️ Error al registrar bitácora (eliminar):', logErr.message); }

@@ -10,6 +10,17 @@ export const listar=async(req,res)=>{
   }
 };
 
+export const exportarReportePdf=async(req,res)=>{
+  try{
+    const pdf=await ordenCompraService.exportarReportePdf(req.query);
+    res.setHeader('Content-Type','application/pdf');
+    res.setHeader('Content-Disposition','attachment; filename="reporte-ordenes-compra.pdf"');
+    res.send(pdf);
+  }catch(error){
+    res.status(500).json({ok:false,mensaje:error.message});
+  }
+};
+
 // Obtener una orden por id
 export const obtener=async(req,res)=>{
   try{

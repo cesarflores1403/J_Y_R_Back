@@ -1,4 +1,29 @@
 import pool from '../config/db-connection.js';
+import { generarReportePdf } from '../utils/pdfReport.js';
+
+const construirFiltrosOrdenesCompra=({buscar='',estado=''}={})=>{
+  const params=[];
+  const condiciones=[];
+  let idx=1;
+
+  if(buscar){
+    condiciones.push(`p.nombre_proveedor ILIKE $${idx}`);
+    params.push(`%${buscar}%`);
+    idx++;
+  }
+
+  if(estado){
+    condiciones.push(`oc.cod_estado_oc = $${idx}`);
+    params.push(estado);
+    idx++;
+  }
+
+  return {
+    params,
+    idx,
+    where:condiciones.length?`WHERE ${condiciones.join(' AND ')}`:''
+  };
+};
 
 class OrdenCompraService{
   // Listar órdenes con filtros y paginación
@@ -6,23 +31,7 @@ class OrdenCompraService{
     const paginaNum=parseInt(pagina)||1;
     const limiteNum=parseInt(limite)||15;
     const offset=(paginaNum-1)*limiteNum;
-    const params=[];
-    const condiciones=[];
-    let idx=1;
-
-    if(buscar){
-      condiciones.push(`p.nombre_proveedor ILIKE $${idx}`);
-      params.push(`%${buscar}%`);
-      idx++;
-    }
-
-    if(estado){
-      condiciones.push(`oc.cod_estado_oc = $${idx}`);
-      params.push(estado);
-      idx++;
-    }
-
-    const where=condiciones.length?`WHERE ${condiciones.join(' AND ')}`:'';
+    const {params,idx,where}=construirFiltrosOrdenesCompra({buscar,estado});
 
     const [countRes,dataRes]=await Promise.all([
       pool.query(
@@ -55,6 +64,61 @@ class OrdenCompraService{
       pagina:paginaNum,
       totalPaginas:Math.ceil(total/limiteNum)
     };
+  }
+
+  async exportarReportePdf({buscar='',estado=''}={}) {
+    const {params,where}=construirFiltrosOrdenesCompra({buscar,estado});
+    const res=await pool.query(
+      `SELECT
+        oc.cod_orden_compra,oc.fecha,oc.moneda,oc.total,oc.observaciones,
+        p.nombre_proveedor,
+        e.nombre AS estado,
+        u.nombre_usuario
+       FROM orden_compra oc
+       JOIN proveedor p ON oc.cod_proveedor = p.cod_proveedor
+       JOIN cat_estado_orden_compra e ON oc.cod_estado_oc = e.cod_estado_oc
+       JOIN usuarios u ON oc.cod_usuario = u.cod_usuario
+       ${where}
+       ORDER BY oc.fecha DESC`,
+      params
+    );
+
+    const estadoLabel=estado
+      ?(res.rows[0]?.estado||estado)
+      :'Todos';
+
+    return generarReportePdf({
+      titulo:'Reporte de ordenes de compra',
+      filtros:[
+        {label:'Busqueda',value:buscar||'Todos'},
+        {label:'Estado',value:estadoLabel}
+      ],
+      metricas:[
+        {label:'Total de ordenes',value:res.rows.length}
+      ],
+      columnas:[
+        {header:'#',key:'numero',width:28,align:'center'},
+        {header:'Orden',key:'orden',width:64},
+        {header:'Proveedor',key:'proveedor',width:144},
+        {header:'Fecha',key:'fecha',width:72},
+        {header:'Moneda',key:'moneda',width:50,align:'center'},
+        {header:'Total',key:'total',width:70,align:'right'},
+        {header:'Estado',key:'estado',width:76},
+        {header:'Usuario',key:'usuario',width:90},
+        {header:'Observaciones',key:'observaciones',width:178}
+      ],
+      filas:res.rows.map((orden,index)=>({
+        numero:index+1,
+        orden:`OC-${String(orden.cod_orden_compra).padStart(4,'0')}`,
+        proveedor:orden.nombre_proveedor,
+        fecha:orden.fecha?new Date(orden.fecha).toLocaleDateString('es-HN'):'-',
+        moneda:orden.moneda,
+        total:`${orden.moneda} ${Number(orden.total||0).toLocaleString('es-HN',{minimumFractionDigits:2})}`,
+        estado:orden.estado,
+        usuario:orden.nombre_usuario,
+        observaciones:orden.observaciones||'-'
+      }))
+    });
   }
 
   // Obtener una orden por id con su detalle

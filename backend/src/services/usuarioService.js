@@ -9,8 +9,9 @@ class UsuarioService {
 
   async listar({ pagina = 1, limite = 15, buscar = '' }) {
     const where = {};
-    if (buscar) {
-      where.nombre_usuario = { [Op.iLike]: `%${buscar}%` };
+    const termino = String(buscar || '').trim();
+    if (termino) {
+      where.nombre_usuario = { [Op.iLike]: `%${termino}%` };
     }
 
     const { count, rows } = await Usuario.findAndCountAll({

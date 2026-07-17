@@ -2,6 +2,7 @@ import { sequelize } from '../config/sequelize.js';
 import Factura from '../models/Factura.js';
 import Pago from '../models/Pago.js';
 import Usuario from '../models/Usuario.js';
+import bitacoraFacturacionService from './bitacoraFacturacionService.js';
 
 // =====================================================
 // SERVICIO: Pagos (HU-FAC-05)
@@ -78,6 +79,12 @@ class PagoService {
     const t = await sequelize.transaction();
 
     try {
+      const facturaAntes = {
+        total_pagado: this.round2(parseFloat(factura.total_pagado || 0)),
+        saldo: this.round2(parseFloat(factura.saldo || factura.total)),
+        estado_pago: factura.estado_pago || 'PENDIENTE'
+      };
+
       // Crear el pago
       const pago = await Pago.create({
         cod_factura,
@@ -111,6 +118,29 @@ class PagoService {
 
       await t.commit();
 
+      try {
+        await bitacoraFacturacionService.registrar({
+          evento: 'PAGO_REGISTRADO',
+          entidad: 'FACTURA',
+          cod_factura: parseInt(cod_factura),
+          cod_usuario: codUsuario,
+          detalle: {
+            cod_pago: pago.cod_pago,
+            monto: montoNum,
+            metodo_pago: parseInt(metodo_pago),
+            ref_pago: ref_pago || null,
+            observacion: observacion || null,
+            cambios: [
+              { campo: 'total_pagado', antes: facturaAntes.total_pagado, despues: nuevoTotalPagado },
+              { campo: 'saldo', antes: facturaAntes.saldo, despues: Math.max(0, nuevoSaldo) },
+              { campo: 'estado_pago', antes: facturaAntes.estado_pago, despues: estadoPago }
+            ]
+          }
+        });
+      } catch (logErr) {
+        console.error('Error al registrar bitacora (pago):', logErr.message);
+      }
+
       // Retornar datos actualizados
       return {
         pago: pago.toJSON(),
@@ -143,6 +173,12 @@ class PagoService {
     const t = await sequelize.transaction();
 
     try {
+      const facturaAntes = {
+        total_pagado: this.round2(parseFloat(pago.factura.total_pagado || 0)),
+        saldo: this.round2(parseFloat(pago.factura.saldo || pago.factura.total)),
+        estado_pago: pago.factura.estado_pago || 'PENDIENTE'
+      };
+
       // Anular el pago
       await pago.update({ estado: false }, { transaction: t });
 
@@ -170,6 +206,26 @@ class PagoService {
       }, { transaction: t });
 
       await t.commit();
+
+      try {
+        await bitacoraFacturacionService.registrar({
+          evento: 'PAGO_ANULADO',
+          entidad: 'FACTURA',
+          cod_factura: parseInt(pago.cod_factura),
+          cod_usuario: codUsuario,
+          detalle: {
+            cod_pago: pago.cod_pago,
+            monto: parseFloat(pago.monto),
+            cambios: [
+              { campo: 'total_pagado', antes: facturaAntes.total_pagado, despues: nuevoTotalPagado },
+              { campo: 'saldo', antes: facturaAntes.saldo, despues: Math.max(0, nuevoSaldo) },
+              { campo: 'estado_pago', antes: facturaAntes.estado_pago, despues: estadoPago }
+            ]
+          }
+        });
+      } catch (logErr) {
+        console.error('Error al registrar bitacora (anular pago):', logErr.message);
+      }
 
       return {
         mensaje: 'Pago anulado correctamente',

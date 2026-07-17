@@ -22,6 +22,50 @@ const calcularMargenGanancia = (precioVenta, precioCosto) => {
   return Number(margen.toFixed(2));
 };
 
+const CAMPOS_AUDITABLES_PRODUCTO = [
+  'cod_categoria',
+  'nombre_producto',
+  'descripcion',
+  'especificaciones',
+  'unidad_medida',
+  'precio_venta',
+  'precio_costo',
+  'cod_isv',
+  'estado_producto',
+  'cod_ubicacion',
+  'stock_minimo',
+  'punto_reorden'
+];
+
+const CAMPOS_NUMERICOS_PRODUCTO = new Set([
+  'cod_categoria',
+  'precio_venta',
+  'precio_costo',
+  'cod_isv',
+  'cod_ubicacion',
+  'stock_minimo',
+  'punto_reorden',
+  'stock_total'
+]);
+
+const serializarValorAuditoria = (valor) => {
+  if (valor === undefined || valor === '') return null;
+  if (valor === null) return null;
+  if (typeof valor === 'object') return JSON.stringify(valor);
+  return String(valor);
+};
+
+const normalizarValorAuditoriaProducto = (campo, valor) => {
+  if (valor === undefined || valor === '') return null;
+  if (valor === null) return null;
+  if (campo === 'especificaciones') return serializarValorAuditoria(valor);
+  if (CAMPOS_NUMERICOS_PRODUCTO.has(campo)) {
+    const numero = Number(valor);
+    return Number.isFinite(numero) ? numero : valor;
+  }
+  return String(valor);
+};
+
 const normalizarEspecificacionesEntrada = (especificaciones) => {
   if (especificaciones === undefined) return undefined;
   if (especificaciones === null || especificaciones === '') return null;
@@ -250,8 +294,8 @@ const verificarDuplicado = async (nombre_producto, codExcluir = null) => {
 // =======================
 // GET PRODUCTO(S)
 // =======================
-export const getProducto = async () => {
-  const productos = await productoModel.getProducto();
+export const getProducto = async ({ buscar = '' } = {}) => {
+  const productos = await productoModel.getProducto({ buscar });
   return (productos || []).map((p) => anexarMargenGanancia(p));
 };
 
@@ -268,8 +312,8 @@ const quitarAuditoriaProducto = (producto = {}) => {
   return sinAuditoria;
 };
 
-export const getProductoConAuditoria = async ({ incluirAuditoria = false } = {}) => {
-  const productos = await productoModel.getProducto();
+export const getProductoConAuditoria = async ({ incluirAuditoria = false, buscar = '' } = {}) => {
+  const productos = await productoModel.getProducto({ buscar });
   const productosConMargen = (productos || []).map((p) => anexarMargenGanancia(p));
   if (incluirAuditoria) return productosConMargen;
   return productosConMargen.map((p) => quitarAuditoriaProducto(p));
@@ -622,9 +666,48 @@ export const updateProducto = async ({ cod_producto, datos = {}, stock_agregar =
   }
 
   const client = await pool.connect();
+  let cambiosAuditoria = [];
+  let productoAntesAuditoria = null;
 
   try {
     await client.query('BEGIN');
+
+    const productoAntesRes = await client.query(
+      `
+        SELECT
+          p.cod_producto,
+          p.nombre_producto,
+          p.cod_categoria,
+          p.descripcion,
+          p.especificaciones,
+          p.unidad_medida,
+          p.precio_venta,
+          p.precio_costo,
+          p.cod_isv,
+          p.estado_producto,
+          p.cod_ubicacion,
+          p.stock_minimo,
+          p.punto_reorden,
+          COALESCE(inv.stock_total, 0) AS stock_total
+        FROM producto p
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(SUM(iv.stock), 0) AS stock_total
+          FROM inventario iv
+          WHERE iv.cod_producto = p.cod_producto
+        ) inv ON TRUE
+        WHERE p.cod_producto = $1
+        FOR UPDATE OF p
+      `,
+      [cod_producto]
+    );
+
+    if (productoAntesRes.rows.length === 0) {
+      const error = new Error(`Producto con código ${cod_producto} no encontrado.`);
+      error.status = 404;
+      throw error;
+    }
+
+    productoAntesAuditoria = productoAntesRes.rows[0];
 
     if (Object.keys(datosConAuditoria).length > 0) {
       await productoModel.updateProducto({
@@ -819,7 +902,69 @@ export const updateProducto = async ({ cod_producto, datos = {}, stock_agregar =
       }
     }
 
+    const productoDespuesRes = await client.query(
+      `
+        SELECT
+          p.cod_producto,
+          p.nombre_producto,
+          p.cod_categoria,
+          p.descripcion,
+          p.especificaciones,
+          p.unidad_medida,
+          p.precio_venta,
+          p.precio_costo,
+          p.cod_isv,
+          p.estado_producto,
+          p.cod_ubicacion,
+          p.stock_minimo,
+          p.punto_reorden,
+          COALESCE(inv.stock_total, 0) AS stock_total
+        FROM producto p
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(SUM(iv.stock), 0) AS stock_total
+          FROM inventario iv
+          WHERE iv.cod_producto = p.cod_producto
+        ) inv ON TRUE
+        WHERE p.cod_producto = $1
+      `,
+      [cod_producto]
+    );
+
+    const productoDespues = productoDespuesRes.rows[0] || {};
+    const camposComparar = new Set([
+      ...CAMPOS_AUDITABLES_PRODUCTO.filter((campo) => campo in datosNorm),
+      ...(stockAgregar > 0 || stockNuevoDefinido ? ['stock_total'] : [])
+    ]);
+
+    cambiosAuditoria = Array.from(camposComparar)
+      .map((campo) => ({
+        campo,
+        antes: normalizarValorAuditoriaProducto(campo, productoAntesAuditoria?.[campo]),
+        despues: normalizarValorAuditoriaProducto(campo, productoDespues?.[campo])
+      }))
+      .filter((cambio) => serializarValorAuditoria(cambio.antes) !== serializarValorAuditoria(cambio.despues));
+
     await client.query('COMMIT');
+
+    if (cambiosAuditoria.length > 0) {
+      try {
+        await bitacoraFacturacionService.registrar({
+          evento: 'PRODUCTO_ACTUALIZADO',
+          entidad: 'PRODUCTO',
+          cod_usuario: codUsuario,
+          nombre_usuario: auditoria.nombre_usuario || null,
+          ip: auditoria.ip || null,
+          detalle: {
+            cod_producto,
+            producto: productoAntesAuditoria?.nombre_producto || `Producto ${cod_producto}`,
+            cambios: cambiosAuditoria
+          }
+        });
+      } catch (logErr) {
+        console.error('Error al registrar bitacora (producto actualizado):', logErr.message);
+      }
+    }
+
     return {
       cod_producto,
       stock_agregado: stockAgregar,

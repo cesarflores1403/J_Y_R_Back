@@ -2,6 +2,59 @@ import BitacoraFacturacion from '../models/BitacoraFacturacion.js';
 import Usuario from '../models/Usuario.js';
 import { Op } from 'sequelize';
 
+const sequelize = BitacoraFacturacion.sequelize;
+
+const extraerNumeroBusqueda = (termino) => {
+  const digitos = String(termino).match(/\d+/g)?.join('');
+  if (!digitos) return null;
+
+  const numero = parseInt(digitos, 10);
+  return Number.isNaN(numero) ? null : numero;
+};
+
+const construirWhere = ({ evento, entidad, cod_factura, cod_usuario, fecha_desde, fecha_hasta, buscar }) => {
+  const where = {};
+
+  if (evento) where.evento = evento;
+  if (entidad) where.entidad = entidad;
+  if (cod_factura) where.cod_factura = parseInt(cod_factura, 10);
+  if (cod_usuario) where.cod_usuario = parseInt(cod_usuario, 10);
+
+  if (fecha_desde || fecha_hasta) {
+    where.fecha = {};
+    if (fecha_desde) where.fecha[Op.gte] = new Date(fecha_desde);
+    if (fecha_hasta) {
+      const hasta = new Date(fecha_hasta);
+      hasta.setHours(23, 59, 59, 999);
+      where.fecha[Op.lte] = hasta;
+    }
+  }
+
+  const termino = String(buscar || '').trim();
+  if (termino) {
+    const busqueda = `%${termino}%`;
+    const condiciones = [
+      { nombre_usuario: { [Op.iLike]: busqueda } },
+      { evento: { [Op.iLike]: busqueda } },
+      { entidad: { [Op.iLike]: busqueda } },
+      sequelize.where(sequelize.cast(sequelize.col('detalle'), 'TEXT'), { [Op.iLike]: busqueda })
+    ];
+
+    const numero = extraerNumeroBusqueda(termino);
+    if (numero !== null) {
+      condiciones.push(
+        { cod_bitacora: numero },
+        { cod_factura: numero },
+        { cod_usuario: numero }
+      );
+    }
+
+    where[Op.or] = condiciones;
+  }
+
+  return where;
+};
+
 class BitacoraFacturacionService {
 
   // =============================================
@@ -32,29 +85,7 @@ class BitacoraFacturacionService {
   // LISTAR CON FILTROS + PAGINACIÓN
   // =============================================
   async listar({ pagina = 1, limite = 25, evento, entidad, cod_factura, cod_usuario, fecha_desde, fecha_hasta, buscar }) {
-    const where = {};
-
-    if (evento) where.evento = evento;
-    if (entidad) where.entidad = entidad;
-    if (cod_factura) where.cod_factura = parseInt(cod_factura);
-    if (cod_usuario) where.cod_usuario = parseInt(cod_usuario);
-
-    if (fecha_desde || fecha_hasta) {
-      where.fecha = {};
-      if (fecha_desde) where.fecha[Op.gte] = new Date(fecha_desde);
-      if (fecha_hasta) {
-        const hasta = new Date(fecha_hasta);
-        hasta.setHours(23, 59, 59, 999);
-        where.fecha[Op.lte] = hasta;
-      }
-    }
-
-    if (buscar) {
-      where[Op.or] = [
-        { nombre_usuario: { [Op.iLike]: `%${buscar}%` } },
-        { evento: { [Op.iLike]: `%${buscar}%` } }
-      ];
-    }
+    const where = construirWhere({ evento, entidad, cod_factura, cod_usuario, fecha_desde, fecha_hasta, buscar });
 
     const { count, rows } = await BitacoraFacturacion.findAndCountAll({
       where,
@@ -75,29 +106,7 @@ class BitacoraFacturacionService {
   // EXPORTAR (todos los registros filtrados, sin paginación)
   // =============================================
   async exportar({ evento, entidad, cod_factura, cod_usuario, fecha_desde, fecha_hasta, buscar }) {
-    const where = {};
-
-    if (evento) where.evento = evento;
-    if (entidad) where.entidad = entidad;
-    if (cod_factura) where.cod_factura = parseInt(cod_factura);
-    if (cod_usuario) where.cod_usuario = parseInt(cod_usuario);
-
-    if (fecha_desde || fecha_hasta) {
-      where.fecha = {};
-      if (fecha_desde) where.fecha[Op.gte] = new Date(fecha_desde);
-      if (fecha_hasta) {
-        const hasta = new Date(fecha_hasta);
-        hasta.setHours(23, 59, 59, 999);
-        where.fecha[Op.lte] = hasta;
-      }
-    }
-
-    if (buscar) {
-      where[Op.or] = [
-        { nombre_usuario: { [Op.iLike]: `%${buscar}%` } },
-        { evento: { [Op.iLike]: `%${buscar}%` } }
-      ];
-    }
+    const where = construirWhere({ evento, entidad, cod_factura, cod_usuario, fecha_desde, fecha_hasta, buscar });
 
     return BitacoraFacturacion.findAll({
       where,
@@ -116,6 +125,15 @@ class BitacoraFacturacionService {
       raw: true
     });
     return result.map(r => r.evento);
+  }
+
+  async tiposEntidad() {
+    const result = await BitacoraFacturacion.findAll({
+      attributes: [[sequelize.fn('DISTINCT', sequelize.col('entidad')), 'entidad']],
+      order: [['entidad', 'ASC']],
+      raw: true
+    });
+    return result.map(r => r.entidad).filter(Boolean);
   }
 
   async eliminar(codBitacora) {

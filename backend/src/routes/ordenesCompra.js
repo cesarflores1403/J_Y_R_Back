@@ -4,7 +4,7 @@ import {validarCampos} from '../middlewares/validar.js';
 import {autenticar} from '../middlewares/auth.js';
 import {
   listar,obtener,crear,cambiarEstado,
-  historial,listarEstados,eliminar,productosDisponibles
+  historial,listarEstados,eliminar,productosDisponibles,exportarReportePdf
 } from '../controllers/ordenCompraController.js';
 
 const router=Router();
@@ -16,6 +16,7 @@ router.get('/productos-disponibles',productosDisponibles);
 
 // Rutas principales
 router.get('/',listar);
+router.get('/reporte/pdf',exportarReportePdf);
 router.get('/:id',obtener);
 router.get('/:id/historial',historial);
 

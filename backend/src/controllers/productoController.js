@@ -9,7 +9,10 @@ export const getProducto = async (req, res, next) => {
   try {
     const rolUsuario = req.usuario?.rol || '';
     const incluirAuditoria = rolUsuario === 'Administrador' || rolUsuario === 'Super Administrador';
-    const data = await productoService.getProductoConAuditoria({ incluirAuditoria }); // // Obtener productos desde service
+    const data = await productoService.getProductoConAuditoria({
+      incluirAuditoria,
+      buscar: req.query?.buscar || ''
+    }); // // Obtener productos desde service
 
     const dataFiltrada = rolUsuario === 'Cajero'
       ? (data || []).map((p) => {
@@ -96,7 +99,9 @@ export const updateProducto = async (req, res, next) => {
       stock_agregar,
       stock_nuevo,
       auditoria: {
-        cod_usuario: req.usuario?.cod_usuario || null
+        cod_usuario: req.usuario?.cod_usuario || null,
+        nombre_usuario: req.usuario?.nombre_usuario || null,
+        ip: req.ip || null
       }
     });
 
