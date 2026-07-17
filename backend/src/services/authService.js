@@ -86,6 +86,20 @@ class AuthService {
 
   async solicitarRecuperacion(nombreUsuario) {
     const nombreUsuarioLimpio = (nombreUsuario || '').trim();
+
+    if (!nombreUsuarioLimpio) {
+      throw Object.assign(new Error('El nombre de usuario es requerido'), { statusCode: 400 });
+    }
+
+    // No se crea la solicitud si el usuario no existe.
+    const usuario = await Usuario.findOne({
+      where: { nombre_usuario: { [Op.iLike]: nombreUsuarioLimpio } }
+    });
+
+    if (!usuario) {
+      throw Object.assign(new Error('El usuario ingresado no fue encontrado.'), { statusCode: 404 });
+    }
+
     await notificacionSuperAdminService.crearSolicitudRecuperacion(nombreUsuarioLimpio);
     return {
       mensaje: 'Ya se ha notificado a los administradores su cambio de contraseña.'

@@ -1,4 +1,4 @@
-import { Op } from 'sequelize';
+import { Op, ForeignKeyConstraintError } from 'sequelize';
 import Cliente from '../models/Cliente.js';
 import { generarReportePdf } from '../utils/pdfReport.js';
 
@@ -129,8 +129,29 @@ class ClienteService {
 
   async eliminar(id) {
     const cliente = await this.obtenerPorId(id);
-    await cliente.destroy();
-    return { mensaje: 'Cliente eliminado' };
+
+    try {
+      await cliente.destroy();
+      return { mensaje: 'Cliente eliminado' };
+    } catch (error) {
+      // El cliente tiene registros dependientes (facturas, cotizaciones, etc.).
+      // Devolvemos un mensaje genérico y registramos el detalle técnico
+      // solo en los logs internos, sin exponerlo al cliente HTTP.
+      const esViolacionFK =
+        error instanceof ForeignKeyConstraintError ||
+        error?.name === 'SequelizeForeignKeyConstraintError' ||
+        error?.original?.code === '23503' ||
+        error?.parent?.code === '23503';
+
+      if (esViolacionFK) {
+        console.error(`[clienteService.eliminar] No se pudo eliminar el cliente ${id}:`, error);
+        throw Object.assign(
+          new Error('No es posible eliminar el cliente porque tiene registros asociados'),
+          { statusCode: 409 }
+        );
+      }
+      throw error;
+    }
   }
 
   async exportarReportePdf({ buscar = '' } = {}) {

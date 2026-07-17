@@ -46,7 +46,7 @@ const ListaNotasCredito = ({ onVer, onNueva }) => {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h3 className="mb-0"><FiFileText className="me-2" />Notas de Crédito</h3>
-        <button className="btn jyr-btn-primary" onClick={onNueva}>
+        <button id="nc-btn-nueva" className="btn jyr-btn-primary" onClick={onNueva}>
           <FiPlusCircle className="me-1" /> Nueva Nota de Crédito
         </button>
       </div>
@@ -57,11 +57,12 @@ const ListaNotasCredito = ({ onVer, onNueva }) => {
           <div className="input-group">
             <span className="input-group-text"><FiSearch /></span>
             <input
+              id="nc-input-buscar"
               type="text" className="form-control" placeholder="Buscar por motivo o cliente..."
               value={buscar} onChange={e => { setBuscar(e.target.value); setPagina(1); }}
             />
             {buscar && (
-              <button className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}>
+              <button id="nc-btn-limpiar-buscar" className="btn btn-outline-secondary" onClick={() => { setBuscar(''); setPagina(1); }}>
                 <FiX />
               </button>
             )}
@@ -106,7 +107,7 @@ const ListaNotasCredito = ({ onVer, onNueva }) => {
                       }
                     </td>
                     <td>
-                      <button className="btn btn-sm btn-outline-primary me-1" onClick={() => onVer(nc.cod_nota_credito)} title="Ver detalle">
+                      <button id={`nc-btn-ver-${nc.cod_nota_credito}`} className="btn btn-sm btn-outline-primary me-1" onClick={() => onVer(nc.cod_nota_credito)} title="Ver detalle">
                         <FiEye />
                       </button>
                     </td>
@@ -121,13 +122,13 @@ const ListaNotasCredito = ({ onVer, onNueva }) => {
       {/* Paginación */}
       {totalPaginas > 1 && (
         <div className="d-flex justify-content-center mt-3 gap-2">
-          <button className="btn btn-sm btn-outline-secondary" disabled={pagina <= 1} onClick={() => setPagina(p => p - 1)}>
+          <button id="nc-btn-pag-anterior" className="btn btn-sm btn-outline-secondary" disabled={pagina <= 1} onClick={() => setPagina(p => p - 1)}>
             <FiChevronLeft />
           </button>
           <span className="align-self-center text-muted" style={{ fontSize: 13 }}>
             Página {pagina} de {totalPaginas}
           </span>
-          <button className="btn btn-sm btn-outline-secondary" disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)}>
+          <button id="nc-btn-pag-siguiente" className="btn btn-sm btn-outline-secondary" disabled={pagina >= totalPaginas} onClick={() => setPagina(p => p + 1)}>
             <FiChevronRight />
           </button>
         </div>
@@ -187,7 +188,7 @@ const DetalleNotaCredito = ({ codNota, onVolver, onRecargar }) => {
 
   return (
     <div>
-      <button className="btn btn-sm btn-outline-secondary mb-3" onClick={onVolver}>
+      <button id="nc-btn-volver-detalle" className="btn btn-sm btn-outline-secondary mb-3" onClick={onVolver}>
         <FiArrowLeft className="me-1" /> Volver
       </button>
 
@@ -208,7 +209,7 @@ const DetalleNotaCredito = ({ codNota, onVolver, onRecargar }) => {
               }
             </div>
             {nota.estado && (
-              <button className="btn btn-outline-danger btn-sm" onClick={handleAnular} disabled={anulando}>
+              <button id="nc-btn-anular" className="btn btn-outline-danger btn-sm" onClick={handleAnular} disabled={anulando}>
                 <FiXCircle className="me-1" /> {anulando ? 'Anulando...' : 'Anular NC'}
               </button>
             )}
@@ -414,7 +415,7 @@ const NuevaNotaCredito = ({ onVolver, onCreada }) => {
 
   return (
     <div>
-      <button className="btn btn-sm btn-outline-secondary mb-3" onClick={onVolver}>
+      <button id="nc-btn-volver-nueva" className="btn btn-sm btn-outline-secondary mb-3" onClick={onVolver}>
         <FiArrowLeft className="me-1" /> Volver
       </button>
 
@@ -432,11 +433,12 @@ const NuevaNotaCredito = ({ onVolver, onCreada }) => {
             <div className="input-group mb-3" style={{ maxWidth: 500 }}>
               <span className="input-group-text"><FiSearch /></span>
               <input
+                id="nc-input-buscar-factura"
                 type="text" className="form-control" placeholder="Buscar por nombre, apellido o DNI del cliente..."
                 value={buscarFactura} onChange={e => setBuscarFactura(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && buscarFacturas()}
               />
-              <button className="btn jyr-btn-primary" onClick={buscarFacturas} disabled={buscandoFact}>
+              <button id="nc-btn-buscar-factura" className="btn jyr-btn-primary" onClick={buscarFacturas} disabled={buscandoFact}>
                 Buscar
               </button>
             </div>
@@ -462,7 +464,7 @@ const NuevaNotaCredito = ({ onVolver, onCreada }) => {
                         <td>{f.cliente ? `${f.cliente.nombre} ${f.cliente.apellido}` : '—'}</td>
                         <td className="text-end">{formatMoneda(f.total)}</td>
                         <td className="text-center">
-                          <button className="btn btn-sm btn-outline-primary" onClick={() => seleccionarFactura(f.cod_factura)} disabled={cargandoDetalles}>
+                          <button id={`nc-btn-seleccionar-factura-${f.cod_factura}`} className="btn btn-sm btn-outline-primary" onClick={() => seleccionarFactura(f.cod_factura)} disabled={cargandoDetalles}>
                             Seleccionar
                           </button>
                         </td>
@@ -498,7 +500,7 @@ const NuevaNotaCredito = ({ onVolver, onCreada }) => {
                     Total factura: <strong>{formatMoneda(facturaSeleccionada.total)}</strong>
                   </span>
                 </div>
-                <button className="btn btn-sm btn-outline-secondary" onClick={() => { setPaso(1); setFacturaSeleccionada(null); setItems([]); setMotivo(''); }}>
+                <button id="nc-btn-cambiar-factura" className="btn btn-sm btn-outline-secondary" onClick={() => { setPaso(1); setFacturaSeleccionada(null); setItems([]); setMotivo(''); }}>
                   <FiRefreshCw className="me-1" /> Cambiar factura
                 </button>
               </div>
@@ -510,6 +512,7 @@ const NuevaNotaCredito = ({ onVolver, onCreada }) => {
             <div className="jyr-card-body">
               <label className="form-label" style={{ fontSize: 13 }}>Motivo de la nota de crédito *</label>
               <textarea
+                id="nc-input-motivo"
                 className="form-control" rows={2} placeholder="Ej: Producto defectuoso, error en facturación, devolución del cliente..."
                 value={motivo} onChange={e => setMotivo(e.target.value)}
               />
@@ -555,6 +558,7 @@ const NuevaNotaCredito = ({ onVolver, onCreada }) => {
                         <tr key={idx} style={{ opacity: noDisponible ? 0.4 : 1 }}>
                           <td>
                             <input
+                              id={`nc-check-item-${it.cod_detalle_factura}`}
                               type="checkbox" className="form-check-input"
                               checked={it.seleccionado} onChange={() => toggleItem(idx)}
                               disabled={noDisponible}
@@ -574,6 +578,7 @@ const NuevaNotaCredito = ({ onVolver, onCreada }) => {
                           </td>
                           <td className="text-center">
                             <input
+                              id={`nc-input-item-cantidad-${it.cod_detalle_factura}`}
                               type="number" className="form-control form-control-sm text-center"
                               value={it.cantidad_devuelta} onChange={e => cambiarCantidad(idx, e.target.value)}
                               min={0} max={it.cantidad_disponible} disabled={noDisponible}
@@ -619,8 +624,9 @@ const NuevaNotaCredito = ({ onVolver, onCreada }) => {
 
           {/* Botón crear */}
           <div className="d-flex justify-content-end gap-2">
-            <button className="btn btn-outline-secondary" onClick={onVolver}>Cancelar</button>
+            <button id="nc-btn-cancelar-nueva" className="btn btn-outline-secondary" onClick={onVolver}>Cancelar</button>
             <button
+              id="nc-btn-crear"
               className="btn jyr-btn-primary"
               onClick={handleCrear}
               disabled={enviando || itemsSeleccionados.length === 0 || !motivo.trim()}

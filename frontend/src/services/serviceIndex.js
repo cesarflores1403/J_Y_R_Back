@@ -92,6 +92,7 @@ export const cotizacionService = {
   eliminar: (id) => api.delete(`/cotizaciones/${id}`),
   productosDisponibles: (params) => api.get('/cotizaciones/productos-disponibles', { params }),
   clientesDisponibles: (params) => api.get('/cotizaciones/clientes-disponibles', { params }),
+  historialCliente: (codCliente, params) => api.get(`/cotizaciones/cliente/${codCliente}`, { params }),
 };
 
 // ==================== CARRUSEL ====================

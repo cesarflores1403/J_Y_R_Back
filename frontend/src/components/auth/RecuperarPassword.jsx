@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import { FiUser, FiArrowLeft } from 'react-icons/fi';
 import logoFull from '../../assets/img/logo1.jpeg';
 import logoClean from '../../assets/img/logo2.jpeg';
@@ -8,8 +7,15 @@ import { authService } from '../../services/serviceIndex.js';
 import { alertDialog } from '../../utils/notifications.js';
 import axios from 'axios';
 import { resolveApiBase } from '../../utils/runtimeApi.js';
+import {
+  MAX_USUARIO, USUARIO_PERMITIDO,
+  sanitizarUsuario, contieneEmoji, contienePatronSQL, contieneHTML,
+} from '../../utils/authValidators.js';
 
 const API_BASE = resolveApiBase();
+
+// Mensaje genérico al detectar símbolos no permitidos (HTML/SQL): no revela la razón de seguridad.
+const MSG_NO_PERMITIDO = 'Se ingresaron caracteres no permitidos.';
 
 const precargarCarrusel = (items = []) => {
   if (!items.length) return;
@@ -29,6 +35,7 @@ const precargarCarrusel = (items = []) => {
 const RecuperarPassword = () => {
   const [nombreUsuario, setNombreUsuario] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState('');
   const [currentSlide, setCurrentSlide] = useState(0);
   const [marcas, setMarcas] = useState([]);
   const navigate = useNavigate();
@@ -62,11 +69,42 @@ const RecuperarPassword = () => {
     return () => clearInterval(timer);
   }, [marcas.length]);
 
+  // ── Bloquea la escritura/pegado de emojis y caracteres no permitidos ──
+  const handleUsuarioChange = (e) => {
+    const original = e.target.value;
+    const limpio = sanitizarUsuario(original).slice(0, MAX_USUARIO);
+    if (limpio !== original) {
+      if (contieneEmoji(original)) setError('Los emojis no están permitidos.');
+      else if (contieneHTML(original) || contienePatronSQL(original)) setError(MSG_NO_PERMITIDO);
+      else setError('El usuario solo admite letras, números y los símbolos . _ - @');
+    } else {
+      setError('');
+    }
+    setNombreUsuario(limpio);
+  };
+
   const handleEnviar = async (e) => {
     e.preventDefault();
-    const usuarioLimpio = nombreUsuario.trim();
-    if (!usuarioLimpio) return;
-    setEnviando(true);
+ setError('');
+ 
+ const usuarioLimpio = nombreUsuario.trim();
+    if (!usuarioLimpio) {
+          setError('Ingresa tu nombre de usuario (no puede contener solo espacios).');
+          return;
+        }
+        if (usuarioLimpio.length > MAX_USUARIO) {
+          setError('El nombre de usuario no puede exceder los 50 caracteres.');
+          return;
+        }
+        if (contieneHTML(usuarioLimpio) || contienePatronSQL(usuarioLimpio)) {
+          setError(MSG_NO_PERMITIDO);
+          return;
+        }
+        if (!USUARIO_PERMITIDO.test(usuarioLimpio)) {
+          setError('El usuario solo admite letras, números y los símbolos . _ - @ (sin emojis).');
+          return;
+        }   
+         setEnviando(true);
 
     try {
       await authService.solicitarRecuperacion({ nombre_usuario: usuarioLimpio });
@@ -80,8 +118,12 @@ const RecuperarPassword = () => {
       });
     } catch (error) {
       setEnviando(false);
-      toast.error(error.response?.data?.mensaje || 'No se pudo enviar la solicitud');
-    }
+      setError(
+        error.response?.data?.mensaje
+        || error.response?.data?.message
+        || 'No se pudo enviar la solicitud'
+      );   
+     }
   };
 
   return (
@@ -130,6 +172,11 @@ const RecuperarPassword = () => {
             <h2 className="login-title">Recuperar contraseña</h2>
             <p className="login-subtitle">Ingresa tu usuario para solicitar el cambio de contraseña</p>
           </div>
+          {error && (
+            <div className="alert alert-danger d-flex align-items-center" role="alert">
+              <span>{error}</span>
+            </div>
+          )}
 
           <form onSubmit={handleEnviar}>
             <div className="mb-4">
@@ -141,9 +188,14 @@ const RecuperarPassword = () => {
                   className="form-control login-input"
                   placeholder="Ingresa tu usuario"
                   value={nombreUsuario}
-                  onChange={(e) => setNombreUsuario(e.target.value)}
-                  required
-                  autoFocus
+                  onChange={handleUsuarioChange}
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                    autoComplete="username"
+                                    maxLength={MAX_USUARIO}
+                                    required
+                                    autoFocus
                 />
               </div>
             </div>

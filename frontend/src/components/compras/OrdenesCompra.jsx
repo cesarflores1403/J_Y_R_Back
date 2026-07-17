@@ -42,17 +42,16 @@ const ListaDesplegable=({items,onSelect,renderItem})=>{
 };
 
 // Buscador de proveedor
-const BuscadorProveedor=({valor,onSeleccionar})=>{
+const BuscadorProveedor=({valor,proveedores=[],onSeleccionar})=>{
   const [texto,setTexto]=useState(valor?.nombre_proveedor||'');
-  const [todos,setTodos]=useState([]);
   const [abierto,setAbierto]=useState(false);
   const ref=useRef(null);
 
+  // Sincroniza el texto mostrado cuando cambia el proveedor seleccionado
+  // (p. ej. al crear uno nuevo desde el modal, se refleja automáticamente)
   useEffect(()=>{
-    proveedorService.listar({limite:200,pagina:1})
-      .then(r=>{if(r.data.ok) setTodos(r.data.datos||[]);})
-      .catch(()=>{});
-  },[]);
+    setTexto(valor?.nombre_proveedor||'');
+  },[valor?.cod_proveedor,valor?.nombre_proveedor]);
 
   useEffect(()=>{
     const fn=e=>{if(ref.current&&!ref.current.contains(e.target)) setAbierto(false);};
@@ -60,7 +59,7 @@ const BuscadorProveedor=({valor,onSeleccionar})=>{
     return()=>document.removeEventListener('mousedown',fn);
   },[]);
 
-  const filtrados=todos.filter(p=>texto.trim()&&p.nombre_proveedor.toLowerCase().includes(texto.toLowerCase()));
+  const filtrados=proveedores.filter(p=>texto.trim()&&p.nombre_proveedor.toLowerCase().includes(texto.toLowerCase()));
 
   const seleccionar=p=>{
     setTexto(p.nombre_proveedor);
@@ -323,7 +322,7 @@ const FormOrden=({titulo,ocNumero,lineasIniciales=[],formInicial,onClose,onGuard
                 <label className="form-label fw-semibold" style={{fontSize:13}}>Proveedor *</label>
                 <div className="d-flex gap-2 align-items-stretch">
                   <div className="flex-grow-1">
-                    <BuscadorProveedor valor={proveedor} onSeleccionar={setProveedor}/>
+                    <BuscadorProveedor valor={proveedor} proveedores={todosProveedor} onSeleccionar={setProveedor}/>
                   </div>
                   <button
                     type="button"
@@ -471,7 +470,17 @@ const FormOrden=({titulo,ocNumero,lineasIniciales=[],formInicial,onClose,onGuard
       {modalProv&&(
         <ModalProveedor
           onClose={()=>setModalProv(false)}
-          onGuardado={prov=>{if(prov) setProveedor(prov);}}
+          onGuardado={prov=>{
+            if(!prov) return;
+            // Agrega el proveedor recién creado a la lista y lo selecciona
+            // para que aparezca de inmediato sin refrescar
+            setTodosProveedor(prev=>
+              prev.some(p=>p.cod_proveedor===prov.cod_proveedor)
+                ?prev
+                :[prov,...prev]
+            );
+            setProveedor(prov);
+          }}
         />
       )}
 

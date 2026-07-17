@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiCalendar, FiFilter, FiMapPin, FiPackage, FiRefreshCw, FiTag } from 'react-icons/fi';
+import { REFERENCIAS_RESERVA } from './referenciasReserva.js';
 
 const formatearCodigoProducto = (producto) => {
   const codigo = String(producto?.codigo_producto || '').trim().toUpperCase();
@@ -169,16 +170,21 @@ const ReservasFiltros = ({
         </div>
 
         <div className="col-12 col-md-5">
-          <label className="form-label mb-1 kdx-label">Referencia</label>
-          <input
-            type="text"
-            className="form-control kdx-control"
+          <label className="form-label mb-1 kdx-label">
+            <FiTag size={14} />
+            Referencia
+          </label>
+          <select
+            className="form-select kdx-control"
             name="referencia"
             value={filtros.referencia}
             onChange={handleInput}
-            maxLength={200}
-            placeholder="Buscar por referencia"
-          />
+          >
+            <option value="">Todas</option>
+            {REFERENCIAS_RESERVA.map((ref) => (
+              <option key={ref} value={ref}>{ref}</option>
+            ))}
+          </select>
         </div>
       </div>
     </form>

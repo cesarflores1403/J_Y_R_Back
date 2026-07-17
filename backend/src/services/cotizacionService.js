@@ -58,6 +58,63 @@ class CotizacionService {
   }
 
   // =============================================
+  // HISTORIAL DE COTIZACIONES POR CLIENTE (trazabilidad comercial)
+  // =============================================
+  async historialPorCliente(codCliente, { pagina = 1, limite = 10 } = {}) {
+    const cod = parseInt(codCliente, 10);
+    if (!Number.isInteger(cod) || cod < 1) {
+      throw Object.assign(new Error('Cliente inválido'), { statusCode: 400 });
+    }
+
+    const cliente = await Cliente.findByPk(cod, {
+      attributes: ['cod_cliente', 'nombre', 'apellido', 'dni', 'empresa']
+    });
+    if (!cliente) throw Object.assign(new Error('Cliente no encontrado'), { statusCode: 404 });
+
+    const limiteNum = parseInt(limite, 10) || 10;
+    const paginaNum = parseInt(pagina, 10) || 1;
+
+    const { count, rows } = await Cotizacion.findAndCountAll({
+      where: { cod_cliente: cod },
+      include: [{ model: Usuario, as: 'usuario', attributes: ['cod_usuario', 'nombre_usuario'] }],
+      limit: limiteNum,
+      offset: (paginaNum - 1) * limiteNum,
+      order: [['cod_cotizacion', 'DESC']]
+    });
+
+    // Auto-vencer cotizaciones expiradas de este cliente
+    const ahora = new Date();
+    for (const cot of rows) {
+      if (cot.estado_cotizacion === 'VIGENTE' && cot.fecha_vencimiento && new Date(cot.fecha_vencimiento) < ahora) {
+        await cot.update({ estado_cotizacion: 'VENCIDA' });
+        cot.estado_cotizacion = 'VENCIDA';
+      }
+    }
+
+    // Resumen global del cliente (sobre todas sus cotizaciones, no solo la página)
+    const todas = await Cotizacion.findAll({
+      where: { cod_cliente: cod },
+      attributes: ['estado_cotizacion', 'total']
+    });
+    const resumen = {
+      total: todas.length,
+      vigentes: todas.filter(c => c.estado_cotizacion === 'VIGENTE').length,
+      convertidas: todas.filter(c => c.estado_cotizacion === 'CONVERTIDA').length,
+      anuladas: todas.filter(c => c.estado_cotizacion === 'ANULADA').length,
+      montoTotal: round2(todas.reduce((a, c) => a + (parseFloat(c.total) || 0), 0))
+    };
+
+    return {
+      cliente,
+      resumen,
+      datos: rows,
+      total: count,
+      pagina: paginaNum,
+      totalPaginas: Math.ceil(count / limiteNum)
+    };
+  }
+
+  // =============================================
   // OBTENER COTIZACIÓN POR ID
   // =============================================
   async obtenerPorId(id) {
@@ -102,6 +159,22 @@ class CotizacionService {
     }
     if (descGlobal < 0) throw Object.assign(new Error('El descuento global no puede ser negativo'), { statusCode: 400 });
     if (tipoDescGlobal === 'PORCENTAJE' && descGlobal > 100) throw Object.assign(new Error('El descuento global en porcentaje no puede ser mayor a 100%'), { statusCode: 400 });
+
+    // Regla de negocio: la vigencia debe ser un entero válido y acotado (1-90).
+    // Evita desbordamientos de datos por números excesivamente grandes o no enteros.
+    const VIGENCIA_MIN = 1;
+    const VIGENCIA_MAX = 90;
+    let diasVigencia = 15; // valor por defecto si no se envía
+    if (vigencia_dias !== undefined && vigencia_dias !== null && String(vigencia_dias).trim() !== '') {
+      const vigenciaNum = Number(vigencia_dias);
+      if (!Number.isInteger(vigenciaNum) || vigenciaNum < VIGENCIA_MIN || vigenciaNum > VIGENCIA_MAX) {
+        throw Object.assign(
+          new Error(`La vigencia debe ser un número entero entre ${VIGENCIA_MIN} y ${VIGENCIA_MAX} días`),
+          { statusCode: 400 }
+        );
+      }
+      diasVigencia = vigenciaNum;
+    }
 
     const cliente = await Cliente.findByPk(cod_cliente);
     if (!cliente) throw Object.assign(new Error('Cliente no encontrado'), { statusCode: 404 });
@@ -182,8 +255,17 @@ class CotizacionService {
       const descuentoTotal = round2(descuentoLineasTotal + montoDescGlobal);
       const totalGeneral = round2(subtotalGeneral + isvGeneral);
 
-      // Vigencia
-      const dias = parseInt(vigencia_dias) || 15;
+      // Regla de negocio: los descuentos (líneas + global) no pueden consumir
+      // el 100% o más de la venta. Se bloquean totales <= 0 (saldos a favor).
+      if (totalGeneral <= 0) {
+        throw Object.assign(
+          new Error('El total de la cotización no puede ser menor o igual a L 0.00. Revisa los descuentos aplicados.'),
+          { statusCode: 400 }
+        );
+      }
+
+      // Vigencia (ya validada como entero acotado 1-90 al inicio de crear)
+      const dias = diasVigencia;
       const fechaVencimiento = new Date();
       fechaVencimiento.setDate(fechaVencimiento.getDate() + dias);
 
