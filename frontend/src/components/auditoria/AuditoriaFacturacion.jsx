@@ -15,9 +15,17 @@ const EVENTO_CONFIG = {
   EXCEPCION_STOCK:   { icon: <FiAlertTriangle />, color: '#ff9800', label: 'Excepción Stock' },
   COTIZACION_CONVERTIDA: { icon: <FiRefreshCw />, color: '#2196f3', label: 'Cotización Convertida' },
   PAGO_REGISTRADO:   { icon: <FiClock />,    color: '#9c27b0', label: 'Pago Registrado' },
+  PAGO_ANULADO:       { icon: <FiXCircle />,  color: '#795548', label: 'Pago Anulado' },
+  CLIENTE_ACTUALIZADO: { icon: <FiUser />, color: '#0d6efd', label: 'Cliente Actualizado' },
+  PRODUCTO_ACTUALIZADO: { icon: <FiFileText />, color: '#198754', label: 'Producto Actualizado' },
+  PRODUCTO_ESTADO_MASIVO: { icon: <FiRefreshCw />, color: '#20c997', label: 'Cambio Masivo de Productos' },
+  LOGIN_EXITOSO: { icon: <FiUser />, color: '#198754', label: 'Login Exitoso' },
+  LOGIN_FALLIDO: { icon: <FiAlertTriangle />, color: '#dc3545', label: 'Login Fallido' },
+  LOGIN_BLOQUEADO: { icon: <FiXCircle />, color: '#6f42c1', label: 'Login Bloqueado' },
 };
 
 const getEventoConfig = (evento) => EVENTO_CONFIG[evento] || { icon: <FiClock />, color: '#888', label: evento };
+const ZONA_HORARIA_LOCAL = 'America/Tegucigalpa';
 
 // ==========================================
 // COMPONENTE PRINCIPAL
@@ -34,12 +42,14 @@ const AuditoriaFacturacion = () => {
 
   // Filtros
   const [filtroEvento, setFiltroEvento] = useState('');
+  const [filtroEntidad, setFiltroEntidad] = useState('');
   const [filtroFactura, setFiltroFactura] = useState('');
   const [filtroFechaDesde, setFiltroFechaDesde] = useState('');
   const [filtroFechaHasta, setFiltroFechaHasta] = useState('');
   const [filtroBuscar, setFiltroBuscar] = useState('');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [tiposEvento, setTiposEvento] = useState([]);
+  const [tiposEntidad, setTiposEntidad] = useState([]);
 
   // Detalle expandido
   const [expandido, setExpandido] = useState(null);
@@ -49,6 +59,9 @@ const AuditoriaFacturacion = () => {
     auditoriaFacturacionService.tiposEvento()
       .then(resp => setTiposEvento(resp.data?.datos || []))
       .catch(() => {});
+    auditoriaFacturacionService.tiposEntidad()
+      .then(resp => setTiposEntidad(resp.data?.datos || []))
+      .catch(() => {});
   }, []);
 
   // Cargar registros
@@ -57,6 +70,7 @@ const AuditoriaFacturacion = () => {
     try {
       const params = { pagina: pag, limite: 20 };
       if (filtroEvento) params.evento = filtroEvento;
+      if (filtroEntidad) params.entidad = filtroEntidad;
       if (filtroFactura) params.cod_factura = filtroFactura;
       if (filtroFechaDesde) params.fecha_desde = filtroFechaDesde;
       if (filtroFechaHasta) params.fecha_hasta = filtroFechaHasta;
@@ -73,7 +87,7 @@ const AuditoriaFacturacion = () => {
     } finally {
       setCargando(false);
     }
-  }, [filtroEvento, filtroFactura, filtroFechaDesde, filtroFechaHasta, filtroBuscar]);
+  }, [filtroEvento, filtroEntidad, filtroFactura, filtroFechaDesde, filtroFechaHasta, filtroBuscar]);
 
   useEffect(() => { cargar(1); }, [cargar]);
 
@@ -83,6 +97,7 @@ const AuditoriaFacturacion = () => {
     try {
       const params = {};
       if (filtroEvento) params.evento = filtroEvento;
+      if (filtroEntidad) params.entidad = filtroEntidad;
       if (filtroFactura) params.cod_factura = filtroFactura;
       if (filtroFechaDesde) params.fecha_desde = filtroFechaDesde;
       if (filtroFechaHasta) params.fecha_hasta = filtroFechaHasta;
@@ -110,6 +125,7 @@ const AuditoriaFacturacion = () => {
   // Limpiar filtros
   const limpiarFiltros = () => {
     setFiltroEvento('');
+    setFiltroEntidad('');
     setFiltroFactura('');
     setFiltroFechaDesde('');
     setFiltroFechaHasta('');
@@ -119,30 +135,135 @@ const AuditoriaFacturacion = () => {
   const formatFecha = (fecha) => {
     if (!fecha) return '—';
     return new Date(fecha).toLocaleString('es-HN', {
+      timeZone: ZONA_HORARIA_LOCAL,
       day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit'
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
     });
   };
 
   const formatFactura = (cod) => cod ? `FAC-${String(cod).padStart(6, '0')}` : '—';
+  const formatEntidad = (entidad) => String(entidad || 'FACTURA').replaceAll('_', ' ');
 
-  const renderDetalle = (detalle) => {
-    if (!detalle) return <span className="text-muted">Sin detalle</span>;
+  const formatValorDetalle = (valor) => {
+    if (valor === null || valor === undefined || valor === '') return 'Sin valor';
+    if (typeof valor === 'boolean') return valor ? 'Si' : 'No';
+    if (typeof valor === 'object') return JSON.stringify(valor, null, 2);
+    return String(valor);
+  };
+
+  const renderCambios = (cambios, titulo = 'Datos cambiados') => {
+    if (!Array.isArray(cambios) || cambios.length === 0) return null;
+
     return (
-      <div style={{ fontSize: '0.82rem', maxHeight: 220, overflow: 'auto' }}>
-        {Object.entries(detalle).map(([key, val]) => (
-          <div key={key} className="mb-1">
-            <strong className="text-muted" style={{ fontSize: '0.75rem' }}>{key}:</strong>{' '}
-            <span className="text-dark">
-              {typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val)}
-            </span>
-          </div>
-        ))}
+      <div className="mb-3">
+        <div className="text-muted fw-semibold mb-1" style={{ fontSize: '0.78rem' }}>{titulo}</div>
+        <div className="table-responsive">
+          <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.78rem' }}>
+            <thead className="table-light">
+              <tr>
+                <th>Campo</th>
+                <th>Antes</th>
+                <th>Despues</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cambios.map((cambio, index) => (
+                <tr key={`${cambio.campo || 'campo'}-${index}`}>
+                  <td className="fw-semibold">{cambio.campo || 'Campo'}</td>
+                  <td style={{ whiteSpace: 'pre-wrap' }}>{formatValorDetalle(cambio.antes)}</td>
+                  <td style={{ whiteSpace: 'pre-wrap' }}>{formatValorDetalle(cambio.despues)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
 
-  const hayFiltrosActivos = filtroEvento || filtroFactura || filtroFechaDesde || filtroFechaHasta || filtroBuscar;
+  const renderDetallesFactura = (detalles) => {
+    if (!Array.isArray(detalles) || detalles.length === 0) return null;
+
+    return (
+      <div className="mb-3">
+        <div className="text-muted fw-semibold mb-1" style={{ fontSize: '0.78rem' }}>Detalle de productos y precios</div>
+        <div className="table-responsive">
+          <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.76rem' }}>
+            <thead className="table-light">
+              <tr>
+                <th>#</th>
+                <th>Item</th>
+                <th>Cant.</th>
+                <th>Precio</th>
+                <th>Desc.</th>
+                <th>ISV</th>
+                <th>Subtotal</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detalles.map((item, index) => (
+                <tr key={`${item.cod_detalle_factura || item.cod_producto || 'item'}-${index}`}>
+                  <td>{item.linea || index + 1}</td>
+                  <td>
+                    <div className="fw-semibold">{item.nombre_item || item.descripcion_item || item.cod_producto || 'Item'}</div>
+                    <small className="text-muted">{item.tipo_item || 'PRODUCTO'}{item.cod_producto ? ` - Cod. ${item.cod_producto}` : ''}</small>
+                  </td>
+                  <td>{formatValorDetalle(item.cantidad)}</td>
+                  <td>{formatValorDetalle(item.precio_unitario)}</td>
+                  <td>{formatValorDetalle(item.monto_descuento ?? item.descuento)}</td>
+                  <td>{formatValorDetalle(item.isv)}</td>
+                  <td>{formatValorDetalle(item.subtotal)}</td>
+                  <td>{formatValorDetalle(item.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDetalle = (detalle) => {
+    if (!detalle) return <span className="text-muted">Sin detalle</span>;
+    const cambios = Array.isArray(detalle.cambios) ? detalle.cambios : [];
+    const entradas = Object.entries(detalle).filter(([key]) => !['cambios', 'detalles_factura'].includes(key));
+
+    return (
+      <div style={{ fontSize: '0.82rem', maxHeight: 220, overflow: 'auto' }}>
+        {renderCambios(cambios)}
+        {renderDetallesFactura(detalle.detalles_factura)}
+        {entradas.map(([key, val]) => {
+          if (key === 'pagos_reversados_detalle' && Array.isArray(val)) {
+            return (
+              <div key={key} className="mt-2">
+                <strong className="text-muted" style={{ fontSize: '0.75rem' }}>pagos_reversados_detalle:</strong>
+                {val.length === 0 ? (
+                  <div className="text-muted">Sin pagos reversados</div>
+                ) : val.map((pago, index) => (
+                  <div key={`${pago.cod_pago || 'pago'}-${index}`} className="mt-2">
+                    {renderCambios(pago.cambios, `Pago #${pago.cod_pago || index + 1} - monto ${formatValorDetalle(pago.monto)}`)}
+                  </div>
+                ))}
+              </div>
+            );
+          }
+
+          return (
+            <div key={key} className="mb-1">
+              <strong className="text-muted" style={{ fontSize: '0.75rem' }}>{key}:</strong>{' '}
+              <span className="text-dark" style={{ whiteSpace: 'pre-wrap' }}>
+                {formatValorDetalle(val)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const hayFiltrosActivos = filtroEvento || filtroEntidad || filtroFactura || filtroFechaDesde || filtroFechaHasta || filtroBuscar;
 
   const eliminarEvento = async (id, eventoLabel) => {
     const ok = await confirmDialog({
@@ -168,7 +289,7 @@ const AuditoriaFacturacion = () => {
       {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div>
-          <h3 className="mb-1"><FiClock className="me-2" />Auditoría de Facturación</h3>
+          <h3 className="mb-1"><FiClock className="me-2" />Auditoría del Sistema</h3>
           <small className="text-muted">{total} registro{total !== 1 ? 's' : ''} encontrado{total !== 1 ? 's' : ''}</small>
         </div>
         <div className="d-flex gap-2">
@@ -198,6 +319,15 @@ const AuditoriaFacturacion = () => {
                 </select>
               </div>
               <div className="col-md-2">
+                <label className="form-label small">Módulo</label>
+                <select className="form-select form-select-sm" value={filtroEntidad} onChange={e => setFiltroEntidad(e.target.value)}>
+                  <option value="">Todos</option>
+                  {tiposEntidad.map(t => (
+                    <option key={t} value={t}>{formatEntidad(t)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-md-2">
                 <label className="form-label small">N° Factura</label>
                 <input type="number" className="form-control form-control-sm" placeholder="Ej: 15"
                   value={filtroFactura} onChange={e => setFiltroFactura(e.target.value)} />
@@ -216,7 +346,7 @@ const AuditoriaFacturacion = () => {
                 <label className="form-label small">Buscar</label>
                 <div className="input-group input-group-sm">
                   <span className="input-group-text"><FiSearch /></span>
-                  <input type="text" className="form-control" placeholder="Usuario, evento..."
+                  <input type="text" className="form-control" placeholder="Usuario, evento, módulo, detalle..."
                     value={filtroBuscar} onChange={e => setFiltroBuscar(e.target.value)} />
                 </div>
               </div>
@@ -252,6 +382,7 @@ const AuditoriaFacturacion = () => {
                   <tr>
                     <th style={{ width: 60 }}>#</th>
                     <th>Evento</th>
+                    <th style={{ width: 130 }}>Módulo</th>
                     <th style={{ width: 140 }}>Factura</th>
                     <th>Usuario</th>
                     <th style={{ width: 190 }}>Fecha</th>
@@ -271,6 +402,9 @@ const AuditoriaFacturacion = () => {
                             <span className="d-inline-flex align-items-center gap-1" style={{ color: cfg.color }}>
                               {cfg.icon} {cfg.label}
                             </span>
+                          </td>
+                          <td>
+                            <span className="badge bg-light text-dark border">{formatEntidad(reg.entidad)}</span>
                           </td>
                           <td>
                             {reg.cod_factura ? (
@@ -304,7 +438,7 @@ const AuditoriaFacturacion = () => {
                         </tr>
                         {isExpanded && reg.detalle && (
                           <tr>
-                            <td colSpan={esSuperAdmin ? 7 : 6} style={{ background: '#f8f9fa', borderLeft: `3px solid ${cfg.color}`, padding: '12px 20px' }}>
+                            <td colSpan={esSuperAdmin ? 8 : 7} style={{ background: '#f8f9fa', borderLeft: `3px solid ${cfg.color}`, padding: '12px 20px' }}>
                               {renderDetalle(reg.detalle)}
                             </td>
                           </tr>

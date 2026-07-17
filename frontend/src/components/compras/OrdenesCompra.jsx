@@ -3,7 +3,7 @@ import {comprasService,proveedorService} from '../../services/serviceIndex.js';
 import {useProducto} from '../../hooks/useProducto.js';
 import {useConfirm} from '../../contexts/ConfirmDialogContext.jsx';
 import {toast} from 'react-toastify';
-import {FiPlus,FiSearch,FiX,FiEye,FiShoppingCart,FiTrash2,FiCheck,FiEdit2} from 'react-icons/fi';
+import {FiPlus,FiSearch,FiX,FiEye,FiShoppingCart,FiTrash2,FiCheck,FiEdit2,FiDownload} from 'react-icons/fi';
 import {confirmDialog} from '../../utils/notifications.js';
 import ModalProveedor from '../proveedores/ModalProveedor.jsx';
 import ProductoForm from '../producto/ProductoForm.jsx';
@@ -12,6 +12,22 @@ import ProductoForm from '../producto/ProductoForm.jsx';
 const fmtFecha=f=>f?new Date(f).toLocaleDateString('es-HN'):'-';
 const fmtMoneda=(v,m='HNL')=>`${m} ${parseFloat(v||0).toLocaleString('es-HN',{minimumFractionDigits:2})}`;
 const fmtOC=id=>`OC-${String(id).padStart(4,'0')}`;
+
+const obtenerMensajeErrorBlob=async(err,fallback)=>{
+  const data=err?.response?.data;
+
+  if(data instanceof Blob){
+    try{
+      const texto=await data.text();
+      const json=JSON.parse(texto);
+      return json?.mensaje||json?.message||fallback;
+    }catch{
+      return fallback;
+    }
+  }
+
+  return data?.mensaje||data?.message||fallback;
+};
 
 const BADGE_ESTADO={
   Pendiente:'bg-warning text-dark',
@@ -601,6 +617,7 @@ const OrdenesCompra=()=>{
   const [ordenDetalle,setOrdenDetalle]=useState(null);
   const [ordenEditar,setOrdenEditar]=useState(null);
   const [seleccionados,setSeleccionados]=useState([]);
+  const [exportandoPdf,setExportandoPdf]=useState(false);
 
   const cargar=useCallback(async()=>{
     setCargando(true);
@@ -753,14 +770,48 @@ const OrdenesCompra=()=>{
     cargar();
   };
 
+  const exportarPdf=async()=>{
+    setExportandoPdf(true);
+
+    try{
+      const {data}=await comprasService.exportarPdf({buscar,estado:filtroEstado});
+      const blob=new Blob([data],{type:'application/pdf'});
+      const url=window.URL.createObjectURL(blob);
+      const link=document.createElement('a');
+      link.href=url;
+      link.download='reporte-ordenes-compra.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Reporte de ordenes de compra exportado');
+    }catch(err){
+      toast.error(await obtenerMensajeErrorBlob(err,'Error al exportar ordenes de compra en PDF'));
+    }finally{
+      setExportandoPdf(false);
+    }
+  };
+
   return(
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h3 className="mb-0">Órdenes de Compra</h3>
-        <button className="btn jyr-btn-primary" onClick={()=>setModalNueva(true)}>
-          <FiPlus className="me-2"/>
-          Nueva Orden
-        </button>
+        <div className="d-flex gap-2">
+          <button
+            type="button"
+            className="jyr-btn jyr-btn-primary"
+            onClick={exportarPdf}
+            disabled={exportandoPdf||cargando}
+          >
+            {exportandoPdf?<span className="spinner-border spinner-border-sm me-2"/>:<FiDownload className="me-2"/>}
+            Exportar PDF
+          </button>
+
+          <button className="btn jyr-btn-primary" onClick={()=>setModalNueva(true)}>
+            <FiPlus className="me-2"/>
+            Nueva Orden
+          </button>
+        </div>
       </div>
 
       <div className="jyr-card mb-3">

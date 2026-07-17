@@ -35,6 +35,40 @@ const limpiarNumeroDecimal = (valor) => {
   return resultado;
 };
 
+const MOTIVOS_ANULACION_GENERICOS = new Set([
+  'anular',
+  'anulacion',
+  'anulacion factura',
+  'cancelar',
+  'cancelacion',
+  'cancelacion factura',
+  'motivo',
+  'justificacion',
+  'error',
+  'prueba',
+  'test',
+  'n/a',
+  'na',
+  'ninguno',
+  'sin motivo',
+  'no aplica'
+]);
+
+const validarMotivoAnulacionFactura = (motivo = '') => {
+  const texto = String(motivo || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+  const textoPlano = texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const letras = textoPlano.replace(/[^a-z0-9]/g, '');
+  const palabrasConSentido = textoPlano.split(/\s+/).filter((p) => p.length >= 3);
+
+  if (!texto) return 'El motivo de anulacion es obligatorio';
+  if (texto.length < 15) return 'Debe tener al menos 15 caracteres';
+  if (palabrasConSentido.length < 3) return 'Explique la causa con al menos 3 palabras';
+  if (/^\d+$/.test(letras)) return 'No puede contener solo numeros';
+  if (/(.)\1{4,}/i.test(letras) || new Set(letras).size < 5) return 'No parece una justificacion valida';
+  if (MOTIVOS_ANULACION_GENERICOS.has(textoPlano)) return 'El motivo es demasiado generico';
+  return '';
+};
+
 const Facturacion = () => {
   const { usuario } = useAuth();
   const confirm = useConfirm();
@@ -337,6 +371,18 @@ const Facturacion = () => {
 
   // ========== ANULAR FACTURA ==========
   const anularFactura = async (id) => {
+    const motivo = window.prompt(
+      'Motivo de anulacion (minimo 15 caracteres y 3 palabras):',
+      ''
+    );
+    if (motivo === null) return;
+
+    const errorMotivo = validarMotivoAnulacionFactura(motivo);
+    if (errorMotivo) {
+      toast.warn(errorMotivo);
+      return;
+    }
+
     const ok = await confirmDialog({
       variant: 'cancel',
       title: 'Anular factura',
@@ -345,7 +391,7 @@ const Facturacion = () => {
     });
     if (!ok) return;
     try {
-      const { data } = await facturaService.anular(id);
+      const { data } = await facturaService.anular(id, motivo.trim());
       if (data.ok) {
         toast.success('Factura anulada');
         cargar();

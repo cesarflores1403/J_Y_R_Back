@@ -262,6 +262,21 @@ const Reportes = () => {
     );
   }, [datos?.productos, busquedaProducto, soloStockBajo]);
 
+  const resumenInventarioFiltrado = useMemo(() => {
+    const productos = inventarioFiltrado || [];
+
+    return {
+      totalProductos: productos.length,
+      totalUnidades: productos.reduce((s, p) => s + parseInt(p.stock_total || 0, 10), 0),
+      valorTotal: productos.reduce((s, p) => s + parseFloat(p.valor_total || 0), 0),
+      stockBajo: productos.filter((p) => {
+        const stock = parseInt(p.stock_total || 0, 10);
+        const minimo = parseInt(p.stock_minimo || 0, 10);
+        return minimo > 0 && stock <= minimo;
+      }).length
+    };
+  }, [inventarioFiltrado]);
+
   const totalPaginasVentas = Math.max(
     1,
     Math.ceil(detalleVentasFiltrado.length / REGISTROS_POR_PAGINA)
@@ -599,32 +614,26 @@ const Reportes = () => {
                 <div className="row g-3 mb-4">
                   <StatCard
                     title="Total productos"
-                    value={datos.resumen?.totalProductos || 0}
+                    value={resumenInventarioFiltrado.totalProductos || 0}
                     icon={<FiPackage />}
-                    subtitle="Productos distintos registrados"
+                    subtitle={busquedaProducto || soloStockBajo ? 'Productos filtrados' : 'Productos distintos registrados'}
                   />
                   <StatCard
                     title="Total unidades"
-                    value={(datos.resumen?.totalUnidades || 0).toLocaleString()}
+                    value={(resumenInventarioFiltrado.totalUnidades || 0).toLocaleString()}
                     icon={<FiDatabase />}
-                    subtitle="Suma de existencias actuales"
+                    subtitle={busquedaProducto || soloStockBajo ? 'Suma de existencias filtradas' : 'Suma de existencias actuales'}
                   />
                   <StatCard
                     title="Valor total"
-                    value={formatMoney(datos.resumen?.valorTotal)}
+                    value={formatMoney(resumenInventarioFiltrado.valorTotal)}
                     icon={<FiDollarSign />}
                     valueClassName="text-success"
-                    subtitle="Valor estimado de venta"
+                    subtitle={busquedaProducto || soloStockBajo ? 'Valor estimado filtrado' : 'Valor estimado de venta'}
                   />
                   <StatCard
                     title="Stock bajo"
-                    value={
-                      (datos.productos || []).filter((p) => {
-                        const stock = parseInt(p.stock_total || 0, 10);
-                        const minimo = parseInt(p.stock_minimo || 0, 10);
-                        return minimo > 0 && stock <= minimo;
-                      }).length
-                    }
+                    value={resumenInventarioFiltrado.stockBajo || 0}
                     icon={<FiTrendingUp />}
                     subtitle="Productos que requieren atención"
                   />

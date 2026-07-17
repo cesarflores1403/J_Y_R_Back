@@ -18,7 +18,7 @@ const estadoBadge = {
   Descontinuado: { className: 'jyr-badge jyr-badge-warning', label: 'Descontinuado' },
 };
 
-const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCambiarEstadoMasivo, onSubirImagen, onEliminarImagen, onVerFicha, onDuplicate, mostrarMargen = false }) => {
+const ProductoList = ({ productos = [], busqueda: busquedaControlada = '', onBusquedaChange, onEdit, onDelete, onCambiarEstado, onCambiarEstadoMasivo, onSubirImagen, onEliminarImagen, onVerFicha, onDuplicate, mostrarMargen = false }) => {
   // HU-07: Categorias dinamicas desde BD
   const { categorias } = useCategorias();
   const fileInputRef = useRef(null); // // HU-08: ref para input file oculto
@@ -35,7 +35,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
   // =====================================================
   // ESTADOS: busqueda, filtros, ordenamiento, paginacion
   // =====================================================
-  const [busqueda, setBusqueda] = useState('');
+  const [busquedaLocal, setBusquedaLocal] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroBajoStock, setFiltroBajoStock] = useState(false);
@@ -52,6 +52,7 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
     confirmText: 'Confirmar',
     action: null,
   });
+  const busqueda = onBusquedaChange ? busquedaControlada : busquedaLocal;
 
   // Normalizar estado (compatibilidad con boolean legacy)
   const getEstado = (p) => {
@@ -254,7 +255,8 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
 
   // Reset pagina al cambiar filtros/busqueda
   const handleBusqueda = (val) => {
-    setBusqueda(val);
+    if (onBusquedaChange) onBusquedaChange(val);
+    else setBusquedaLocal(val);
     setPagina(1);
   };
   const handleFiltroCategoria = (val) => {
@@ -293,7 +295,8 @@ const ProductoList = ({ productos = [], onEdit, onDelete, onCambiarEstado, onCam
   // Limpiar filtros
   const hayFiltros = busqueda || filtroCategoria || filtroEstado || filtroBajoStock;
   const limpiarFiltros = () => {
-    setBusqueda('');
+    if (onBusquedaChange) onBusquedaChange('');
+    else setBusquedaLocal('');
     setFiltroCategoria('');
     setFiltroEstado('');
     setFiltroBajoStock(false);
