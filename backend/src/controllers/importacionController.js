@@ -7,7 +7,7 @@ import { sendOk } from '../utils/response.js';
 export const importarProductos = async (req, res, next) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ ok: false, message: 'No se envió ningún archivo.', data: null });
+      return res.status(400).json({ ok: false, mensaje: 'No se envió ningún archivo.' });
     }
 
     const resultado = await importacionService.importarProductos(
@@ -19,8 +19,8 @@ export const importarProductos = async (req, res, next) => {
     if (resultado.errores.length > 0) {
       return res.status(400).json({
         ok: false,
-        message: `Se encontraron errores en ${resultado.errores.length} fila(s). No se insertó ningún producto.`,
-        data: resultado,
+        mensaje: `Se encontraron errores en ${resultado.errores.length} fila(s). No se insertó ningún producto.`,
+        datos: resultado,
       });
     }
 

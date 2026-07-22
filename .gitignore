@@ -16,6 +16,8 @@ frontend/dist/
 # VARIABLES DE ENTORNO
 # ==============================
 .env
+.env.*
+!.env.example
 backend/.env
 frontend/.env
 .env.tunnel
@@ -25,11 +27,24 @@ frontend/.env
 # ==============================
 *.log
 public-url.txt
+logs/
+backend/logs/
 
 # ==============================
 # BACKUPS LOCALES
 # ==============================
 backend/backups/*/
+backups/
+uploads/
+backend/backups/
+backend/uploads/
+
+# ==============================
+# BUILD Y COBERTURA
+# ==============================
+coverage/
+dist/
+frontend/dist/
 
 # ==============================
 # ARCHIVOS SISTEMA

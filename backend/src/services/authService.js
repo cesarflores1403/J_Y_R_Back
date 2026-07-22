@@ -5,9 +5,10 @@ import Usuario from '../models/Usuario.js';
 import Rol from '../models/Rol.js';
 import notificacionSuperAdminService from './notificacionSuperAdminService.js';
 import { assertPasswordPolicy } from '../utils/passwordPolicy.js';
+import { getJwtExpiresIn, getJwtSecret } from '../config/security.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'CAMBIA_ESTE_SECRET_EN_ENV';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || process.env.JWT_EXPIRE || '30m';
+const JWT_SECRET = getJwtSecret();
+const JWT_EXPIRES_IN = getJwtExpiresIn();
 
 class AuthService {
   generarToken(usuario, nombreRol) {

@@ -1,84 +1,83 @@
-# J Y R Backend
+# J&R Backend
 
-Backend API desarrollado con Node.js, Express y PostgreSQL.
+API Node.js/Express 5 con PostgreSQL, Sequelize, JWT y bcryptjs.
 
-## Estructura del Proyecto
+## Instalacion
 
-```
-src/
-├── config/          # Configuración de la base de datos y variables
-├── controllers/     # Controladores de la lógica de negocio
-├── middleware/      # Middleware personalizado
-├── models/          # Modelos de datos
-├── routes/          # Rutas de la API
-├── services/        # Servicios/lógica de negocio
-├── utils/           # Funciones utilitarias
-├── validators/      # Validadores de datos
-└── server.js        # Punto de entrada
-tests/               # Tests unitarios e integración
-public/              # Archivos públicos (imágenes, etc)
+```powershell
+npm install
 ```
 
-## Instalación
+## Variables de Entorno
 
-1. Clonar el repositorio
-2. Instalar dependencias:
-   ```bash
-   npm install
-   ```
+Usa `backend/.env.example` como plantilla. No compartas `backend/.env`.
 
-3. Crear archivo `.env` basado en `.env.example`:
-   ```bash
-   cp .env.example .env
-   ```
+Variables clave:
 
-4. Configurar variables de entorno en `.env`
+- `DB_APP_USER` y `DB_APP_PASSWORD` para la API.
+- `DB_MAINTENANCE_USER` y `DB_MAINTENANCE_PASSWORD` solo para backup/restore.
+- `JWT_SECRET` obligatorio y de 32 caracteres o mas.
+- `CORS_ALLOWED_ORIGINS` con orígenes exactos.
+- `ALLOW_TUNNEL_ORIGINS=true` solo si realmente necesitas tuneles.
 
-## Desarrollo
+## Ejecucion
 
-```bash
+```powershell
 npm run dev
 ```
 
-## Producción
+El arranque solo verifica conexión y no altera el esquema.
 
-```bash
-npm start
+## Pagos
+
+Tabla canonica: `public.pago`.
+
+Endpoint conservado:
+
+```text
+/api/pagos
 ```
 
-## Testing
+Los cambios de pagos usan transacciones, bloqueo de factura y validación del catálogo de metodos de pago.
 
-```bash
-npm test
-```
+## SQL Versionado
 
-## Backup y Restore
+- `scripts/sql/002-consolidar-pago.sql`
+- `scripts/sql/least-privilege-app-role.sql`
+- `scripts/sql/003-revocar-acceso-directo.sql`
 
-Respalda base de datos y carpeta de archivos subidos (`uploads`) para recuperar el sistema completo.
+No ejecutes scripts destructivos sin validar primero que `public.pagos` esté vacía.
 
-Requisitos:
+## Backup
 
-- Tener instalado PostgreSQL client tools (`pg_dump` y `pg_restore`) y disponibles en PATH.
-- Tener configuradas variables `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` en `.env`.
-
-Crear backup:
-
-```bash
+```powershell
 npm run backup:system
 ```
 
-Se crea una carpeta en `backend/backups/<timestamp>` con:
+Genera un backup custom solo para `schema public`, usa `pg_dump`, calcula SHA-256 y copia `uploads` si existen.
 
-- `db.backup`
-- `uploads/` (si existe)
-- `metadata.json`
+## Restore
 
-Restaurar backup:
-
-```bash
-npm run restore:system -- "backups/<timestamp>"
+```powershell
+npm run restore:system -- "backups/<carpeta-backup>"
 ```
 
-Recomendado antes de restaurar:
+Antes de restaurar:
 
-- Detener el backend para evitar conexiones activas.
+1. Detén el backend.
+2. Verifica hash del backup.
+3. Confirma que la ruta esté dentro de `backups/`.
+
+## Pruebas
+
+```powershell
+npm test
+npm run test:api
+```
+
+## Seguridad
+
+- No hay secret JWT por defecto.
+- No se ejecutan migraciones automáticas al iniciar.
+- CORS no queda abierto indiscriminadamente.
+- Los errores de base de datos se traducen a mensajes seguros.

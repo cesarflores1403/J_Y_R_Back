@@ -1,10 +1,6 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/sequelize.js';
 
-// =====================================================
-// MODELO: pago
-// HU-FAC-05: Registrar pagos (incluye pagos parciales)
-// =====================================================
 const Pago = sequelize.define('pago', {
   cod_pago: {
     type: DataTypes.INTEGER,
@@ -39,12 +35,18 @@ const Pago = sequelize.define('pago', {
   },
   estado: {
     type: DataTypes.BOOLEAN,
-    defaultValue: true // true = activo, false = anulado
+    allowNull: false,
+    defaultValue: true
   },
   cod_usuario: {
     type: DataTypes.INTEGER,
-    allowNull: false // usuario que registró el pago (auditoría)
+    allowNull: false
   }
+}, {
+  tableName: 'pago',
+  freezeTableName: true,
+  timestamps: false,
+  schema: 'public'
 });
 
 export default Pago;

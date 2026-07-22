@@ -25,7 +25,7 @@ export const listarActivas = async (req, res) => {
     const datos = await categoriaProductoService.listarActivas();
     res.json({ ok: true, message: 'Categorías activas', data: datos });
   } catch (error) {
-    res.status(500).json({ ok: false, message: error.message, data: null });
+    res.status(500).json({ ok: false, mensaje: error.message });
   }
 };
 

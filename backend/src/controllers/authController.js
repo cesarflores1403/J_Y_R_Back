@@ -1,5 +1,6 @@
 import authService from '../services/authService.js';
 import { registrarEventoSeguridad } from '../utils/auditoriaSeguridad.js';
+import { resetLoginAttempts } from '../middlewares/loginRateLimiter.js';
 
 const respuestaAuthError = (res, error) => {
   const status = error.statusCode || error.status || 500;
@@ -17,6 +18,7 @@ export const login = async (req, res) => {
   const { nombre_usuario, password } = req.body;
   try {
     const resultado = await authService.login(nombre_usuario, password);
+    resetLoginAttempts(req);
     await registrarEventoSeguridad(req, {
       evento: 'LOGIN_EXITOSO',
       cod_usuario: resultado.usuario?.cod_usuario || null,

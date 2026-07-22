@@ -229,11 +229,11 @@ export const subirImagen = async (req, res, next) => {
     const cod_producto = Number(req.params.codProducto);
 
     if (!cod_producto || isNaN(cod_producto) || cod_producto < 1) {
-      return res.status(400).json({ ok: false, message: 'cod_producto inválido.', data: null });
+      return res.status(400).json({ ok: false, mensaje: 'cod_producto inválido.' });
     }
 
     if (!req.file) {
-      return res.status(400).json({ ok: false, message: 'No se envió ninguna imagen.', data: null });
+      return res.status(400).json({ ok: false, mensaje: 'No se envió ninguna imagen.' });
     }
 
     const imagen_url = await productoService.subirImagen(cod_producto, req.file);
@@ -256,7 +256,7 @@ export const eliminarImagen = async (req, res, next) => {
     const cod_producto = Number(req.params.codProducto);
 
     if (!cod_producto || isNaN(cod_producto) || cod_producto < 1) {
-      return res.status(400).json({ ok: false, message: 'cod_producto inválido.', data: null });
+      return res.status(400).json({ ok: false, mensaje: 'cod_producto inválido.' });
     }
 
     await productoService.eliminarImagen(cod_producto);

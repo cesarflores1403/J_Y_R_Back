@@ -1,0 +1,43 @@
+-- ADVERTENCIA:
+-- Este script solo se ejecuta después de confirmar que el frontend React utiliza exclusivamente la API Node/Express
+-- y no accede directamente a Supabase.
+
+BEGIN;
+
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM authenticated;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM authenticated;
+REVOKE ALL ON ALL PROCEDURES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL PROCEDURES IN SCHEMA public FROM authenticated;
+
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
+REVOKE EXECUTE ON ALL PROCEDURES IN SCHEMA public FROM PUBLIC;
+
+GRANT USAGE ON SCHEMA public TO jyr_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO jyr_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO jyr_app;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO jyr_app;
+GRANT EXECUTE ON ALL PROCEDURES IN SCHEMA public TO jyr_app;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO jyr_app;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO jyr_app;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO jyr_app;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT EXECUTE ON PROCEDURES TO jyr_app;
+
+COMMIT;
+
+SELECT grantee, privilege_type, table_name
+FROM information_schema.table_privileges
+WHERE table_schema = 'public'
+  AND grantee IN ('anon', 'authenticated', 'jyr_app')
+ORDER BY grantee, table_name, privilege_type;

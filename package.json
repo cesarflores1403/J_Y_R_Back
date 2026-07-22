@@ -20,6 +20,7 @@
     "dev": "npm run dev:public",
     "build:frontend": "npm run build --prefix frontend",
     "test": "npm test --prefix backend",
+    "test:api": "npm run test:api --prefix backend",
     "services:install": "powershell -Command \"Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser -Force; & '.\\scripts\\install-services.ps1'\"",
     "services:uninstall": "powershell -Command \"Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser -Force; & '.\\scripts\\uninstall-services.ps1'\"",
     "services:diagnose": "powershell -Command \"& '.\\scripts\\diagnose-services.ps1'\"",

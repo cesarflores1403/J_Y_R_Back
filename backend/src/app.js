@@ -6,6 +6,7 @@ import morgan from 'morgan'; // // Logger HTTP requests
 import routes from './routes/index.js';
 
 import pool from './config/db-connection.js'; // // Pool BD (conexión PostgreSQL)
+import { getCorsOriginValidator, getHelmetOptions, getJsonBodyLimit, isProduction } from './config/security.js';
 
 // Importar asociaciones Sequelize (registra las relaciones entre modelos)
 import './models/associations.js';
@@ -19,42 +20,11 @@ const app = express();
 // MIDDLEWARES GLOBALES
 // =======================
 
-// =======================
-// CABECERAS DE SEGURIDAD HTTP (helmet)
-// CSP + Anti-Clickjacking (X-Frame-Options) + nosniff + HSTS
-// =======================
-app.use(helmet({
-  // Content-Security-Policy: restringe de dónde se puede cargar contenido.
-  contentSecurityPolicy: {
-    useDefaults: true,
-    directives: {
-      defaultSrc: ["'self'"],
-      baseUri: ["'self'"],
-      objectSrc: ["'none'"],
-      frameAncestors: ["'none'"],                 // anti-clickjacking (nadie puede embeber en iframe)
-      imgSrc: ["'self'", 'data:', 'blob:'],       // logos e imágenes en base64/blob
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],     // estilos inline de Bootstrap
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'", 'data:']
-    }
-  },
-  // X-Frame-Options: DENY (refuerza el anti-clickjacking en navegadores viejos)
-  frameguard: { action: 'deny' },
-  // Strict-Transport-Security: fuerza HTTPS por 1 año.
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true
-  },
-  // X-Content-Type-Options: nosniff (helmet lo activa por defecto; explícito aquí)
-  // Referrer-Policy endurecida
-  referrerPolicy: { policy: 'no-referrer' },
-  // Permite que /uploads (imágenes) se consuman desde el frontend en otro origen.
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
-})); // // Seguridad HTTP
-app.use(morgan('dev')); // // Log de requests en desarrollo
-app.use(express.json()); // // Permite recibir JSON
+app.use(helmet(getHelmetOptions())); // // Seguridad HTTP
+if (!isProduction()) {
+  app.use(morgan('dev')); // // Log de requests en desarrollo
+}
+app.use(express.json({ limit: getJsonBodyLimit() })); // // Permite recibir JSON
 app.use(express.urlencoded({ extended: true })); // // Permite recibir form-data
 app.use(cookieParser()); // // Habilita cookies
 
@@ -63,26 +33,8 @@ app.use(cookieParser()); // // Habilita cookies
 // =======================
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // // Permitir requests sin origin (Postman, curl, etc.)
-    if (!origin) return callback(null, true);
-
-    // // Permitir localhost y dominios temporales de tuneles para compartir entorno local
-    const allowedPatterns = [
-      /^http:\/\/localhost:\d+$/,
-      /^http:\/\/127\.0\.0\.1:\d+$/,
-      /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/,
-      /^https:\/\/[a-z0-9-]+\.loca\.lt$/,
-      /^https:\/\/[a-z0-9-]+\.lhr\.life$/
-    ];
-
-    if (allowedPatterns.some((pattern) => pattern.test(origin))) {
-      return callback(null, true);
-    }
-
-    callback(new Error('No permitido por CORS'));
-  },
-  credentials: true // // Permitir cookies
+  origin: getCorsOriginValidator(),
+  credentials: true
 }));
 
 // =======================
@@ -139,7 +91,6 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.use('/uploads', (req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  res.setHeader('Access-Control-Allow-Origin', '*');
   next();
 }, express.static(path.resolve(__dirname, '../uploads'), {
   maxAge: '7d',

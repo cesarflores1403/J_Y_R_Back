@@ -1,8 +1,9 @@
 import jwt from 'jsonwebtoken';
 import Usuario from '../models/Usuario.js';
 import Rol from '../models/Rol.js';
+import { getJwtSecret } from '../config/security.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'CAMBIA_ESTE_SECRET_EN_ENV';
+const JWT_SECRET = getJwtSecret();
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -46,7 +47,7 @@ export const autenticar = async (req, res, next) => {
     if (!usuario || !usuario.estado_usuario) {
       return res.status(401).json({
         ok: false,
-        mensaje: 'Token invalido o usuario desactivado'
+        mensaje: 'Token invalido o usuario inactivo'
       });
     }
 
@@ -77,7 +78,7 @@ export const autorizar = (...rolesPermitidos) => {
     if (!rolesPermitidos.includes(rolUsuario)) {
       return res.status(403).json({
         ok: false,
-        mensaje: `Acceso denegado. Se requiere rol: ${rolesPermitidos.join(' o ')}`
+        mensaje: 'Acceso denegado'
       });
     }
     return next();
@@ -120,7 +121,7 @@ export const authRequired = (req, res, next) => {
   const token = req.cookies?.access_token;
 
   if (!token) {
-    return res.status(401).json({ error: true, message: 'No autorizado' });
+    return res.status(401).json({ ok: false, mensaje: 'No autorizado' });
   }
 
   try {
@@ -136,7 +137,7 @@ export const authRequired = (req, res, next) => {
     res.clearCookie('access_token', { path: '/', sameSite, secure });
     res.clearCookie('csrf_token', { path: '/', sameSite, secure });
 
-    return res.status(401).json({ error: true, message: 'Sesion expirada o invalida' });
+    return res.status(401).json({ ok: false, mensaje: 'Sesion expirada o invalida' });
   }
 };
 
@@ -147,7 +148,7 @@ export const csrfProtect = (req, res, next) => {
   const csrfHeader = req.get('x-csrf-token');
 
   if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
-    return res.status(403).json({ error: true, message: 'CSRF token invalido' });
+    return res.status(403).json({ ok: false, mensaje: 'CSRF token invalido' });
   }
 
   return next();

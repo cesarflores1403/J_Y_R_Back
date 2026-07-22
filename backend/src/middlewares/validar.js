@@ -29,9 +29,7 @@ export const validarCampos = (req, res, next) => {
 
     return res.status(400).json({
       ok: false,
-      message,           // Contrato estándar
-      data: null,         // Contrato estándar
-      errores: listaErrores  // Detalle por campo
+      mensaje: message
     });
   }
   next();

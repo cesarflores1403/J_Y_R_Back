@@ -15,7 +15,9 @@
     "clientes:scrub": "node scripts/scrubClientes.mjs",
     "clientes:scrub:apply": "node scripts/scrubClientes.mjs --apply",
     "backup:system": "node scripts/backupSystem.mjs",
-    "restore:system": "node scripts/restoreSystem.mjs"
+    "restore:system": "node scripts/restoreSystem.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:api": "node --test tests/api.test.mjs"
   },
   "dependencies": {
     "archiver": "^7.0.1",

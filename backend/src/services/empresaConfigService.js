@@ -39,10 +39,18 @@ const asegurarSecuenciaSegura = (secuencia) => {
 
 const empresaConfigService = {
   async _asegurarCampoLogoFactura() {
-    await sequelize.query(
-      'ALTER TABLE empresa_config ADD COLUMN IF NOT EXISTS logo_factura_url VARCHAR(300)',
-      { type: QueryTypes.RAW }
+    const columna = await sequelize.query(
+      `SELECT 1
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'empresa_config'
+          AND column_name = 'logo_factura_url'`,
+      { type: QueryTypes.SELECT }
     );
+
+    if (!columna?.length) {
+      throw Object.assign(new Error('La columna empresa_config.logo_factura_url no existe. Debes aplicar el script SQL versionado correspondiente.'), { statusCode: 500 });
+    }
   },
 
   async _obtenerSecuencia(tabla, columna, transaction = null) {

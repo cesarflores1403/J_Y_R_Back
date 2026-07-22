@@ -1,4 +1,5 @@
 import { Sequelize } from 'sequelize';
+import { getAppDatabaseCredentials } from './security.js';
 
 const DEFAULT_DB_PORT = 5432;
 
@@ -10,21 +11,7 @@ const requiredEnv = (name) => {
   return value;
 };
 
-const getDbCredentials = () => {
-  const appUser = String(process.env.DB_APP_USER || '').trim();
-  const appPassword = String(process.env.DB_APP_PASSWORD || '').trim();
-
-  if (appUser && appPassword) {
-    return { user: appUser, password: appPassword };
-  }
-
-  return {
-    user: requiredEnv('DB_USER'),
-    password: requiredEnv('DB_PASSWORD')
-  };
-};
-
-const dbCredentials = getDbCredentials();
+const dbCredentials = getAppDatabaseCredentials();
 
 const dbConfig = {
   host: requiredEnv('DB_HOST'),
@@ -34,7 +21,7 @@ const dbConfig = {
   password: dbCredentials.password
 };
 
-const dbTimezone = process.env.DB_TIMEZONE || '-06:00';
+const dbTimezone = String(process.env.DB_TIMEZONE || '-06:00').trim() || '-06:00';
 const usarSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
 const dialectOptions = usarSsl ? {
   ssl: {
@@ -54,10 +41,10 @@ const sequelize = new Sequelize(
     timezone: dbTimezone,
     dialectOptions,
     pool: {
-      max: 10,
-      min: 2,
-      acquire: 30000,
-      idle: 10000
+      max: Number(process.env.DB_POOL_MAX || 10),
+      min: Number(process.env.DB_POOL_MIN || 0),
+      acquire: Number(process.env.DB_POOL_ACQUIRE_MS || 30000),
+      idle: Number(process.env.DB_POOL_IDLE_MS || 10000)
     },
     define: {
       timestamps: false,

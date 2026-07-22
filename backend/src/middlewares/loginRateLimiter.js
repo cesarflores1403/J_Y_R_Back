@@ -80,7 +80,13 @@ export const loginRateLimiter = (req, res, next) => {
     return respuestaBloqueo(res, registro.reiniciaEn);
   }
 
+  req.loginRateLimitKey = clave;
   return next();
+};
+
+export const resetLoginAttempts = (req) => {
+  const clave = req?.loginRateLimitKey || construirClave(req);
+  registros.delete(clave);
 };
 
 export default loginRateLimiter;

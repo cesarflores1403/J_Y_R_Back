@@ -1,4 +1,5 @@
 import pkg from 'pg';
+import { getAppDatabaseCredentials } from './security.js';
 
 const { Pool } = pkg;
 
@@ -11,22 +12,8 @@ const requiredEnv = (name) => {
 };
 
 const usarSsl = String(process.env.DB_SSL || '').toLowerCase() === 'true';
-
-const getDbCredentials = () => {
-  const appUser = String(process.env.DB_APP_USER || '').trim();
-  const appPassword = String(process.env.DB_APP_PASSWORD || '').trim();
-
-  if (appUser && appPassword) {
-    return { user: appUser, password: appPassword };
-  }
-
-  return {
-    user: requiredEnv('DB_USER'),
-    password: requiredEnv('DB_PASSWORD')
-  };
-};
-
-const dbCredentials = getDbCredentials();
+const dbTimezone = String(process.env.DB_TIMEZONE || '-06:00').trim() || '-06:00';
+const dbCredentials = getAppDatabaseCredentials();
 
 const pool = new Pool({
   host: requiredEnv('DB_HOST'),
@@ -34,7 +21,14 @@ const pool = new Pool({
   user: dbCredentials.user,
   password: dbCredentials.password,
   database: requiredEnv('DB_NAME'),
-  ssl: usarSsl ? { rejectUnauthorized: false } : false
+  ssl: usarSsl ? { rejectUnauthorized: false } : false,
+  application_name: process.env.DB_APPLICATION_NAME || 'jyr-back',
+  options: `-c TimeZone=${dbTimezone}`,
+  max: Number(process.env.DB_POOL_MAX || 10),
+  min: Number(process.env.DB_POOL_MIN || 0),
+  connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10000),
+  idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30000),
+  keepAlive: true
 });
 
 pool.on('connect', () => {

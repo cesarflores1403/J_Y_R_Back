@@ -20,6 +20,11 @@ if (!fs.existsSync(uploadsTempDir)) {
   fs.mkdirSync(uploadsTempDir, { recursive: true });
 }
 
+const maxUploadMb = Number.parseInt(process.env.BACKUP_MAX_UPLOAD_MB || '512', 10);
+const maxUploadBytes = Number.isInteger(maxUploadMb) && maxUploadMb > 0
+  ? maxUploadMb * 1024 * 1024
+  : 512 * 1024 * 1024;
+
 const uploadZip = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadsTempDir),
@@ -28,7 +33,7 @@ const uploadZip = multer({
       cb(null, `backup-upload-${stamp}${path.extname(file.originalname).toLowerCase() || '.zip'}`);
     }
   }),
-  limits: { fileSize: 1024 * 1024 * 1024 },
+  limits: { fileSize: maxUploadBytes },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ext === '.zip') {

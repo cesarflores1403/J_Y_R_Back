@@ -1,102 +1,101 @@
-# J&R - Monorepo
+# J&R Monorepo
 
-Proyecto completo con Backend y Frontend.
-
-## Estructura
-
-```
-├── backend/    → API REST (Node.js + Express)
-├── frontend/   → Aplicación web (React + Vite)
-└── package.json → Scripts globales
-```
+Monorepo con backend Node.js/Express/PostgreSQL y frontend React/Vite.
 
 ## Instalación
 
-```bash
-# Instalar dependencias globales
+```powershell
 npm install
-
-# Instalar dependencias de backend y frontend
 npm run install:all
 ```
 
-## Desarrollo
+## Configuración Segura
 
-```bash
-# Iniciar backend + frontend + URL publica automatica
-npm run dev
+1. Copia `backend/.env.example` a `backend/.env`.
+2. Completa `DB_APP_USER` y `DB_APP_PASSWORD` con el usuario de aplicación `jyr_app`.
+3. Usa `DB_MAINTENANCE_USER` y `DB_MAINTENANCE_PASSWORD` solo para backups, restauraciones y tareas administrativas.
+4. Define `JWT_SECRET` con al menos 32 caracteres.
+5. Configura `CORS_ALLOWED_ORIGINS` con orígenes exactos. Los túneles solo se permiten si `ALLOW_TUNNEL_ORIGINS=true`.
 
-# Equivalente explicito (mismo comportamiento)
-npm run dev:public
-
-# Iniciar backend + frontend compilado + URL publica mas rapida
-npm run dev:public:fast
-
-# Solo backend (puerto 5000)
-npm run start:backend
-
-# Solo frontend (puerto 5173)
-npm run start:frontend
-```
-
-## URL Publica Fija (Cloudflare)
-
-El script `npm run dev` ya levanta el tunel automaticamente.
-
-Para una URL publica con mejor rendimiento, usa `npm run dev:public:fast`.
-
-- Si no configuras token, usa modo rapido (`trycloudflare`) y la URL cambia en cada arranque.
-- Si configuras token, usa modo fijo y mantiene tu URL estable.
-
-Pasos para URL fija:
-
-```bash
-# 1) Copiar plantilla
-copy .env.tunnel.example .env.tunnel
-
-# 2) Editar .env.tunnel y completar:
-# - TUNNEL_TOKEN
-# - TUNNEL_PUBLIC_URL
-
-# 3) Arrancar todo
-npm run dev
-```
-
-La URL publica activa se guarda en `public-url.txt`.
-
-## 🔌 Servicios de Windows (Producción)
-
-**¿Quieres que la URL pública siga funcionando cuando la máquina duerma?**
-
-Usa servicios de Windows para que Backend y Cloudflare Tunnel se ejecuten automáticamente:
+## Backend
 
 ```powershell
-# 1) Abre PowerShell como Administrador (requerido)
-
-# 2) Ejecuta el instalador:
-cd scripts
-.\install-services.ps1
-
-# 3) Verifica el estado:
-.\diagnose-services.ps1
+npm run dev:backend
 ```
 
-**Beneficios:**
-- ✅ La URL pública sigue funcionando cuando la máquina duerme
-- ✅ Se inicia automáticamente al encender Windows
-- ✅ Se reinicia automáticamente si falla
-- ✅ No requiere sesión iniciada
+La API no modifica el esquema al iniciar. Solo comprueba conexión y arranca.
 
-Para más detalles: Ver [scripts/README.md](scripts/README.md)
+## Tabla Canonica de Pagos
 
-## Build
+El backend usa únicamente `public.pago`.
 
-```bash
-npm run build:frontend
+El endpoint HTTP se conserva en plural:
+
+```text
+/api/pagos
 ```
 
-## Tests
+### Endpoints
 
-```bash
+- `GET /api/pagos/factura/:codFactura`
+- `POST /api/pagos`
+- `PATCH /api/pagos/:codPago/anular`
+
+## Migracion de Pagos
+
+Antes de consolidar pagos, revisa el script:
+
+```text
+backend/scripts/sql/002-consolidar-pago.sql
+```
+
+Ejecuta solo después de validar que `public.pagos` está vacía.
+
+## Rol jyr_app y Privilegios Minimos
+
+Revisa y ejecuta manualmente:
+
+- `backend/scripts/sql/least-privilege-app-role.sql`
+- `backend/scripts/sql/003-revocar-acceso-directo.sql`
+
+El script de revocación solo debe correr cuando el frontend React ya use exclusivamente la API Node/Express.
+
+## Pruebas
+
+```powershell
 npm test
+npm run test:api
 ```
+
+## Backup
+
+```powershell
+npm run backup:system --prefix backend
+```
+
+Genera un respaldo custom de PostgreSQL para `schema public`, copia `uploads` cuando existe y escribe `metadata.json` con hash SHA-256.
+
+## Restore
+
+```powershell
+npm run restore:system --prefix backend -- "backups/<carpeta-backup>"
+```
+
+Antes de restaurar:
+
+1. Detén el backend.
+2. Valida el hash del respaldo.
+3. Verifica que la ruta esté dentro de `backups/`.
+
+## Archivos Que Nunca Deben Compartirse
+
+- `backend/.env`
+- `backend/backups/`
+- `backend/uploads/`
+- `*.log`
+- tokens JWT
+- contraseñas o credenciales de base de datos
+
+## Advertencia de Arranque
+
+La API no ejecuta `ALTER TABLE`, `CREATE TABLE`, `DROP TABLE`, `sync({ alter: true })` ni `sync({ force: true })` al iniciar. Los cambios de esquema quedan en `backend/scripts/sql/`.

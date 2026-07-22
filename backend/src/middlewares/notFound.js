@@ -5,6 +5,6 @@
 export const notFound = (req, res, next) => {
   res.status(404).json({
     ok: false,
-    message: 'Recurso no encontrado',
+    mensaje: 'Recurso no encontrado',
   });
 };

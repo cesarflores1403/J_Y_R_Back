@@ -64,7 +64,7 @@ Factura.hasMany(Pago, { foreignKey: 'cod_factura', as: 'pagos' });
 Pago.belongsTo(Factura, { foreignKey: 'cod_factura', as: 'factura' });
 
 // Pago -> Usuario (auditoría)
-Usuario.hasMany(Pago, { foreignKey: 'cod_usuario', as: 'pagosRegistrados' });
+Usuario.hasMany(Pago, { foreignKey: 'cod_usuario', as: 'pagos' });
 Pago.belongsTo(Usuario, { foreignKey: 'cod_usuario', as: 'usuario' });
 
 // CategoriaProducto -> Producto (HU-07)
