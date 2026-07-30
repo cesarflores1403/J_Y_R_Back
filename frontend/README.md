@@ -13,7 +13,8 @@ Frontend de la aplicación J Y R construido con React JS y Bootstrap 5.
 
 ```bash
 git clone <tu-repositorio>
-cd J_Y_R_Fron
+cd J_Y_R_Back
+cd frontend
 ```
 
 2. Instala las dependencias:
@@ -28,40 +29,37 @@ npm install
 npm start
 ```
 
-La aplicación estará disponible en `http://localhost:3000`
+La aplicación estará disponible en `http://localhost:5173`
 
 ## Estructura del Proyecto
 
 ```
 src/
-├── components/       # Componentes reutilizables
-│   ├── Navbar.js
-│   ├── Navbar.css
-│   ├── Footer.js
-│   └── Footer.css
+├── app/             # Componente principal y punto de entrada
+│   ├── App.jsx      # Componente raíz con rutas
+│   └── main.jsx     # Punto de entrada
+├── components/      # Componentes reutilizables
 ├── pages/           # Páginas de la aplicación
-│   ├── Home.js
-│   └── Home.css
-├── App.js           # Componente principal
-├── App.css
-├── index.js         # Punto de entrada
-└── index.css
+├── services/        # Llamadas a la API (axios)
+├── contexts/        # Contextos de React
+├── hooks/           # Hooks personalizados
+├── utils/           # Funciones utilitarias
+└── styles/          # Módulos CSS
 ```
 
 ## Tecnologías Utilizadas
 
 - **React JS** - Librería de interfaz de usuario
 - **Bootstrap 5** - Framework CSS
-- **React Bootstrap** - Componentes Bootstrap para React
 - **React Router** - Enrutamiento de la aplicación
 - **Axios** - Cliente HTTP
+- **React Toastify** - Notificaciones
 
 ## Scripts Disponibles
 
 - `npm start` - Inicia el servidor de desarrollo
-- `npm build` - Crea una versión de producción
-- `npm test` - Ejecuta las pruebas
-- `npm eject` - Expone la configuración (irreversible)
+- `npm run build` - Crea una versión de producción
+- `npm run preview` - Vista previa de la versión de producción
 
 ## Desarrollo
 
@@ -74,15 +72,15 @@ Para agregar nuevos componentes:
 Para agregar nuevas páginas:
 
 1. Crea un archivo en `src/pages/`
-2. Agrega la ruta en `App.js` usando React Router
-3. Importa el componente en `App.js`
+2. Agrega la ruta en `App.jsx` usando React Router
+3. Importa el componente en `App.jsx`
 
 ## Variables de Entorno
 
 Crea un archivo `.env` en la raíz del proyecto:
 
 ```
-REACT_APP_API_URL=http://localhost:5000/api
+VITE_API_URL=http://localhost:5000/api
 ```
 
 ## Contribuir
