@@ -49,10 +49,17 @@ DB_SSL=false
 ```powershell
 npm install
 npm run install:all
+npm run db:restore-preserved --prefix backend
 npm run db:seed --prefix backend
 ```
 
-El comando crea solamente roles, catalogos tecnicos y la cuenta Super Administrador indicada en `backend/.env`.
+El primer comando restaura exclusivamente los cuatro usuarios conservados, sus
+roles, la configuracion de J&R y las entradas del carrusel. Las contrasenas se
+guardan como hashes bcrypt; no hay contrasenas visibles en el archivo SQL.
+
+El segundo comando completa los catalogos tecnicos requeridos. Si no se carga
+el archivo preservado, crea la cuenta Super Administrador indicada en
+`backend/.env`.
 
 ## 5. Compilar y ejecutar
 
