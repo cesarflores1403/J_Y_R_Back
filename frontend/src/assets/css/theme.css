@@ -1856,8 +1856,8 @@ a {
 }
 
 .login-slide-img {
-  width: 220px;
-  height: 180px;
+  width: 330px;
+  height: 270px;
   object-fit: contain;
   position: relative;
   z-index: 2;
@@ -2061,8 +2061,8 @@ a {
     border-top: 1px solid rgba(255, 255, 255, 0.06);
   }
   .login-slide-img {
-    width: 160px;
-    height: 130px;
+    width: 240px;
+    height: 195px;
   }
   .login-slide-name {
     font-size: 22px;

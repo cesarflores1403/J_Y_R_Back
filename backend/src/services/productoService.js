@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import bitacoraFacturacionService from './bitacoraFacturacionService.js';
 import { generarReportePdf } from '../utils/pdfReport.js';
+import { eliminarArchivoSeguro, optimizarImagenProducto } from '../utils/optimizarImagenProducto.js';
 
 // =====================================================
 // SERVICE: Producto
@@ -1103,28 +1104,37 @@ export const cambiarEstadoMasivo = async ({ cod_productos, estado, cod_usuario =
 // HU-08: Subir/reemplazar imagen del producto
 // =======================
 export const subirImagen = async (cod_producto, file) => {
-  // Verificar que el producto existe
-  const existe = await pool.query('SELECT cod_producto, imagen_url FROM producto WHERE cod_producto = $1', [cod_producto]);
-  if (existe.rows.length === 0) {
-    const error = new Error(`Producto con código ${cod_producto} no encontrado.`);
-    error.status = 404;
+  let imagenOptimizada = null;
+
+  try {
+    const existe = await pool.query(
+      'SELECT cod_producto, imagen_url FROM producto WHERE cod_producto = $1',
+      [cod_producto]
+    );
+    if (existe.rows.length === 0) {
+      const error = new Error(`Producto con código ${cod_producto} no encontrado.`);
+      error.status = 404;
+      throw error;
+    }
+
+    imagenOptimizada = await optimizarImagenProducto(file.path);
+    const imagen_url = `/uploads/productos/${imagenOptimizada.filename}`;
+
+    await productoModel.updateImagenProducto(cod_producto, imagen_url);
+
+    const imagenAnterior = existe.rows[0].imagen_url;
+    if (imagenAnterior && imagenAnterior !== imagen_url) {
+      await eliminarArchivoSeguro(path.resolve(imagenAnterior.replace(/^\//, '')));
+    }
+
+    return imagen_url;
+  } catch (error) {
+    await eliminarArchivoSeguro(file?.path);
+    if (imagenOptimizada?.outputPath) {
+      await eliminarArchivoSeguro(imagenOptimizada.outputPath);
+    }
     throw error;
   }
-
-  // Si ya tiene imagen, eliminar el archivo anterior
-  const imagenAnterior = existe.rows[0].imagen_url;
-  if (imagenAnterior) {
-    const rutaAnterior = path.resolve(imagenAnterior.replace(/^\//, ''));
-    if (fs.existsSync(rutaAnterior)) {
-      fs.unlinkSync(rutaAnterior);
-    }
-  }
-
-  // Guardar nueva ruta en BD
-  const imagen_url = `/uploads/productos/${file.filename}`;
-  await productoModel.updateImagenProducto(cod_producto, imagen_url);
-
-  return imagen_url;
 };
 
 // =======================

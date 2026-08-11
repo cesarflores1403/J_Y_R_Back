@@ -31,6 +31,14 @@ public-url.txt
 # ==============================
 backend/backups/*/
 
+# Datos generados en ejecucion (no deben subirse al repositorio)
+backend/uploads/*
+!backend/uploads/.gitkeep
+!backend/uploads/carrusel-marca_*.png
+!backend/uploads/carrusel-marca_*.svg
+.local-postgres/
+.local-postgres17/
+
 # ==============================
 # ARCHIVOS SISTEMA
 # ==============================

@@ -35,17 +35,18 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (_req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png/;
+  const allowedTypes = /jpeg|jpg|png|webp/;
   const extOk = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimeOk = allowedTypes.test(file.mimetype.split('/')[1]);
   if (extOk && mimeOk) return cb(null, true);
-  cb(new Error('Solo se permiten imágenes JPG o PNG.'));
+  cb(new Error('Solo se permiten imágenes JPG, PNG o WebP.'));
 };
 
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 2 * 1024 * 1024 } // 2 MB max
+  // El original es temporal; despues se reduce y convierte a WebP.
+  limits: { fileSize: 8 * 1024 * 1024 }
 });
 
 // GET /api/v1/productos

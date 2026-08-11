@@ -84,7 +84,7 @@ export const createProducto = async (datos, db = pool) => {
   // // 1. Insertar producto
   await db.query(queryInsert, [tabla, datosJson]);
 
-  // // 2. Buscar el producto recién creado por nombre (método confiable con Supabase pooler)
+  // // 2. Buscar el producto recien creado por nombre
   const buscar = `
     SELECT cod_producto, nombre_producto, cod_categoria,
           descripcion, especificaciones, unidad_medida, precio_venta, precio_costo, cod_isv, estado_producto,

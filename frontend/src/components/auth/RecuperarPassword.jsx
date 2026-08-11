@@ -65,7 +65,7 @@ const RecuperarPassword = () => {
     if (marcas.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % marcas.length);
-    }, 3500);
+    }, 1000);
     return () => clearInterval(timer);
   }, [marcas.length]);
 
@@ -153,7 +153,6 @@ const RecuperarPassword = () => {
                 fetchPriority={i === currentSlide ? 'high' : 'auto'}
                 decoding="async"
               />
-              <h2 className="login-slide-name">{marca.nombre}</h2>
             </div>
           ))}
         </div>

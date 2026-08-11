@@ -2,6 +2,8 @@
 
 Proyecto completo con Backend y Frontend.
 
+Para instalar el sistema con PostgreSQL y archivos locales en una maquina virtual, consulta [INSTALACION_SERVIDOR.md](INSTALACION_SERVIDOR.md).
+
 ## Estructura
 
 ```

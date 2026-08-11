@@ -9,14 +9,6 @@ const ROOT_DIR = path.resolve(path.dirname(__filename), '..');
 const ENV_PATH = path.join(ROOT_DIR, '.env');
 dotenv.config({ path: ENV_PATH });
 
-const defaults = {
-  host: 'aws-1-us-east-1.pooler.supabase.com',
-  port: '5432',
-  name: 'postgres',
-  user: 'postgres.eabyyyzucmjehildotvb',
-  password: 'H0l@mundo123!'
-};
-
 const db = {
   host: requiredEnv('DB_HOST'),
   port: process.env.DB_PORT || '5432',

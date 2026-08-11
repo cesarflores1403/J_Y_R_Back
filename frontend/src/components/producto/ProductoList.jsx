@@ -348,22 +348,22 @@ const ProductoList = ({ productos = [], busqueda: busquedaControlada = '', onBus
     if (!file || !uploadTarget) return;
 
     // Validar tipo
-    const tiposPermitidos = ['image/jpeg', 'image/png'];
+    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
     if (!tiposPermitidos.includes(file.type)) {
       await alertDialog({
         title: 'Formato no permitido',
-        text: 'Solo se permiten imágenes JPG o PNG.',
+        text: 'Solo se permiten imágenes JPG, PNG o WebP.',
         icon: 'error'
       });
       e.target.value = '';
       return;
     }
 
-    // Validar tamano (2 MB)
-    if (file.size > 2 * 1024 * 1024) {
+    // El servidor comprime y convierte la imagen a WebP.
+    if (file.size > 8 * 1024 * 1024) {
       await alertDialog({
         title: 'Archivo demasiado grande',
-        text: 'La imagen no puede exceder 2 MB.',
+        text: 'La imagen original no puede exceder 8 MB.',
         icon: 'warning'
       });
       e.target.value = '';
@@ -531,7 +531,7 @@ const ProductoList = ({ productos = [], busqueda: busquedaControlada = '', onBus
       <input
         type="file"
         ref={fileInputRef}
-        accept="image/jpeg,image/png"
+        accept="image/jpeg,image/png,image/webp"
         style={{ display: 'none' }}
         onChange={handleFileChange}
       />

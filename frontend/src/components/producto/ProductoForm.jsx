@@ -157,14 +157,14 @@ const ProductoForm = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const tiposPermitidos = ['image/jpeg', 'image/png'];
+    const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
     if (!tiposPermitidos.includes(file.type)) {
-      setFormError('Solo se permiten imágenes JPG o PNG.');
+      setFormError('Solo se permiten imágenes JPG, PNG o WebP.');
       e.target.value = '';
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setFormError('La imagen no puede exceder 2 MB.');
+    if (file.size > 8 * 1024 * 1024) {
+      setFormError('La imagen original no puede exceder 8 MB.');
       e.target.value = '';
       return;
     }
@@ -1035,7 +1035,7 @@ const ProductoForm = ({
                 <input
                   type="file"
                   ref={fileInputRef}
-                  accept="image/jpeg,image/png"
+                  accept="image/jpeg,image/png,image/webp"
                   style={{ display: 'none' }}
                   onChange={handleImagenChange}
                 />
@@ -1050,7 +1050,7 @@ const ProductoForm = ({
                   {imagenPreview ? 'Cambiar imagen' : 'Seleccionar imagen'}
                 </button>
                 <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--jyr-gray-400)' }}>
-                  JPG o PNG. Máx 2 MB.
+                  JPG, PNG o WebP. Máx. 8 MB; se optimiza automáticamente.
                 </p>
                 {imagenFile && (
                   <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--jyr-success, #16a34a)', fontWeight: 500 }}>
