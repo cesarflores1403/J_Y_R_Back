@@ -1,6 +1,7 @@
+import fs from 'fs/promises';
 import path from 'path';
-import { spawn } from 'child_process';
 import dotenv from 'dotenv';
+import pg from 'pg';
 import { fileURLToPath } from 'url';
 
 const backendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -22,27 +23,55 @@ if (!['127.0.0.1', 'localhost', '::1'].includes(host.toLowerCase())) {
   throw new Error('La restauracion solo permite PostgreSQL en esta misma maquina.');
 }
 
-const sqlFile = path.join(projectDir, 'database', 'jyr_preserved_data.sql');
-const args = [
-  '-v', 'ON_ERROR_STOP=1',
-  '-h', host,
-  '-p', String(process.env.DB_PORT || 5432),
-  '-U', required('DB_USER'),
-  '-d', required('DB_NAME'),
-  '-f', sqlFile
-];
-
-const child = spawn('psql', args, {
-  stdio: 'inherit',
-  env: { ...process.env, PGPASSWORD: required('DB_PASSWORD') }
+const client = new pg.Client({
+  host,
+  port: Number(process.env.DB_PORT || 5432),
+  database: required('DB_NAME'),
+  user: required('DB_USER'),
+  password: required('DB_PASSWORD'),
+  ssl: false
 });
 
-child.on('error', (error) => {
-  console.error('No se pudo ejecutar psql:', error.message);
-  process.exit(1);
-});
+await client.connect();
+try {
+  const operational = await client.query(`
+    SELECT
+      (SELECT COUNT(*) FROM public.factura) +
+      (SELECT COUNT(*) FROM public.clientes) +
+      (SELECT COUNT(*) FROM public.producto) AS total
+  `);
 
-child.on('exit', (code) => {
-  if (code !== 0) process.exit(code || 1);
+  if (Number(operational.rows[0].total) > 0) {
+    throw new Error(
+      'Restauracion detenida: la base ya contiene facturas, clientes o productos. ' +
+      'No se sobrescribio ningun dato.'
+    );
+  }
+
+  const sqlPath = path.join(projectDir, 'database', 'jyr_preserved_data.sql');
+  const sql = (await fs.readFile(sqlPath, 'utf8'))
+    .split(/\r?\n/)
+    .filter((line) => !line.trimStart().startsWith('\\'))
+    .join('\n');
+
+  await client.query(sql);
+
+  const verification = await client.query(`
+    SELECT
+      (SELECT COUNT(*)::int FROM public.usuarios) AS usuarios,
+      (SELECT COUNT(*)::int FROM public.usuarios_rol) AS usuarios_rol,
+      (SELECT COUNT(*)::int FROM public.empresa_config) AS empresa_config,
+      (SELECT COUNT(*)::int FROM public.carrusel_imagenes) AS carrusel
+  `);
+  const result = verification.rows[0];
+
+  if (result.usuarios !== 4 || result.usuarios_rol !== 4 ||
+      result.empresa_config !== 1 || result.carrusel !== 9) {
+    throw new Error(`Verificacion inesperada: ${JSON.stringify(result)}`);
+  }
+
   console.log('Usuarios, configuracion y carrusel restaurados correctamente.');
-});
+  console.log(JSON.stringify(result));
+} finally {
+  await client.end();
+}

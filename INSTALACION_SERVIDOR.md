@@ -56,6 +56,9 @@ npm run db:seed --prefix backend
 El primer comando restaura exclusivamente los cuatro usuarios conservados, sus
 roles, la configuracion de J&R y las entradas del carrusel. Las contrasenas se
 guardan como hashes bcrypt; no hay contrasenas visibles en el archivo SQL.
+El restaurador usa directamente la conexion del backend y no depende de que
+`psql` este agregado al PATH. Tambien comprueba los conteos al finalizar y se
+detiene sin sobrescribir si detecta facturas, clientes o productos existentes.
 
 El segundo comando completa los catalogos tecnicos requeridos. Si no se carga
 el archivo preservado, crea la cuenta Super Administrador indicada en
