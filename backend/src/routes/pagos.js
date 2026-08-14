@@ -21,7 +21,7 @@ const validarRegistroPago = [
   body('observacion').optional().isString(),
   validarCampos
 ];
-router.post('/', autorizar('Administrador', 'Cajero'), validarRegistroPago, registrarPago);
+router.post('/', autorizar('Administrador', 'Cajero', 'Vendedor'), validarRegistroPago, registrarPago);
 
 // Anular un pago (solo Administrador)
 router.patch('/:codPago/anular', autorizar('Administrador'), anularPago);

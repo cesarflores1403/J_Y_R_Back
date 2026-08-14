@@ -35,10 +35,10 @@ const validarCrearCotizacion = [
 ];
 
 // Administrador y Cajero pueden crear cotizaciones
-router.post('/', autorizar('Administrador', 'Cajero'), validarCrearCotizacion, crear);
+router.post('/', autorizar('Administrador', 'Cajero', 'Vendedor'), validarCrearCotizacion, crear);
 
 // Convertir cotización a factura
-router.post('/:id/convertir', autorizar('Administrador', 'Cajero'), convertirAFactura);
+router.post('/:id/convertir', autorizar('Administrador', 'Cajero', 'Vendedor'), convertirAFactura);
 
 // Anular cotización
 router.patch('/:id/anular', autorizar('Administrador'), anular);

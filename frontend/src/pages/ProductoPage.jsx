@@ -39,7 +39,7 @@ const ProductoPage = () => {
   // HU-09: Determinar si el usuario puede editar
   const puedeEditar = ['Administrador', 'Bodeguero', 'Cajero'].includes(usuario?.rol);
   const puedeVerAuditoriaProducto = ['Administrador', 'Super Administrador'].includes(usuario?.rol);
-  const puedeVerPrecioCosto = usuario?.rol !== 'Cajero';
+  const puedeVerPrecioCosto = !['Cajero', 'Vendedor'].includes(usuario?.rol);
   const puedeVerMargen = usuario?.rol === 'Administrador';
 
   const handleEdit = (p) => {

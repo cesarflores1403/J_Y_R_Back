@@ -534,7 +534,7 @@ const Facturacion = () => {
       {/* ========== HEADER ========== */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h3 className="mb-0"><FiFileText className="me-2" />Facturación</h3>
-        {(usuario?.rol === 'Administrador' || usuario?.rol === 'Cajero') && (
+        {(['Administrador', 'Cajero', 'Vendedor'].includes(usuario?.rol)) && (
           <button className="btn jyr-btn-primary" onClick={abrirNuevaFactura}>
             <FiPlus className="me-2" />Nueva Factura
           </button>
@@ -599,7 +599,7 @@ const Facturacion = () => {
                       <button className="btn btn-sm btn-outline-secondary me-1" onClick={() => imprimirComprobante(f.cod_factura)} title="Imprimir comprobante">
                         <FiPrinter />
                       </button>
-                      {f.estado && f.estado_pago !== 'PAGADA' && (usuario?.rol === 'Administrador' || usuario?.rol === 'Cajero') && (
+                      {f.estado && f.estado_pago !== 'PAGADA' && ['Administrador', 'Cajero', 'Vendedor'].includes(usuario?.rol) && (
                         <button className="btn btn-sm btn-outline-success me-1" onClick={() => abrirModalPagos(f.cod_factura)} title="Registrar pago">
                           <FiCreditCard />
                         </button>
@@ -1038,7 +1038,7 @@ const Facturacion = () => {
                 <button className="btn btn-outline-dark me-auto" onClick={() => imprimirComprobante(facturaDetalle.cod_factura)}>
                   <FiPrinter className="me-2" />Imprimir / PDF
                 </button>
-                {facturaDetalle.estado && facturaDetalle.estado_pago !== 'PAGADA' && (usuario?.rol === 'Administrador' || usuario?.rol === 'Cajero') && (
+                {facturaDetalle.estado && facturaDetalle.estado_pago !== 'PAGADA' && ['Administrador', 'Cajero', 'Vendedor'].includes(usuario?.rol) && (
                   <button className="btn btn-success" onClick={() => { setModalDetalle(false); abrirModalPagos(facturaDetalle.cod_factura); }}>
                     <FiCreditCard className="me-2" />Registrar Pago
                   </button>
@@ -1102,7 +1102,7 @@ const Facturacion = () => {
                 </div>
 
                 {/* Formulario nuevo pago */}
-                {pagoFactura.estado_pago !== 'PAGADA' && pagoFactura.estado && (usuario?.rol === 'Administrador' || usuario?.rol === 'Cajero') && (
+                {pagoFactura.estado_pago !== 'PAGADA' && pagoFactura.estado && ['Administrador', 'Cajero', 'Vendedor'].includes(usuario?.rol) && (
                   <div className="card border-success mb-3">
                     <div className="card-header bg-success bg-opacity-10 py-2">
                       <strong><FiPlus className="me-1" />Registrar Nuevo Pago</strong>

@@ -375,7 +375,7 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h3 className="mb-0"><FiClipboard className="me-2" />Cotizaciones</h3>
-        {['Administrador', 'Cajero'].includes(usuario?.rol) && (
+        {['Administrador', 'Cajero', 'Vendedor'].includes(usuario?.rol) && (
           <button className="btn jyr-btn-primary" onClick={onNueva}>
             <FiPlus className="me-2" />Nueva Cotización
           </button>
@@ -443,7 +443,7 @@ const ListaCotizaciones = ({ onNueva, onVer }) => {
                               <FiClipboard />
                             </button>
                           )}
-                          {c.estado_cotizacion === 'VIGENTE' && ['Administrador', 'Cajero'].includes(usuario?.rol) && (
+                          {c.estado_cotizacion === 'VIGENTE' && ['Administrador', 'Cajero', 'Vendedor'].includes(usuario?.rol) && (
                             <button className="btn btn-sm btn-outline-success" title="Convertir a Factura" onClick={() => convertir(c.cod_cotizacion)}>
                               <FiRefreshCw />
                             </button>
@@ -571,7 +571,7 @@ const DetalleCotizacion = ({ codCotizacion, onVolver, onConvertida }) => {
           <FiArrowLeft className="me-2" />Volver
         </button>
         <div className="d-flex gap-2">
-          {esVigente && ['Administrador', 'Cajero'].includes(usuario?.rol) && (
+          {esVigente && ['Administrador', 'Cajero', 'Vendedor'].includes(usuario?.rol) && (
             <button className="btn btn-success" onClick={handleConvertir}>
               <FiCheckCircle className="me-2" />Convertir a Factura
             </button>

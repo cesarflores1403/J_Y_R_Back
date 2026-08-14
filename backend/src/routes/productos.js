@@ -11,9 +11,10 @@ import {
   validarCambiarEstadoMasivo,
   validarEliminarProducto
 } from '../middlewares/productoValidator.js';
-import { autenticarOpcional } from '../middlewares/auth.js';
+import { autenticar, autenticarOpcional, autorizar } from '../middlewares/auth.js';
 
 const router = express.Router();
+const permitirGestionProductos = [autenticar, autorizar('Administrador', 'Bodeguero', 'Cajero')];
 
 router.use(autenticarOpcional);
 
@@ -56,29 +57,29 @@ router.get('/', getProducto);
 router.get('/reporte/pdf', exportarReportePdf);
 
 // POST /api/v1/productos
-router.post('/', validarCrearProducto, createProducto);
+router.post('/', ...permitirGestionProductos, validarCrearProducto, createProducto);
 
 // PUT /api/v1/productos
-router.put('/', validarActualizarProducto, updateProducto);
+router.put('/', ...permitirGestionProductos, validarActualizarProducto, updateProducto);
 
 // PATCH /api/v1/productos/estado — Cambiar estado (Activo/Inactivo/Descontinuado)
-router.patch('/estado', validarCambiarEstado, cambiarEstado);
+router.patch('/estado', ...permitirGestionProductos, validarCambiarEstado, cambiarEstado);
 
 // PATCH /api/v1/productos/estado-masivo — Cambiar estado de múltiples productos
-router.patch('/estado-masivo', validarCambiarEstadoMasivo, cambiarEstadoMasivo);
+router.patch('/estado-masivo', ...permitirGestionProductos, validarCambiarEstadoMasivo, cambiarEstadoMasivo);
 
 // DELETE /api/v1/productos
-router.delete('/', validarEliminarProducto, deleteProducto);
+router.delete('/', ...permitirGestionProductos, validarEliminarProducto, deleteProducto);
 
 // =======================
 // HU-08: Rutas de imagen de producto
 // =======================
 
 // POST /api/v1/productos/:codProducto/imagen — Subir o reemplazar imagen
-router.post('/:codProducto/imagen', upload.single('imagen'), subirImagen);
+router.post('/:codProducto/imagen', ...permitirGestionProductos, upload.single('imagen'), subirImagen);
 
 // DELETE /api/v1/productos/:codProducto/imagen — Eliminar imagen
-router.delete('/:codProducto/imagen', eliminarImagen);
+router.delete('/:codProducto/imagen', ...permitirGestionProductos, eliminarImagen);
 
 // =======================
 // HU-12: Importación masiva de productos
@@ -97,7 +98,7 @@ const uploadImport = multer({
 });
 
 // POST /api/v1/productos/importar — Importar productos desde CSV/Excel
-router.post('/importar', uploadImport.single('archivo'), importarProductos);
+router.post('/importar', autenticar, autorizar('Administrador', 'Bodeguero'), uploadImport.single('archivo'), importarProductos);
 
 // GET /api/v1/productos/plantilla — Descargar plantilla CSV
 router.get('/plantilla', descargarPlantilla);

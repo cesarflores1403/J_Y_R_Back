@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict sO0j6joi3uSJWnSIB7nbSBNiWTShNgD59n4u9hmmlMapagIJCP3EHVs6x2Kx8wp
+\restrict aKSX0RnQP2qym8y0Zmikeu2DZm6dwDe1a8Ux1wsuwgC3yGRbc9q7REvxq1ChNyS
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -60,6 +60,7 @@ INSERT INTO public.roles (cod_rol, nombre_rol, descripcion, fecha_creacion) VALU
 INSERT INTO public.roles (cod_rol, nombre_rol, descripcion, fecha_creacion) VALUES (2, 'Cajero', 'Rol de Cajero', '2026-08-11 13:46:41.480496');
 INSERT INTO public.roles (cod_rol, nombre_rol, descripcion, fecha_creacion) VALUES (3, 'Bodeguero', 'Rol de Bodeguero', '2026-08-11 13:46:41.480496');
 INSERT INTO public.roles (cod_rol, nombre_rol, descripcion, fecha_creacion) VALUES (4, 'Super Administrador', 'Acceso total al sistema sin restricciones', '2026-08-11 13:46:41.480496');
+INSERT INTO public.roles (cod_rol, nombre_rol, descripcion, fecha_creacion) VALUES (5, 'Vendedor', 'Gestion comercial de clientes, cotizaciones y ventas', '2026-08-13 18:14:01.388105');
 
 
 --
@@ -67,19 +68,21 @@ INSERT INTO public.roles (cod_rol, nombre_rol, descripcion, fecha_creacion) VALU
 --
 
 INSERT INTO public.usuarios (cod_usuario, nombre_usuario, contrasena, estado_usuario, creado_en, actualizado_en, token_recuperacion, expiracion_token) VALUES (4, 'bodeguero', '$2a$12$uC.cJGIPHypqY6fiNiktP.3ATl1ASVu7Uah/8PSLX88txlZZpuSXK', true, '2026-02-14 02:24:48.989813', '2026-03-18 23:57:59.947', NULL, NULL);
-INSERT INTO public.usuarios (cod_usuario, nombre_usuario, contrasena, estado_usuario, creado_en, actualizado_en, token_recuperacion, expiracion_token) VALUES (3, 'cajero', '$2a$12$MEnQj8vcOQY4sMf8khA1HuZnJ2KdVwIc.sEi9gdrUUKsJzptnEW3S', true, '2026-02-14 02:24:48.336285', '2026-03-11 06:49:25.273', NULL, NULL);
-INSERT INTO public.usuarios (cod_usuario, nombre_usuario, contrasena, estado_usuario, creado_en, actualizado_en, token_recuperacion, expiracion_token) VALUES (7, 'Mantenimiento', '$2a$12$kLAJdW1iZe9YSsmnoUYmF.PWQYzliT6S5fmqrLQgjGb6m8qhSOJ92', true, '2026-03-09 13:51:22.53057', '2026-08-11 14:34:02.327', NULL, NULL);
-INSERT INTO public.usuarios (cod_usuario, nombre_usuario, contrasena, estado_usuario, creado_en, actualizado_en, token_recuperacion, expiracion_token) VALUES (2, 'admin', '$2a$12$9niNfV50wVYznlb/1pr42uszutPNhYu0LY3BvIFWiCp13vTVI8b0y', true, '2026-02-14 02:24:47.335391', '2026-08-11 14:16:58.968', NULL, NULL);
+INSERT INTO public.usuarios (cod_usuario, nombre_usuario, contrasena, estado_usuario, creado_en, actualizado_en, token_recuperacion, expiracion_token) VALUES (7, 'Mantenimiento', '$2a$12$kLAJdW1iZe9YSsmnoUYmF.PWQYzliT6S5fmqrLQgjGb6m8qhSOJ92', true, '2026-03-09 13:51:22.53057', '2026-08-13 18:05:37.934', NULL, NULL);
+INSERT INTO public.usuarios (cod_usuario, nombre_usuario, contrasena, estado_usuario, creado_en, actualizado_en, token_recuperacion, expiracion_token) VALUES (2, 'Rudery Ortega', '$2a$12$yeHtEupmSR1ppL8yEQn/xeupi3vw/W4RguGd1QIh4I7CVh7t9WsR.', true, '2026-02-14 02:24:47.335391', '2026-08-13 17:55:58.772', NULL, NULL);
+INSERT INTO public.usuarios (cod_usuario, nombre_usuario, contrasena, estado_usuario, creado_en, actualizado_en, token_recuperacion, expiracion_token) VALUES (3, 'Genesis Ortega', '$2a$12$txTipjyZij3tViIe7XY63.dzJ0aC3m9vEpA01BpY.48A16RDJTzyW', true, '2026-02-14 02:24:48.336285', '2026-03-11 06:49:25.273', NULL, NULL);
+INSERT INTO public.usuarios (cod_usuario, nombre_usuario, contrasena, estado_usuario, creado_en, actualizado_en, token_recuperacion, expiracion_token) VALUES (8, 'vendedor', '$2a$12$lrY1Cu6UtSmlEk1hK1BhBOkoA/Zfss1O3LIfD6IpF627xUNdSZOZy', true, '2026-08-13 18:14:01.388105', '2026-08-13 18:14:01.388105', NULL, NULL);
 
 
 --
 -- Data for Name: usuarios_rol; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-INSERT INTO public.usuarios_rol (cod_usuario, cod_rol, fecha_asignacion, estado) VALUES (2, 1, '2026-02-14 02:24:47.878802', 1);
-INSERT INTO public.usuarios_rol (cod_usuario, cod_rol, fecha_asignacion, estado) VALUES (3, 2, '2026-02-14 02:24:48.565291', 1);
 INSERT INTO public.usuarios_rol (cod_usuario, cod_rol, fecha_asignacion, estado) VALUES (4, 3, '2026-02-14 02:24:49.415745', 1);
 INSERT INTO public.usuarios_rol (cod_usuario, cod_rol, fecha_asignacion, estado) VALUES (7, 4, '2026-03-09 13:51:22.702991', 1);
+INSERT INTO public.usuarios_rol (cod_usuario, cod_rol, fecha_asignacion, estado) VALUES (2, 1, '2026-08-13 18:07:08.614', 1);
+INSERT INTO public.usuarios_rol (cod_usuario, cod_rol, fecha_asignacion, estado) VALUES (3, 2, '2026-08-13 18:08:20.487', 1);
+INSERT INTO public.usuarios_rol (cod_usuario, cod_rol, fecha_asignacion, estado) VALUES (8, 5, '2026-08-13 18:14:01.388105', 1);
 
 
 --
@@ -107,7 +110,7 @@ SELECT pg_catalog.setval('public.roles_cod_rol_seq', 4, true);
 -- Name: usuarios_cod_usuario_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.usuarios_cod_usuario_seq', 7, true);
+SELECT pg_catalog.setval('public.usuarios_cod_usuario_seq', 8, true);
 
 
 --
@@ -116,4 +119,4 @@ SELECT pg_catalog.setval('public.usuarios_cod_usuario_seq', 7, true);
 
 COMMIT;
 
-\unrestrict sO0j6joi3uSJWnSIB7nbSBNiWTShNgD59n4u9hmmlMapagIJCP3EHVs6x2Kx8wp
+\unrestrict aKSX0RnQP2qym8y0Zmikeu2DZm6dwDe1a8Ux1wsuwgC3yGRbc9q7REvxq1ChNyS

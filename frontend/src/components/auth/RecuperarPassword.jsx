@@ -41,10 +41,13 @@ const RecuperarPassword = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    let activo = true;
+    let reintentoId = null;
+
     const cargar = async () => {
       try {
         const { data } = await axios.get(`${API_BASE}/api/carrusel`);
-        if (data.ok && data.datos?.length > 0) {
+        if (activo && data.ok && data.datos?.length > 0) {
           const imagenes = data.datos.map((img) => ({
             nombre: img.titulo || '',
             logo: img.imagen_url.startsWith('http') ? img.imagen_url : `${API_BASE}${img.imagen_url}`,
@@ -56,9 +59,15 @@ const RecuperarPassword = () => {
         }
       } catch (err) {
         console.error('Error cargando carrusel:', err);
+        if (activo) reintentoId = setTimeout(cargar, 3000);
       }
     };
     cargar();
+
+    return () => {
+      activo = false;
+      if (reintentoId) clearTimeout(reintentoId);
+    };
   }, []);
 
   useEffect(() => {

@@ -14,7 +14,7 @@ export const getProducto = async (req, res, next) => {
       buscar: req.query?.buscar || ''
     }); // // Obtener productos desde service
 
-    const dataFiltrada = rolUsuario === 'Cajero'
+    const dataFiltrada = ['Cajero', 'Vendedor'].includes(rolUsuario)
       ? (data || []).map((p) => {
         const sinCosto = { ...p };
         delete sinCosto.precio_costo;

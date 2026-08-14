@@ -53,7 +53,7 @@ npm run db:restore-preserved --prefix backend
 npm run db:seed --prefix backend
 ```
 
-El primer comando restaura exclusivamente los cuatro usuarios conservados, sus
+El primer comando restaura exclusivamente los cinco usuarios conservados, sus
 roles, la configuracion de J&R y las entradas del carrusel. Las contrasenas se
 guardan como hashes bcrypt; no hay contrasenas visibles en el archivo SQL.
 El restaurador usa directamente la conexion del backend y no depende de que

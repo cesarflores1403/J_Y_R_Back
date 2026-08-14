@@ -4,7 +4,8 @@ const roles = [
   [1, 'Administrador', 'Rol de Administrador'],
   [2, 'Cajero', 'Rol de Cajero'],
   [3, 'Bodeguero', 'Rol de Bodeguero'],
-  [4, 'Super Administrador', 'Acceso total al sistema sin restricciones']
+  [4, 'Super Administrador', 'Acceso total al sistema sin restricciones'],
+  [5, 'Vendedor', 'Gestion comercial de clientes, cotizaciones y ventas']
 ];
 
 export const seedSystemData = async (client, { username, passwordHash }) => {

@@ -11,16 +11,16 @@ import logoClean from '../../assets/img/logo2.jpeg';
 
 const menuItems = [
   { section: 'Principal', items: [
-    { path: '/', label: 'Dashboard', icon: <FiGrid />, roles: ['Administrador', 'Cajero', 'Bodeguero'] },
+    { path: '/', label: 'Dashboard', icon: <FiGrid />, roles: ['Administrador', 'Cajero', 'Bodeguero', 'Vendedor'] },
   ]},
   { section: 'Comercial', items: [
-    { path: '/clientes', label: 'Clientes', icon: <FiUsers />, roles: ['Administrador', 'Cajero'] },
-    { path: '/facturas', label: 'Facturación', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
-    { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiClipboard />, roles: ['Administrador', 'Cajero'] },
-    { path: '/notas-credito', label: 'Notas de Crédito', icon: <FiFileText />, roles: ['Administrador', 'Cajero'] },
+    { path: '/clientes', label: 'Clientes', icon: <FiUsers />, roles: ['Administrador', 'Cajero', 'Vendedor'] },
+    { path: '/facturas', label: 'Facturación', icon: <FiFileText />, roles: ['Administrador', 'Cajero', 'Vendedor'] },
+    { path: '/cotizaciones', label: 'Cotizaciones', icon: <FiClipboard />, roles: ['Administrador', 'Cajero', 'Vendedor'] },
+    { path: '/notas-credito', label: 'Notas de Crédito', icon: <FiFileText />, roles: ['Administrador', 'Cajero', 'Vendedor'] },
   ]},
   { section: 'Catálogo', items: [
-    { path: '/productos', label: 'Productos', icon: <FiPackage />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
+    { path: '/productos', label: 'Productos', icon: <FiPackage />, roles: ['Administrador', 'Bodeguero', 'Cajero', 'Vendedor'] },
     { path: '/categorias', label: 'Categorías', icon: <FiTag />, roles: ['Administrador'] },
   ]},
   { section: 'Inventario', items: [
@@ -32,7 +32,7 @@ const menuItems = [
     { path: '/inventario/bajas', label: 'Bajas', icon: <FiAlertTriangle />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/transferencias', label: 'Transferencias', icon: <FiRepeat />, roles: ['Administrador', 'Bodeguero'] },
     { path: '/inventario/conteos', label: 'Conteos', icon: <FiClipboard />, roles: ['Administrador', 'Bodeguero'] },
-    { path: '/inventario/reservas', label: 'Reservas', icon: <FiLock />, roles: ['Administrador', 'Bodeguero', 'Cajero'] },
+    { path: '/inventario/reservas', label: 'Reservas', icon: <FiLock />, roles: ['Administrador', 'Bodeguero', 'Cajero', 'Vendedor'] },
   ]},
   { section: 'Compras', items: [
     { path: '/proveedores', label: 'Proveedores', icon: <FiTruck />, roles: ['Administrador', 'Bodeguero'] },

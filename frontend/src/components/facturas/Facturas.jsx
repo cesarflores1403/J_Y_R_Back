@@ -143,7 +143,7 @@ const ListaFacturas = ({ onNuevaProductos, onNuevaReparacion, onVer }) => {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h3 className="mb-0"><FiFileText className="me-2" />Facturación</h3>
-        {['Administrador', 'Cajero'].includes(usuario?.rol) && (
+        {['Administrador', 'Cajero', 'Vendedor'].includes(usuario?.rol) && (
           <div className="d-flex gap-2 flex-wrap justify-content-end">
             <button className="btn jyr-btn-primary" onClick={onNuevaProductos}>
               <FiPlus className="me-2" />Nueva Factura Productos

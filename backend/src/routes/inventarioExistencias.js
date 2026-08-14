@@ -13,7 +13,7 @@ import { listarReservas, crearReserva, liberarReserva, consumirReserva, exportar
 
 const router = Router();
 const ROLES_INVENTARIO = ['Administrador', 'Bodeguero'];
-const ROLES_RESERVAS = ['Administrador', 'Bodeguero', 'Cajero'];
+const ROLES_RESERVAS = ['Administrador', 'Bodeguero', 'Cajero', 'Vendedor'];
 
 // // Todas las rutas de existencias requieren autenticacion
 router.use(autenticar);

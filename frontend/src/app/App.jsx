@@ -64,15 +64,15 @@ const App = () => {
             {/* // Submodulo de Inventario para conteo fisico completo */}
             <Route path="inventario/conteos" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><InventarioConteosPage /></PrivateRoute>} />
             {/* // Submodulo de Inventario para reservas de inventario */}
-            <Route path="inventario/reservas" element={<PrivateRoute roles={['Administrador', 'Bodeguero', 'Cajero']}><InventarioReservasPage /></PrivateRoute>} />
-            <Route path="clientes" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Clientes /></PrivateRoute>} />
-            <Route path="facturas" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Facturas /></PrivateRoute>} />
-            <Route path="cotizaciones" element={<PrivateRoute roles={['Administrador', 'Cajero']}><Cotizaciones /></PrivateRoute>} />
+            <Route path="inventario/reservas" element={<PrivateRoute roles={['Administrador', 'Bodeguero', 'Cajero', 'Vendedor']}><InventarioReservasPage /></PrivateRoute>} />
+            <Route path="clientes" element={<PrivateRoute roles={['Administrador', 'Cajero', 'Vendedor']}><Clientes /></PrivateRoute>} />
+            <Route path="facturas" element={<PrivateRoute roles={['Administrador', 'Cajero', 'Vendedor']}><Facturas /></PrivateRoute>} />
+            <Route path="cotizaciones" element={<PrivateRoute roles={['Administrador', 'Cajero', 'Vendedor']}><Cotizaciones /></PrivateRoute>} />
             <Route path="proveedores" element={<PrivateRoute roles={['Administrador', 'Bodeguero']}><Proveedores /></PrivateRoute>} />
             <Route path="reportes" element={<PrivateRoute roles={['Administrador']}><Reportes /></PrivateRoute>} />
             <Route path="carrusel" element={<PrivateRoute roles={['Administrador']}><CarruselPage /></PrivateRoute>} />
             <Route path="auditoria-facturacion" element={<PrivateRoute roles={['Administrador']}><AuditoriaFacturacion /></PrivateRoute>} />
-            <Route path="notas-credito" element={<PrivateRoute roles={['Administrador', 'Cajero']}><NotasCredito /></PrivateRoute>} />
+            <Route path="notas-credito" element={<PrivateRoute roles={['Administrador', 'Cajero', 'Vendedor']}><NotasCredito /></PrivateRoute>} />
             <Route path="usuarios" element={<PrivateRoute roles={['Administrador']}><Usuarios /></PrivateRoute>} />
             <Route path="compras/ordenes" element={<PrivateRoute roles={['Administrador','Bodeguero']}><OrdenesCompra /></PrivateRoute>} />
             <Route path="config-empresa" element={<PrivateRoute roles={['Super Administrador']}><ConfigEmpresa /></PrivateRoute>} />

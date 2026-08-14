@@ -65,7 +65,7 @@ try {
   `);
   const result = verification.rows[0];
 
-  if (result.usuarios !== 4 || result.usuarios_rol !== 4 ||
+  if (result.usuarios !== 5 || result.usuarios_rol !== 5 ||
       result.empresa_config !== 1 || result.carrusel !== 9) {
     throw new Error(`Verificacion inesperada: ${JSON.stringify(result)}`);
   }

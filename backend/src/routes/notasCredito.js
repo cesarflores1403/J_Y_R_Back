@@ -28,7 +28,7 @@ const validarCrearNC = [
   body('items.*.cantidad_devuelta').isInt({ min: 1 }).withMessage('cantidad_devuelta debe ser >= 1'),
   validarCampos
 ];
-router.post('/', autorizar('Administrador', 'Cajero'), validarCrearNC, crear);
+router.post('/', autorizar('Administrador', 'Cajero', 'Vendedor'), validarCrearNC, crear);
 
 // Anular nota de crédito (solo Administrador)
 router.patch('/:id/anular', autorizar('Administrador'), anular);
